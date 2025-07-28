@@ -1,0 +1,25 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "start-blazor",
+            "type": "shell",
+            "command": "dotnet",
+            "args": ["watch", "run", "--urls=http://0.0.0.0:5000;https://0.0.0.0:5001"],
+            "options": {
+                "cwd": "${workspaceFolder}/VSM/VSM.Client"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

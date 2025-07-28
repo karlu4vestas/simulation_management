@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch and Debug Blazor WebAssembly",
+            "type": "blazorwasm",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/VSM/VSM.Client",
+            "browser": "chrome"
+        }
+    ]
+}

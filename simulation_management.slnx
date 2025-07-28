@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/VSM/">
+    <Project Path="VSM/QuickGridToolkit/QuickGridToolkit.csproj" />
+    <Project Path="VSM/VSM.Client/VSM.Client.csproj" />
+    <Project Path="VSM/VSM/VSM.csproj" />
+  </Folder>
+</Solution>

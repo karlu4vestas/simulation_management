@@ -1,4 +1,3 @@
-
 using Microsoft.FluentUI.AspNetCore.Components;
 using VSM.Client.Pages;
 using VSM.Components;
@@ -39,6 +38,5 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(VSM.Client._Imports).Assembly);
-
 
 app.Run();
