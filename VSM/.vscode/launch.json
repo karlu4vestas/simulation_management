@@ -23,5 +23,29 @@
         "args": "http://localhost:5000"
       }
     }
+    ,
+    {
+      "name": ".NET 9 Attach to VSM Server",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickProcess}",
+      "justMyCode": true
+    }
+    ,
+    {
+      "name": "Debug Blazor WebAssembly in Chrome",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5000",
+      "webRoot": "${workspaceFolder}/VSM.Client"
+    }
+    ,
+    {
+      "name": "Debug Blazor WebAssembly in Edge",
+      "type": "edge",
+      "request": "launch",
+      "url": "http://localhost:5000",
+      "webRoot": "${workspaceFolder}/VSM.Client"
+    }
   ]
 }
