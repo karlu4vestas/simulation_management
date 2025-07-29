@@ -23,17 +23,25 @@
 			}
 		}
 	},
+    "hostRequirements": {
+        "memory": "8gb",
+        "cpus": 2
+    },
+    "remoteEnv": {
+        "DOTNET_MULTILEVEL_LOOKUP": "0",
+        "TARGET": "net9.0"
+    },
 	"forwardPorts": [5000, 5001],
-	"portsAttributes": {
-		"5001": {
-			"label": "Blazor HTTPS",
-			"onAutoForward": "notify"
-		},
-		"5000": {
-			"label": "Blazor HTTP",
-			"onAutoForward": "notify"
-		}
-	},
-	"postCreateCommand": "dotnet restore simulation_management.sln && wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add - && echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' | sudo tee /etc/apt/sources.list.d/google.list && sudo apt-get update && sudo apt-get install -y google-chrome-stable",
-	"remoteUser": "vscode"
+    "portsAttributes": {
+        "5000": {
+            "label": "API",
+            "onAutoForward": "notify"
+        },
+        "5001": {
+            "label": "Front End",
+            "onAutoForward": "notify"
+        }
+    },
+
+    "postCreateCommand": "dotnet new install Aspire.ProjectTemplates && dotnet restore simulation_management.slnx"
 }

@@ -7,6 +7,12 @@
             "request": "launch",
             "cwd": "${workspaceFolder}/VSM/VSM.Client",
             "browser": "chrome"
+        },
+        {
+            "name": "C#: VSM.Client [Default Configuration]",
+            "type": "dotnet",
+            "request": "launch",
+            "projectPath": "${workspaceFolder}/VSM/VSM.Client/VSM.Client.csproj"
         }
     ]
 }
