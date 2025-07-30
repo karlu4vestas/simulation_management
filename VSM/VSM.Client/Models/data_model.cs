@@ -54,55 +54,41 @@ namespace VSM.Client.Datamodel
                     new RootFolder
                     {
                         Id = rootId,
-                        Users = new List<User> { user },
-                        root_path = "\\\\domain.net\\root_1"
+                        Is_registeredfor_cleanup = true,
+                        Users = new List<User> {user, new User("jajac"), new User("misve") },
+                        Root_path = "\\\\domain.net\\root_1"
                     });
 
                 rootFolders.Add(
                     new RootFolder
                     {
                         Id = ++rootId,
-                        Users = new List<User> { user },
-                        root_path = "\\\\domain.net\\root_2"
+                        Is_registeredfor_cleanup = true,
+                        Users = new List<User> {user, new User("stefw"), new User("misve") },
+                        Root_path = "\\\\domain.net\\root_2"
+                    });
+
+                rootFolders.Add(
+                    new RootFolder
+                    {
+                        Id = rootId,
+                        Users = new List<User> {user, new User("facap"), new User("misve") },
+                        Root_path = "\\\\domain.net\\root_3"
+
+                    });
+
+                rootFolders.Add(
+                    new RootFolder
+                    {
+                        Id = ++rootId,
+                        Users = new List<User> { user, new User("caemh"), new User("arlem") },
+                        Root_path = "\\\\domain.net\\root_4"
                     });
 
             }
             return rootFolders;
         }
 
-        private static List<RootFolder> un_registered_rootFolders = new();
-        public List<RootFolder> GetUnRegisteredRootFolders()
-        {
-            User? user = GetLoggedInUser();
-
-            if (user is null)
-            {
-                return new List<RootFolder>();
-            }
-
-            if (un_registered_rootFolders.Count == 0)
-            {
-
-                int rootId = 3;
-                un_registered_rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = rootId,
-                        Users = new List<User> { user },
-                        root_path = "\\\\domain.net\\root_3"
-                    });
-
-                un_registered_rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = ++rootId,
-                        Users = new List<User> { user },
-                        root_path = "\\\\domain.net\\root_4"
-                    });
-
-            }
-            return un_registered_rootFolders;
-        }
 
         public bool RegisterRootFolder(RootFolder rootFolder)
         {
@@ -110,15 +96,8 @@ namespace VSM.Client.Datamodel
             {
                 return false;
             }
-            List<RootFolder> registered_root_folders = GetRootFoldersForUser();
-            //ignore if the root folder is already registered.
-            if (registered_root_folders.Any(r => r.root_path == rootFolder.root_path))
-            {
-                return false;
-            }
+            rootFolder.Is_registeredfor_cleanup = true;
 
-            registered_root_folders.Add(rootFolder);
-            un_registered_rootFolders.RemoveAll(r => r.Id == rootFolder.Id);
             return true;
         }
 
@@ -131,7 +110,7 @@ namespace VSM.Client.Datamodel
             {
                 Id = idCounter,
                 ParentId = idCounter,
-                Name = root.root_path,
+                Name = root.Root_path,
                 IsExpanded = true,
                 Level = 0,
                 Attributs = AttributeRow.GenerateAttributeRow(idCounter),

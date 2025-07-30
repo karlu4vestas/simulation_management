@@ -4,42 +4,40 @@
 @using VSM.Client.Datamodel
 
 <h3>Retention settings</h3>
-<div class="grid">
-    <div class="grid">
-        @*<QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Style="height: 480px; width: 100%;"*@
-        <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" >
-            <TemplateColumn TGridItem="Folder" Title="Tree-Name" >
-                <ChildContent Context="item">
-                    <div style="padding-left:@(item.Level * 15)px;">
-                        @if (item.Children.Count() > 0)
-                        {
-                            <button class="e-flat" @onclick="() => ToggleExpand(item)">
-                                @(item.IsExpanded ? "▾" : "▸")
-                            </button>
-                        }
-                        @item.Name
-                    </div>
-                </ChildContent>
-            </TemplateColumn>
-            <PropertyColumn Property="@(item => item.Attributs.Review)" />
-            <PropertyColumn Property="@(item => item.Attributs.Path)" />
-            <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
-            <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
-            <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
-            <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
-
-        </QuickGrid>
-    </div>
-</div>
 <div class="master-detail">
     <div class="master">
+        <hr />
+        <div class="grid">
+            @*<QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Style="height: 480px; width: 100%;"*@
+            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ShowHover="true">
+                <TemplateColumn TGridItem="Folder" Title="Folders">
+                    <ChildContent Context="item">
+                        <div style="padding-left:@(item.Level * 15)px;">
+                            @if (item.Children.Count() > 0)
+                            {
+                                <button class="e-flat" @onclick="() => ToggleExpand(item)">
+                                    @(item.IsExpanded ? "▾" : "▸")
+                                </button>
+                            }
+                            @item.Name
+                        </div>
+                    </ChildContent>
+                </TemplateColumn>
+                <PropertyColumn Property="@(item => item.Attributs.Review)" />
+                <PropertyColumn Property="@(item => item.Attributs.Path)" />
+                <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
+                <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
+                <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
+                <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
+
+            </QuickGrid>
+        </div>
     </div>
     <div class="detail">
         <div class="property-panel-content" Style="height: 280px; width: 100%;">
+            <hr />
             <table id="property" class="property-panel-table">
-                <!-- Detail table content here -->
-                <h3>For settings Retentions</h3>
-
+                <h2> Detail panel for settings retentions</h2>
             </table>
         </div>
     </div>
@@ -98,13 +96,13 @@
         return result;
     }
 
-    /*    private void OnCellClick(DataGridCell<Folder> args)
+    /* private void OnCellClick(DataGridCell<Folder> args)
     {
     // Store the clicked item in current_cell for further processing
     current_cell = args.Item as Folder;
     selected_folder_name = current_cell?.Name ?? "No folder selected";
     selected_retention = $"{args.GridColumn},{args.Element}";
-    
+
 
     // Optionally, you can perform additional actions based on the clicked item
     // For example, you can update a property or trigger an event

@@ -3,47 +3,58 @@
 @using Microsoft.FluentUI.AspNetCore.Components
 @using VSM.Client.Datamodel
 
-<h3>Tree FluentDataGrid</h3>
+<h3>Retention settings</h3>
 
-<FluentBodyContent>
-    <div class="grid">
-        <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize="30"
-            DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
-            <TemplateColumn TGridItem="Folder" Title="Tree-Name" Width="350px">
-                <ChildContent Context="item">
-                    <div style="padding-left:@(item.Level * 15)px;">
-                        @if (item.Children.Count() > 0)
-                        {
-                            <button class="e-flat" @onclick="() => ToggleExpand(item)">
-                                @(item.IsExpanded ? "▾" : "▸")
-                            </button>
-                        }
-                        @item.Name
-                    </div>
-                </ChildContent>
-            </TemplateColumn>
+<FluentStack Orientation="Orientation.Vertical">
+    <FluentBodyContent>
+        <hr />
+        <div class="grid">
+            <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize ="25"  
+                ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
+                GenerateHeader="@GenerateHeaderOption.Sticky">
+                <TemplateColumn TGridItem="Folder" Title="Folders" Width="350px">
+                    <ChildContent Context="item">
+                        <div style="padding-left:@(item.Level * 15)px;">
+                            @if (item.Children.Count() > 0)
+                            {
+                                <button class="e-flat" @onclick="() => ToggleExpand(item)">
+                                    @(item.IsExpanded ? "▾" : "▸")
+                                </button>
+                            }
+                            @item.Name
+                        </div>
+                    </ChildContent>
+                </TemplateColumn>
 
-            <TemplateColumn Title="Review_B">
-                <ChildContent Context="item">
-                    <FluentButton Appearance="Appearance.Neutral" @onclick="@(() => button_click(item))">@item.Name</FluentButton>
-                </ChildContent>
-            </TemplateColumn>
-            <PropertyColumn Property="@(item => item.Attributs.Review)" />
-            <PropertyColumn Property="@(item => item.Attributs.Path)" />
-            <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
-            <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
-            <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
-            <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
-        </FluentDataGrid>
-    </div>
-</FluentBodyContent>
+                <TemplateColumn Title="Review_B">
+                    <ChildContent Context="item">
+                        <FluentButton Appearance="Appearance.Neutral" @onclick="@(() => button_click(item))">@item.Name
+                        </FluentButton>
+                    </ChildContent>
+                </TemplateColumn>
+                <PropertyColumn Property="@(item => item.Attributs.Review)" />
+                <PropertyColumn Property="@(item => item.Attributs.Path)" />
+                <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
+                <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
+                <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
+                <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
+            </FluentDataGrid>
+        </div>
+    </FluentBodyContent>
+    <FluentBodyContent>
+        <hr />
+                <h2> Detail panel for settings retentions</h2>
+
+    </FluentBodyContent>
+
+</FluentStack>
 @code {
-/*
-            <TemplateColumn Title="Review_B">
-                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Name(context))">Regular</FluentButton>
-            </TemplateColumn>
-*/
-    FluentDataGrid<Folder> ?grid;
+    /*
+    <TemplateColumn Title="Review_B">
+    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Name(context))">Regular</FluentButton>
+    </TemplateColumn>
+    */
+    FluentDataGrid<Folder>? grid;
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
     private RootFolder? rootFolder;
@@ -114,7 +125,7 @@
     {
         //Console.WriteLine($"Cell focused : {cell.GridColumn}, {cell.Column.Title}");
         Console.WriteLine($"Cell focused : {cell.GridColumn}");
-        
+
     }
     /*
 

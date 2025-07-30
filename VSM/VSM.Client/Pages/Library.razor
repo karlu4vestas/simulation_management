@@ -6,50 +6,102 @@
 
 <PageTitle>Library</PageTitle>
 
+<FluentStack Orientation="Orientation.Vertical">
 
+    <div style="display:flex">
+        <p>Login to access your simulations:</p>
+        <FluentTextField @bind-Value="user_initials" Placeholder="your initials"></FluentTextField>
 
-<div style="display:flex">
-    <p>Login to access your simulations:</p>
-    <FluentTextField @bind-Value="user_initials" Placeholder="your initials"></FluentTextField>
+        <FluentButton OnClick="@StartLoadingAsync" Appearance="Appearance.Accent">Login</FluentButton>
 
-    <FluentButton OnClick="@StartLoadingAsync" Appearance="Appearance.Accent">Login</FluentButton>
+    </div>
 
-</div>
-
-@if (is_logged_in)
-{
-    <h4>Add a new root folder</h4>
-    <FluentCombobox AriaLabel="Root folder" Items="@unregistered_rootFolders.Select(r => r.root_path).ToList()"
-        @bind-Value="@selected_unregistered_rootFolder_name" Height="200px" />
-    @if (selected_unregistered_rootFolder_name != null && selected_unregistered_rootFolder_name.Length > 0)
+    @if (is_logged_in)
     {
+        <FluentBodyContent>
+            <hr />
+            <div class="grid">
+                <FluentDataGrid @ref="grid" Items="@rootFolders.AsQueryable()" TGridItem="RootFolder"
+                    OnRowClick="HandleRowClick" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
+                    GenerateHeader="@GenerateHeaderOption.Sticky">
 
-        register_new_rootFolder(selected_unregistered_rootFolder_name);
-        selected_unregistered_rootFolder_name = null;
+                    <PropertyColumn Property="@(folder => folder.Root_path)" />
+
+                    <TemplateColumn Title="Owners">
+                        <ChildContent Context="folder">
+                            @string.Join(", ", folder.Users.Select(u => u.Initials))
+                        </ChildContent>
+                    </TemplateColumn>
+
+
+                    <TemplateColumn Title="Active cleanup">
+                        <ChildContent Context="folder">
+                            @(folder.Is_registeredfor_cleanup ? "X" : "")
+                        </ChildContent>
+                    </TemplateColumn>
+
+                    <TemplateColumn Title="Go to Retention">
+                        <ChildContent Context="folder">
+                            @if (folder.Is_registeredfor_cleanup)
+                            {
+                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Retentions
+                                </FluentButton>
+                            }
+                            else
+                            {
+                                <FluentButton Appearance="Appearance.Neutral" Disabled="true">-</FluentButton>
+                            }
+                        </ChildContent>
+                    </TemplateColumn>
+                </FluentDataGrid>
+            </div>
+
+        </FluentBodyContent>
+        <FluentBodyContent>
+            <hr />
+            @if (selected_root_folder != null)
+            {
+                string ownerstring = string.Join(", ", selected_root_folder.Users.Select(u => u.Initials));
+                <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span> @selected_root_folder.Root_path  </div>
+                <p></p>
+                <div style="display:flex"><span style="width: 80px; display: inline-block;">Owners:</span> @ownerstring AriaLabel</div>
+                <p></p>
+                string toggle_subscription = selected_root_folder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" : "Subscribe to cleanup";
+                <div style="display:flex">Change the subscription to the cleanup process:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<FluentButton Appearance="Appearance.Accent"
+                        @onclick="@(() => ToggleCleanupProcess(selected_root_folder))">@toggle_subscription</FluentButton>
+                </div>
+
+            }
+        </FluentBodyContent>
+
     }
 
-    <h1>Simulations libraries that @user_initials has access to:</h1>
-
-    <FluentListbox Items=@rootFolders OptionText="@(r => r.root_path)" @bind-Value="@selected_root_path" />
-    <p> Going to retention page for: @selected_root_path<br /></p>
-
-    @if (selected_root_path != null && selected_root_path.Length > 0)
-    {
-        SelectRootFolder(selected_root_path);
-    }
-}
-
+</FluentStack>
 @code {
-    string? selected_root_path;
+    FluentDataGrid<RootFolder>? grid;
+    RootFolder? selected_root_folder;
 
     string? user_initials;
     bool is_logged_in = false;
 
-    List<RootFolder> unregistered_rootFolders = new List<RootFolder>();
-    string? selected_unregistered_rootFolder_name;
 
     List<RootFolder> rootFolders = new List<RootFolder>();
 
+    /*
+    //---------test start--------
+    bool DeferredLoading = false;
+    TabSize size=TabSize.Large;
+
+    string? activeid = "tab-3";
+    FluentTab? changedto;
+
+    private void HandleOnTabChange(FluentTab tab)
+    {
+    changedto = tab;
+    }
+
+    //------test slut--------
+    */
     private void Login()
     {
         user_initials = user_initials ?? "";
@@ -70,27 +122,26 @@
     private void UpdateFolders()
     {
         rootFolders = DataModel.Instance.GetRootFoldersForUser();
-        unregistered_rootFolders = DataModel.Instance.GetUnRegisteredRootFolders();
 
     }
-
-    private void register_new_rootFolder(string new_rootFolder_name)
+    private void HandleRowClick(FluentDataGridRow<RootFolder> row)
     {
-        RootFolder? root_folder = unregistered_rootFolders.Where(r => r.root_path == new_rootFolder_name).FirstOrDefault();
-
+        if (row.Item != null)
+        {
+            Console.WriteLine($"Row clicked: {row.Item.Root_path}");
+            selected_root_folder = row.Item;
+        }
+    }
+    private void ToggleCleanupProcess(RootFolder root_folder)
+    {
         if (root_folder != null)
         {
-            bool success = DataModel.Instance.RegisterRootFolder(root_folder);
-            if (success)
-            {
-                UpdateFolders();
-            }
+            root_folder.Is_registeredfor_cleanup = !root_folder.Is_registeredfor_cleanup;
         }
     }
 
-    private void SelectRootFolder(string root_path)
+    private void Go2retention(RootFolder root_folder)
     {
-        RootFolder? root_folder = rootFolders.Where(r => r.root_path == root_path).FirstOrDefault();
         if (root_folder != null)
         {
             DataModel.Instance.SetRootFolder(root_folder);
