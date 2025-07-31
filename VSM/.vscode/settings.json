@@ -1,1 +1,94 @@
-{}
+{
+    "editor.quickSuggestions": {
+        "other": false,
+        "comments": false,
+        "strings": false
+    },
+    "editor.suggestOnTriggerCharacters": false,
+    "editor.acceptSuggestionOnEnter": "off",
+    "editor.acceptSuggestionOnCommitCharacter": false,
+    "editor.wordBasedSuggestions": "off",
+    "editor.parameterHints.enabled": false,
+    "editor.suggest.snippetsPreventQuickSuggestions": true,
+    "csharp.semanticHighlighting.enabled": true,
+    "editor.hover.enabled": false,
+    "editor.lightbulb.enabled": "off",
+    "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": false,
+    // Additional settings to make autocompletion even less aggressive
+    "editor.suggest.showMethods": false,
+    "editor.suggest.showFunctions": false,
+    "editor.suggest.showVariables": false,
+    "editor.suggest.showFields": false,
+    "editor.suggest.showKeywords": false,
+    "editor.suggest.showSnippets": false,
+    "editor.suggest.showClasses": false,
+    "editor.suggest.showInterfaces": false,
+    "editor.suggest.showModules": false,
+    "editor.suggest.showProperties": false,
+    "editor.suggest.showValues": false,
+    "editor.suggest.showConstants": false,
+    "editor.suggest.showEnums": false,
+    "editor.suggest.showEnumMembers": false,
+    "editor.suggest.showEvents": false,
+    "editor.suggest.showOperators": false,
+    "editor.suggest.showReferences": false,
+    "editor.suggest.showColors": false,
+    "editor.suggest.showFiles": false,
+    "editor.suggest.showFolders": false,
+    "editor.suggest.showTypeParameters": false,
+    "editor.suggest.showIssues": false,
+    "editor.suggest.showUsers": false,
+    "editor.suggest.insertMode": "replace",
+    "editor.suggest.filterGraceful": false,
+    "editor.suggest.localityBonus": false,
+    "editor.suggest.shareSuggestSelections": false,
+    "editor.tabCompletion": "off",
+    "editor.suggest.showStatusBar": false,
+    
+    // Additional settings to disable more autocomplete sources
+    "editor.suggest.showWords": false,
+    "editor.inlineSuggest.enabled": false,
+    "editor.inlineSuggest.showToolbar": "never",
+    
+    // GitHub Copilot specific settings
+    "github.copilot.enable": {
+        "*": false,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false,
+        "csharp": false,
+        "razor": false,
+        "aspnetcorerazor": false
+    },
+    "github.copilot.editor.enableAutoCompletions": false,
+    "github.copilot.advanced": {
+        "secret_key": "editor.action.inlineSuggest.trigger",
+        "length": 500,
+        "temperature": "",
+        "top_p": "",
+        "stop": {
+            "*": ["\n\n\n"]
+        }
+    },
+    
+    // C# specific settings
+    "csharp.inlayHints.enableInlayHintsForLiteralParameters": false,
+    "csharp.inlayHints.enableInlayHintsForIndexerParameters": false,
+    "csharp.inlayHints.enableInlayHintsForObjectCreationParameters": false,
+    "csharp.inlayHints.enableInlayHintsForOtherParameters": false,
+    "csharp.inlayHints.enableInlayHintsForParameters": false,
+    "csharp.inlayHints.enableInlayHintsForTypes": false,
+    "csharp.suppressHiddenDiagnostics": true,
+    
+    // Razor/Blazor specific settings
+    "razor.completion.commitElementsWithSpace": false,
+    "html.suggest.html5": false,
+    "html.autoClosingTags": false,
+    "html.autoCreateQuotes": false,
+    
+    // IntelliCode settings
+    "vsintellicode.modify.editor.suggestSelection": "off",
+    "vsintellicode.features.python.deepLearning": "disabled",
+    "vsintellicode.features.typescript.deepLearning": "disabled",
+    "vsintellicode.features.csharp.deepLearning": "disabled"
+}

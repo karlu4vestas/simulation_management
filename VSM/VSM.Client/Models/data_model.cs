@@ -104,7 +104,6 @@ namespace VSM.Client.Datamodel
         //return the folder hierarchy that match the path to the rootfolder.
         public Folder GenerateFolderTreeForRootFolder(RootFolder root)
         {
-
             int idCounter = 1;
             Folder the_root_folder = new Folder
             {
@@ -113,8 +112,8 @@ namespace VSM.Client.Datamodel
                 Name = root.Root_path,
                 IsExpanded = true,
                 Level = 0,
-                Attributs = AttributeRow.GenerateAttributeRow(idCounter),
-                Attributs2 = AttributeRow2.GenerateAttributeRow(idCounter),
+                Attributs    = AttributeRow.GenerateAttributeRow(idCounter),
+                AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
             };
 
             idCounter = the_root_folder.Id;
@@ -135,8 +134,8 @@ namespace VSM.Client.Datamodel
                         Name = $"Node {r}.{level}",
                         //IsExpanded = true,
                         Level = level,
-                        Attributs = AttributeRow.GenerateAttributeRow(childId),
-                        Attributs2 = AttributeRow2.GenerateAttributeRow(childId),
+                        Attributs    = AttributeRow.GenerateAttributeRow(childId),
+                        AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
                     };
 
                     parent.Children.Add(child);

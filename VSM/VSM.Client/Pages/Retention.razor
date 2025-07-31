@@ -9,7 +9,7 @@
         <hr />
         <div class="grid">
             @*<QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Style="height: 480px; width: 100%;"*@
-            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ShowHover="true">
+            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" >
                 <TemplateColumn TGridItem="Folder" Title="Folders">
                     <ChildContent Context="item">
                         <div style="padding-left:@(item.Level * 15)px;">
@@ -95,17 +95,4 @@
 
         return result;
     }
-
-    /* private void OnCellClick(DataGridCell<Folder> args)
-    {
-    // Store the clicked item in current_cell for further processing
-    current_cell = args.Item as Folder;
-    selected_folder_name = current_cell?.Name ?? "No folder selected";
-    selected_retention = $"{args.GridColumn},{args.Element}";
-
-
-    // Optionally, you can perform additional actions based on the clicked item
-    // For example, you can update a property or trigger an event
-    //StateHasChanged(); // Refresh the UI if needed
-    }*/
 }

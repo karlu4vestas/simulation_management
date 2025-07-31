@@ -11,8 +11,7 @@ namespace VSM.Client.Datamodel
         //public bool IsChildrenLoaded { get; set; } = false;
         public List<Folder> Children { get; set; } = new List<Folder>();
         public AttributeRow Attributs { get; set; } = new();
-        public AttributeRow2 Attributs2 { get; set; } = new();
-
+        public Dictionary<string, int> AttributDict { get; set; } = new();
     }
 
     // retention row calculated from the retention in the folder hierarchy 
@@ -39,11 +38,25 @@ namespace VSM.Client.Datamodel
                 _2026_Q2 = rand.Next(0, 100).ToString()
             };
         }
+        public static Dictionary<string, int> GenerateRetentionDict(int random_seed)
+        {
+            var rand = new Random(random_seed);
+            Dictionary<string, int> retentions = new Dictionary<string, int>();
+            List<string> Titles = new List<string>(["Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"]);
+
+            foreach (var t in Titles)
+            {
+                retentions.Add(t, rand.Next(0, 100));
+            }
+            return retentions;
+        }
+
     }
-    public class AttributeRow2
+    /*public class AttributeRow2
     {
         public int Id { get; set; } // treenode id
 
+        public Dictionary<string, int> Retentions { get; set; } = new Dictionary<string, int>
         public List<string> Titles { get; set; } = new List<string>();
         public List<string> Values { get; set; } = new List<string>();
         public static AttributeRow2 GenerateAttributeRow(int id)
@@ -64,10 +77,10 @@ namespace VSM.Client.Datamodel
             };
             return r2;
         }
-    }
+    }*/
 
     public class Folder : TreeNode
     {
-        public string Retention { get; set; } = "";
+        //public string Retention { get; set; } = "";
     }
 }

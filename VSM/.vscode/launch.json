@@ -17,10 +17,6 @@
       },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      },
-      "launchBrowser": {
-        "enabled": true,
-        "args": "http://localhost:5000"
       }
     }
     ,

@@ -12,7 +12,7 @@
 ::deep thead {
     position: sticky;
     top: 0;
-    background-color: #d8d8d8;
+    background-color: #616060;
     outline: 1px solid gray;
     z-index: 1;
 }
