@@ -5,7 +5,6 @@
     <Platform Name="x86" />
   </Configurations>
   <Folder Name="/VSM_client_server/" />
-  <Project Path="QuickGridToolkit/QuickGridToolkit.csproj" />
   <Project Path="VSM.Client/VSM.Client.csproj" />
   <Project Path="VSM/VSM.csproj" />
 </Solution>
