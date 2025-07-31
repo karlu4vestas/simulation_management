@@ -8,6 +8,7 @@
     min-width: 100%;
 }
 
+
 /* Sticky header while scrolling */
 ::deep thead {
     position: sticky;
