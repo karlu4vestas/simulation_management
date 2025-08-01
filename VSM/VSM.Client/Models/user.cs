@@ -6,7 +6,7 @@ namespace VSM.Client.Datamodel
         {
             Initials = initials;
         }
-        public int Id { get; set; }
+
         public string Initials { get; set; }
     }
 }

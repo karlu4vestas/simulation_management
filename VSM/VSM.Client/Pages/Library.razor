@@ -7,22 +7,22 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
+    @if (!is_logged_in)
+    {
+        <div style="display:flex">
+            <p>Login to access your simulations:</p>
+            <FluentTextField @bind-Value="@user" Placeholder="your initials"></FluentTextField>
 
-    <div style="display:flex">
-        <p>Login to access your simulations:</p>
-        <FluentTextField @bind-Value="user_initials" Placeholder="your initials"></FluentTextField>
-
-        <FluentButton OnClick="@StartLoadingAsync" Appearance="Appearance.Accent">Login</FluentButton>
-
-    </div>
-
-    @if (is_logged_in)
+            <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
+        </div>
+    }
+    else
     {
         <FluentBodyContent>
             <hr />
             <div class="grid">
                 <FluentDataGrid @ref="grid" Items="@rootFolders.AsQueryable()" TGridItem="RootFolder"
-                    OnRowClick="HandleRowClick" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
+                    OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
                     GenerateHeader="@GenerateHeaderOption.Sticky">
 
                     <PropertyColumn Property="@(folder => folder.Root_path)" />
@@ -62,13 +62,17 @@
             @if (selected_root_folder != null)
             {
                 string ownerstring = string.Join(", ", selected_root_folder.Users.Select(u => u.Initials));
-                <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span> @selected_root_folder.Root_path  </div>
+                <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span>
+                    @selected_root_folder.Root_path </div>
                 <p></p>
-                <div style="display:flex"><span style="width: 80px; display: inline-block;">Owners:</span> @ownerstring AriaLabel</div>
+                <div style="display:flex"><span style="width: 80px; display: inline-block;">Owners:</span> @ownerstring
+                    AriaLabel</div>
                 <p></p>
-                string toggle_subscription = selected_root_folder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" : "Subscribe to cleanup";
-                <div style="display:flex">Change the subscription to the cleanup process:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<FluentButton Appearance="Appearance.Accent"
-                        @onclick="@(() => ToggleCleanupProcess(selected_root_folder))">@toggle_subscription</FluentButton>
+                string toggle_subscription = selected_root_folder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" :
+                "Subscribe to cleanup";
+                <div style="display:flex">Change the subscription to the cleanup process:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => ToggleCleanupProcess(selected_root_folder))">
+                        @toggle_subscription</FluentButton>
                 </div>
 
             }
@@ -81,54 +85,31 @@
     FluentDataGrid<RootFolder>? grid;
     RootFolder? selected_root_folder;
 
-    string? user_initials;
-    bool is_logged_in = false;
-
-
-    List<RootFolder> rootFolders = new List<RootFolder>();
-
-    /*
-    //---------test start--------
-    bool DeferredLoading = false;
-    TabSize size=TabSize.Large;
-
-    string? activeid = "tab-3";
-    FluentTab? changedto;
-
-    private void HandleOnTabChange(FluentTab tab)
+    string? initials;
+    string? user
     {
-    changedto = tab;
+        get { return DataModel.Instance.User != null ? DataModel.Instance.User.Initials : initials; }
+        set { initials = value; }
     }
 
-    //------test slut--------
-    */
-    private void Login()
-    {
-        user_initials = user_initials ?? "";
-    }
+    bool is_logged_in { get { return DataModel.Instance.User != null && DataModel.Instance.User.Initials.Length > 0; } }
 
-    async Task StartLoadingAsync()
+    List<RootFolder> rootFolders { get{ return DataModel.Instance.GetRootFoldersForUser();} }
+
+    async Task OnLoginClicked()
     {
-        if (user_initials != null && user_initials.Length > 0)
+        if (initials != null && initials.Length > 0 && DataModel.Instance.User==null)
         {
-            DataModel.Instance.PerformUserLogIn(user_initials);
-            is_logged_in = user_initials != null && user_initials.Length > 0;
-            UpdateFolders();
-            //await DataSource.WaitAsync(2000, () => loading = false);
+            DataModel.Instance.User = new User(initials);
             await Task.Delay(2000);
         }
     }
 
-    private void UpdateFolders()
-    {
-        rootFolders = DataModel.Instance.GetRootFoldersForUser();
-
-    }
-    private void HandleRowClick(FluentDataGridRow<RootFolder> row)
+    //selecte the folder for the details panel
+    private void OnSelectRootFolder(FluentDataGridRow<RootFolder> row)
     {
         if (row.Item != null)
         {
-            Console.WriteLine($"Row clicked: {row.Item.Root_path}");
             selected_root_folder = row.Item;
         }
     }
@@ -139,7 +120,6 @@
             root_folder.Is_registeredfor_cleanup = !root_folder.Is_registeredfor_cleanup;
         }
     }
-
     private void Go2retention(RootFolder root_folder)
     {
         if (root_folder != null)

@@ -10,21 +10,12 @@ namespace VSM.Client.Datamodel
         private DataModel() { }
 
         // Public static property to access the instance
-        public static DataModel Instance { get { return _instance.Value; } }
+        public static DataModel Instance => _instance.Value;
 
-        User? logged_in_user;
-        RootFolder? selected_root_folder;
+        private RootFolder? selected_root_folder;
 
-        public User? GetLoggedInUser() { return logged_in_user; }
-        public User? PerformUserLogIn(string initials)
-        {
-            // validate user by creating af single sign on.
-            // this is a placeholder for the real authentication logic.
-            // if the log in work, then creata a User object and return true
-            logged_in_user = new User(initials);
-            return GetLoggedInUser();
-        }
-
+        public User? User { get; set; }
+        
         public void SetRootFolder(RootFolder rootFolder)
         {
             selected_root_folder = rootFolder;
@@ -34,13 +25,12 @@ namespace VSM.Client.Datamodel
             return selected_root_folder;
         }
 
-        private static List<RootFolder> rootFolders = new();
+        private static readonly List<RootFolder> rootFolders = [];
         public List<RootFolder> GetRootFoldersForUser()
         {
-            User? user = GetLoggedInUser();
             // this is a placeholder for the real logic to get the root folders for a user.
             // in a real application, this would query a database or an API.
-            if (user is null)
+            if (User is null)
             {
                 rootFolders.Clear();
                 return rootFolders;
@@ -55,7 +45,7 @@ namespace VSM.Client.Datamodel
                     {
                         Id = rootId,
                         Is_registeredfor_cleanup = true,
-                        Users = new List<User> {user, new User("jajac"), new User("misve") },
+                        Users = [User, new("jajac"), new("misve")],
                         Root_path = "\\\\domain.net\\root_1"
                     });
 
@@ -64,7 +54,7 @@ namespace VSM.Client.Datamodel
                     {
                         Id = ++rootId,
                         Is_registeredfor_cleanup = true,
-                        Users = new List<User> {user, new User("stefw"), new User("misve") },
+                        Users = [User, new("stefw"), new("misve")],
                         Root_path = "\\\\domain.net\\root_2"
                     });
 
@@ -72,7 +62,7 @@ namespace VSM.Client.Datamodel
                     new RootFolder
                     {
                         Id = rootId,
-                        Users = new List<User> {user, new User("facap"), new User("misve") },
+                        Users = [User, new("facap"), new("misve")],
                         Root_path = "\\\\domain.net\\root_3"
 
                     });
@@ -81,7 +71,7 @@ namespace VSM.Client.Datamodel
                     new RootFolder
                     {
                         Id = ++rootId,
-                        Users = new List<User> { user, new User("caemh"), new User("arlem") },
+                        Users = [User, new("caemh"), new("arlem")],
                         Root_path = "\\\\domain.net\\root_4"
                     });
 
@@ -92,7 +82,7 @@ namespace VSM.Client.Datamodel
 
         public bool RegisterRootFolder(RootFolder rootFolder)
         {
-            if (GetLoggedInUser() is null)
+            if (User is null)
             {
                 return false;
             }
@@ -105,14 +95,14 @@ namespace VSM.Client.Datamodel
         public Folder GenerateFolderTreeForRootFolder(RootFolder root)
         {
             int idCounter = 1;
-            Folder the_root_folder = new Folder
+            Folder the_root_folder = new()
             {
                 Id = idCounter,
                 ParentId = idCounter,
                 Name = root.Root_path,
                 IsExpanded = true,
                 Level = 0,
-                Attributs    = AttributeRow.GenerateAttributeRow(idCounter),
+                Attributs = AttributeRow.GenerateAttributeRow(idCounter),
                 AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
             };
 
@@ -134,7 +124,7 @@ namespace VSM.Client.Datamodel
                         Name = $"Node {r}.{level}",
                         //IsExpanded = true,
                         Level = level,
-                        Attributs    = AttributeRow.GenerateAttributeRow(childId),
+                        Attributs = AttributeRow.GenerateAttributeRow(childId),
                         AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
                     };
 
