@@ -9,7 +9,7 @@
         <hr />
         <div class="grid">
             @*<QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Style="height: 480px; width: 100%;"*@
-            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" >
+            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true">
                 <TemplateColumn TGridItem="Folder" Title="Folders">
                     <ChildContent Context="item">
                         <div style="padding-left:@(item.Level * 15)px;">
@@ -23,12 +23,20 @@
                         </div>
                     </ChildContent>
                 </TemplateColumn>
-                <PropertyColumn Property="@(item => item.Attributs.Review)" />
-                <PropertyColumn Property="@(item => item.Attributs.Path)" />
-                <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
-                <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
-                <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
-                <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
+
+                @foreach (var key in RetentionHeaders)
+                {
+                    <TemplateColumn TGridItem="Folder" Title="@key">
+                        <ChildContent Context="item">
+                            @if (item.AttributDict.TryGetValue(key, out var val))
+                            {
+                                <button class="e-flat" @onclick="() => OnCellClick(item, key)">
+                                    @val
+                                </button>
+                            }
+                        </ChildContent>
+                    </TemplateColumn>
+                }
 
             </QuickGrid>
         </div>
@@ -45,6 +53,9 @@
 
 @code {
 
+    bool clicked = false;
+    List<string> RetentionHeaders = new List<string>();
+    QuickGrid<Folder>? grid;
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
     private RootFolder? rootFolder;
@@ -52,24 +63,33 @@
     //private Folder? current_cell;
     public string selected_folder_name = "No folder selected";
     public string selected_retention = "No retention selected";
-
+    private void button_click(Folder cell)
+    {
+    }
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root folder
-        if (rootFolder != DataModel.Instance.GetRootFolder())
+        rootFolder = DataModel.Instance.GetSelectedRootFolder();
+        if (rootFolder != null)
         {
-            rootFolder = DataModel.Instance.GetRootFolder();
-            if (rootFolder != null)
+            rootFolder.FolderTree = DataModel.Instance.GetSelectedRootFolderTree();
+
+            if( rootFolder.FolderTree == null ){
+                TreeRoots.Clear() ;
+            } 
+            else 
             {
-                DataModel.Instance.SetRootFolder(rootFolder);
-                rootFolder.FolderTree = DataModel.Instance.GenerateFolderTreeForRootFolder(rootFolder);
                 TreeRoots = rootFolder.FolderTree.Children;
-                RefreshVisibleRows();
+                //set the first attrubute column  so we have something to click
+                int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
+                RetentionHeaders.Add(RetentionHeaders_max[ix]);
+                clickCount++;
             }
         }
-
-
+        RefreshVisibleRows();
     }
+
+
     private void ToggleExpand(Folder node)
     {
         node.IsExpanded = !node.IsExpanded;
@@ -94,5 +114,12 @@
         }
 
         return result;
+    }
+
+    int clickCount = 0;
+    string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
+    private void OnCellClick(Folder node, string column)
+    {
+        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {column}");
     }
 }

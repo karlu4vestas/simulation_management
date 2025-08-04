@@ -8,35 +8,34 @@
 <FluentBodyContent>
     <FluentStack>
         <div class="grid">
-            <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize="30"
-                DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
-                <TemplateColumn TGridItem="Folder" Title="Tree-Name" Width="350px">
-                    <ChildContent Context="item">
-                        <div style="padding-left:@(item.Level * 15)px;">
-                            @if (item.Children.Count() > 0)
-                            {
-                                <button class="e-flat" @onclick="() => ToggleExpand(item)">
-                                    @(item.IsExpanded ? "▾" : "▸")
-                                </button>
-                            }
-                            @item.Name
-                        </div>
-                    </ChildContent>
-                </TemplateColumn>
+                 <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize ="25" 
+                                ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
+                                OnCellClick="OnCellClick">
 
-                <TemplateColumn Title="Review_B">
-                    <ChildContent Context="item">
-                        <FluentButton Appearance="Appearance.Neutral" @onclick="@(() => button_click(item))">@item.Name
-                        </FluentButton>
-                    </ChildContent>
-                </TemplateColumn>
-                <PropertyColumn Property="@(item => item.Attributs.Review)" />
-                <PropertyColumn Property="@(item => item.Attributs.Path)" />
-                <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
-                <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
-                <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
-                <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
-            </FluentDataGrid>
+                    <TemplateColumn TGridItem="Folder" Title="Folders" Width="350px">
+                        <ChildContent Context="item">
+                            <div style="padding-left:@(item.Level * 15)px;">
+                                @if (item.Children.Count() > 0)
+                                {
+                                    <button class="e-flat" @onclick="() => ToggleExpand(item)">
+                                        @(item.IsExpanded ? "▾" : "▸")
+                                    </button>
+                                }
+                                @item.Name
+                        </div>
+                        </ChildContent>
+                    </TemplateColumn>                                
+
+                    @foreach (var key in RetentionHeaders)
+                    {
+                        <TemplateColumn TGridItem="Folder" Title="@key">
+                            <ChildContent Context="item">
+                                @((item.AttributDict.TryGetValue(key, out var val)) ? val : null)
+                            </ChildContent>
+                        </TemplateColumn>
+                    }
+
+                </FluentDataGrid>
         </div>
     </FluentStack>
     <div style="width: 100%;">
@@ -53,6 +52,10 @@
 
 </FluentBodyContent>
 @code {
+
+    bool clicked = false;
+    List<string> RetentionHeaders = new  List<string>() ;
+    FluentDataGrid<Folder>? grid;
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
     private RootFolder? rootFolder;
@@ -66,16 +69,15 @@
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root folder
-        if (rootFolder != DataModel.Instance.GetRootFolder())
+        if (rootFolder != DataModel.Instance.GetSelectedRootFolder())
         {
-            rootFolder = DataModel.Instance.GetRootFolder();
+            rootFolder = DataModel.Instance.GetSelectedRootFolder();
             if (rootFolder != null)
             {
-                DataModel.Instance.SetRootFolder(rootFolder);
-                rootFolder.FolderTree = DataModel.Instance.GenerateFolderTreeForRootFolder(rootFolder);
+                rootFolder.FolderTree = DataModel.Instance.GetSelectedRootFolderTree();
                 TreeRoots = rootFolder.FolderTree.Children;
-                RefreshVisibleRows();
             }
+            RefreshVisibleRows();
         }
     }
 
@@ -105,64 +107,23 @@
         return result;
     }
 
-    //private void OnCellClick(Folder cell)
-    private void OnCellClick(Folder cell)
+    int clickCount = 0;
+    string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
+    private void OnCellClick(FluentDataGridCell<Folder> cell)
     {
-        // Store the clicked item in current_cell for further processing
-        //current_cell = cell.Item as Folder;
-        //selected_folder_name = current_cell?.Name ?? "No folder selected";
-        //selected_retention = $"{cell.GridColumn},{cell.Element}";
-
-
-        // Optionally, you can perform additional actions based on the clicked item
-        // For example, you can update a property or trigger an event
-        //StateHasChanged(); // Refresh the UI if needed
+        Console.WriteLine($"Cell focused, clickCount : {cell.GridColumn},  {clickCount}");
+        if( clickCount < RetentionHeaders_max.Length )
+        {
+            int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
+            RetentionHeaders.Add(RetentionHeaders_max[ix]);
+            clickCount++;
+            clicked = !clicked;
+        }
     }
-
-    /*
-
-    <div class="card" Style="height: 300px; width: 100%; border: 2px dotted var(--accent-fill-rest)">
-    <h4>panel for setting retentions</h4>
-    <div>
-    <h4>Folder:</h4>
-    <FluentTextArea @bind-Value=@selected_folder_name style="width: 100%;"></FluentTextArea>
-    </div>
-    <div>
-    <h4>Retention:</h4>
-    <FluentTextField @bind-Value=selected_retention style="width: 100%;"></FluentTextField>
-    </div>
-    </div>
-
-
-    <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="Folder"
-    VerticalAlignment="VerticalAlignment.Center" GenerateHeader="@GenerateHeaderOption.Sticky" Virtualize="true"
-    ItemSize="30">
-
-    <TemplateColumn TGridItem="Folder" Title="Tree-Name" Width="350px">
-    <ChildContent Context="item">
-    <div style="padding-left:@(item.Level * 15)px;">
-    @if (item.Children.Count() > 0)
+    private void OnRowClick(FluentDataGridCell<Folder> cell)
     {
-    <button class="e-flat" @onclick="() => ToggleExpand(item)">
-    @(item.IsExpanded ? "▾" : "▸")
-    </button>
-    }
-    @item.Name
-    </div>
-    </ChildContent>
-    </TemplateColumn>
-    </FluentDataGrid>
+        //Console.WriteLine($"Cell focused : {cell.GridColumn}, {cell.Column.Title}");
+        Console.WriteLine($"Cell focused : {cell.GridColumn}");
 
-    <PropertyColumn Property="@(item => item.Attributs.Review)"/>
-    <PropertyColumn Property="@(item => item.Attributs.Path)"/>
-    <PropertyColumn Property="@(item => item.Attributs.LongTerm)" />
-    <PropertyColumn Property="@(item => item.Attributs._2025_Q4)" />
-    <PropertyColumn Property="@(item => item.Attributs._2026_Q1)" />
-    <PropertyColumn Property="@(item => item.Attributs._2026_Q2)" />
-    <TemplateColumn TGridItem="Folder" Title="Review">
-    <ChildContent Context="item">
-    <FluentButton @onclick="() => OnCellClick(item)">@item.Attributs.Review</FluentButton>
-    </ChildContent>
-    </TemplateColumn>
-    */
+    }
 }

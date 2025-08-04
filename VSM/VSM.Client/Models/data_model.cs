@@ -15,12 +15,12 @@ namespace VSM.Client.Datamodel
         private RootFolder? selected_root_folder;
 
         public User? User { get; set; }
-        
+
         public void SetRootFolder(RootFolder rootFolder)
         {
             selected_root_folder = rootFolder;
         }
-        public RootFolder? GetRootFolder()
+        public RootFolder? GetSelectedRootFolder()
         {
             return selected_root_folder;
         }
@@ -92,48 +92,51 @@ namespace VSM.Client.Datamodel
         }
 
         //return the folder hierarchy that match the path to the rootfolder.
-        public Folder GenerateFolderTreeForRootFolder(RootFolder root)
+        public Folder? GetSelectedRootFolderTree()
         {
-            int idCounter = 1;
-            Folder the_root_folder = new()
+            RootFolder? root = GetSelectedRootFolder();
+            if (root is null) return null;
+            else
             {
-                Id = idCounter,
-                ParentId = idCounter,
-                Name = root.Root_path,
-                IsExpanded = true,
-                Level = 0,
-                Attributs = AttributeRow.GenerateAttributeRow(idCounter),
-                AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
-            };
-
-            idCounter = the_root_folder.Id;
-
-            //generate 10 children under the root folder
-            for (int r = 1; r < 10; r++)
-            {
-                Folder parent = the_root_folder;
-
-                //generate one child pr level
-                for (int level = 1; level <= 3; level++)
+                int idCounter = 1;
+                Folder the_root_folder = new()
                 {
-                    var childId = ++idCounter;
-                    var child = new Folder
+                    Id = idCounter,
+                    ParentId = idCounter,
+                    Name = root.Root_path,
+                    IsExpanded = true,
+                    Level = 0,
+                    AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
+                };
+
+                idCounter = the_root_folder.Id;
+
+                //generate 10 children under the root folder
+                for (int r = 1; r < 10; r++)
+                {
+                    Folder parent = the_root_folder;
+
+                    //generate one child pr level
+                    for (int level = 1; level <= 3; level++)
                     {
-                        Id = childId,
-                        ParentId = parent.Id,
-                        Name = $"Node {r}.{level}",
-                        //IsExpanded = true,
-                        Level = level,
-                        Attributs = AttributeRow.GenerateAttributeRow(childId),
-                        AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
-                    };
+                        var childId = ++idCounter;
+                        var child = new Folder
+                        {
+                            Id = childId,
+                            ParentId = parent.Id,
+                            Name = $"Node {r}.{level}",
+                            //IsExpanded = true,
+                            Level = level,
+                            AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
+                        };
 
-                    parent.Children.Add(child);
+                        parent.Children.Add(child);
 
-                    parent = child; // for the newt level 
+                        parent = child; // for the newt level 
+                    }
                 }
+                return the_root_folder;
             }
-            return the_root_folder;
         }
 
     }

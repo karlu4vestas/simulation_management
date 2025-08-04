@@ -10,8 +10,7 @@
         <hr/>
         <div class="grid">
                 <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize ="25" 
-                                ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
-                                OnCellClick="OnCellClick">
+                                ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
 
                     <TemplateColumn TGridItem="Folder" Title="Folders" Width="350px">
                         <ChildContent Context="item">
@@ -27,11 +26,16 @@
                         </ChildContent>
                     </TemplateColumn>                                
 
-                    @foreach (var key in ColumnHeaders)
+
+                    @foreach (var key in RetentionHeaders)
                     {
                         <TemplateColumn TGridItem="Folder" Title="@key">
                             <ChildContent Context="item">
-                                @((item.AttributDict.TryGetValue(key, out var val)) ? val : null)
+                                @if( item.AttributDict.TryGetValue(key, out var val) ){
+                                    <button class="e-flat" @onclick="() => OnCellClick(item, key)">
+                                        @val
+                                    </button>
+                                }
                             </ChildContent>
                         </TemplateColumn>
                     }
@@ -46,13 +50,9 @@
 </FluentStack>
 
 @code {
-/*
 
-
-
-*/
     bool clicked = false;
-    List<string> ColumnHeaders = new  List<string>() ;
+    List<string> RetentionHeaders = new  List<string>() ;
     FluentDataGrid<Folder>? grid;
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
@@ -67,16 +67,23 @@
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root folder
-        if (rootFolder != DataModel.Instance.GetRootFolder())
+        rootFolder = DataModel.Instance.GetSelectedRootFolder();
+        if (rootFolder != null)
         {
-            rootFolder = DataModel.Instance.GetRootFolder();
-            if (rootFolder != null)
-            {
-                rootFolder.FolderTree = DataModel.Instance.GenerateFolderTreeForRootFolder(rootFolder);
+            rootFolder.FolderTree = DataModel.Instance.GetSelectedRootFolderTree();
+
+            if( rootFolder.FolderTree == null ){
+                TreeRoots.Clear() ;
+            } else {
                 TreeRoots = rootFolder.FolderTree.Children;
-                RefreshVisibleRows();
+
+                //set the first attrubute column  so we have something to click
+                int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
+                RetentionHeaders.Add(RetentionHeaders_max[ix]);
+                clickCount++;
             }
         }
+        RefreshVisibleRows();
     }
 
     private void ToggleExpand(Folder node)
@@ -106,14 +113,14 @@
     }
 
     int clickCount = 0;
-    string[] ColumnHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
-    private void OnCellClick(FluentDataGridCell<Folder> cell)
+    string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
+    private void OnCellClick(Folder node, string column)
     {
-        Console.WriteLine($"Cell focused, clickCount : {cell.GridColumn},  {clickCount}");
-        if( clickCount < ColumnHeaders_max.Length )
+        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {column}");
+        if( clickCount < RetentionHeaders_max.Length )
         {
-            int ix = Math.Min(clickCount, ColumnHeaders_max.Length - 1);
-            ColumnHeaders.Add(ColumnHeaders_max[ix]);
+            int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
+            RetentionHeaders.Add(RetentionHeaders_max[ix]);
             clickCount++;
             clicked = !clicked;
         }
@@ -122,6 +129,5 @@
     {
         //Console.WriteLine($"Cell focused : {cell.GridColumn}, {cell.Column.Title}");
         Console.WriteLine($"Cell focused : {cell.GridColumn}");
-
     }
 }
