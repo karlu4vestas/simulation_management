@@ -26,23 +26,24 @@
                         </ChildContent>
                     </TemplateColumn>                                
 
+                    @if( rootFolder!=null ){
+                        @foreach (var key in rootFolder.RetentionHeaders)
+                        {
+                            <TemplateColumn TGridItem="Folder" Title="@key">
+                                <ChildContent Context="item">
+                                    @if( item.AttributDict.TryGetValue(key, out var val) ){
+    
+                                        var cellId = $"{item.Id}_{key}";
+                                        var isSelected = selectedCellId == cellId;
+                                        var buttonClass = isSelected ? "e-flat selected" : "e-flat";
 
-                    @foreach (var key in RetentionHeaders)
-                    {
-                        <TemplateColumn TGridItem="Folder" Title="@key">
-                            <ChildContent Context="item">
-                                @if( item.AttributDict.TryGetValue(key, out var val) ){
- 
-                                    var cellId = $"{item.Id}_{key}";
-                                    var isSelected = selectedCellId == cellId;
-                                    var buttonClass = isSelected ? "e-flat selected" : "e-flat";
-
-                                    <button class="@buttonClass" @onclick="() => OnCellClick(item, key)">
-                                        @val
-                                    </button>
-                                }
-                            </ChildContent>
-                        </TemplateColumn>
+                                        <button class="@buttonClass" @onclick="() => OnCellClick(item, key)">
+                                            @val
+                                        </button>
+                                    }
+                                </ChildContent>
+                            </TemplateColumn>
+                        }
                     }
 
                 </FluentDataGrid>
@@ -50,44 +51,65 @@
     </FluentBodyContent>
     <FluentBodyContent>
         <hr />
-        <h2> Detail panel for settings retentions</h2>
+        <h2> Review and change retention</h2>
+        @if( selected_cell != null && selected_cell is var (folder, retention_key) ){
+            string folder_name = folder.Name;
+            string retention   = retention_key;
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span>Folder: </span>
+                <span>@folder_name</span>
+            </div>            
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span>Current Retention: </span>
+                <span>@folder_name</span>
+            </div>            
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span>New retention: </span>
+                <FluentComboBox Items="@retentionOptions" 
+                                @bind="@selectedRetention"
+                                OnSelectedOptionChanged="@OnRetentionChanged"
+                                Placeholder="Select retention period">
+                </FluentComboBox>
+            </div>            
+        }
+
     </FluentBodyContent>
 </FluentStack>
 
 @code {
 
-    bool clicked = false;
-    List<string> RetentionHeaders = new  List<string>() ;
     FluentDataGrid<Folder>? grid;
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
-    private RootFolder? rootFolder;
-    string? selectedCellId;
+    public  RootFolder? rootFolder { get; set; }
+    private List<string> retentionOptions = new List<string>
+    {
+        "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"
+    };
     
-    //private Folder? current_cell;
+    private string? selectedRetention;
+
+    // change selectedCellId to use selected_cell
+    string? selectedCellId;
+    (Folder folder, string retention_key)? selected_cell = null;
+    
     public string selected_folder_name = "No folder selected";
     public string selected_retention = "No retention selected";
-    private void button_click(Folder cell)
-    {
-    }
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root folder
-        rootFolder = DataModel.Instance.GetSelectedRootFolder();
-        if (rootFolder != null)
+        if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
         {
-            rootFolder.FolderTree = DataModel.Instance.GetSelectedRootFolderTree();
-
+            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
             if( rootFolder.FolderTree == null ){
                 TreeRoots.Clear() ;
             } else {
                 TreeRoots = rootFolder.FolderTree.Children;
-
-                //set the first attrubute column  so we have something to click
-                int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
-                RetentionHeaders.Add(RetentionHeaders_max[ix]);
-                clickCount++;
             }
+
+            if( rootFolder.FolderTree != null )
+                rootFolder.FolderTree.UpdateAggregation(); 
+
         }
         RefreshVisibleRows();
     }
@@ -118,18 +140,10 @@
         return result;
     }
 
-    int clickCount = 0;
-    string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
     private void OnCellClick(Folder node, string key)
     {
+        selected_cell = (node,key);
         Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key}");
-        if( clickCount < RetentionHeaders_max.Length )
-        {
-            int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
-            RetentionHeaders.Add(RetentionHeaders_max[ix]);
-            clickCount++;
-            clicked = !clicked;
-        }
 
         var cellId = $"{node.Id}_{key}";
         if (selectedCellId != cellId)
@@ -137,9 +151,33 @@
             selectedCellId = cellId; // Select new cell
         }
     }
-    private void OnRowClick(FluentDataGridCell<Folder> cell)
+
+    private void OnRetentionChanged(string? newRetention)
     {
-        //Console.WriteLine($"Cell focused : {cell.GridColumn}, {cell.Column.Title}");
-        Console.WriteLine($"Cell focused : {cell.GridColumn}");
+        selectedRetention = newRetention;
+        Console.WriteLine($"Retention changed to: {newRetention}");
+        
+        // If you have a selected cell, you can update the folder's retention here
+        if (selected_cell is var (folder, retention_key) && newRetention != null)
+        {
+            // Update the folder's retention or perform other actions
+            folder.Retention = newRetention;
+            Console.WriteLine($"Updated folder {folder.Name} retention to {newRetention}");
+            
+            // Optionally refresh the grid or perform other updates
+            StateHasChanged();
+        }
     }
+
+    /*private async Task OnRetentionChangedAsync(string? newRetention)
+    {
+        selectedRetention = newRetention;
+        Console.WriteLine($"Retention changed to: {newRetention}");
+        
+        if (selected_cell is var (folder, retention_key) && newRetention != null)
+        {
+            folder.Retention = newRetention;
+            await InvokeAsync(StateHasChanged);
+        }
+    }*/        
 }

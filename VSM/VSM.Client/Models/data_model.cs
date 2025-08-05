@@ -22,6 +22,8 @@ namespace VSM.Client.Datamodel
         }
         public RootFolder? GetSelectedRootFolder()
         {
+            if( selected_root_folder!=null && selected_root_folder.FolderTree==null )
+                selected_root_folder.FolderTree = DataModel.Instance.GetRootFolderTree(selected_root_folder);
             return selected_root_folder;
         }
 
@@ -91,11 +93,26 @@ namespace VSM.Client.Datamodel
             return true;
         }
 
-        //return the folder hierarchy that match the path to the rootfolder.
-        public Folder? GetSelectedRootFolderTree()
+        class RandomRetention
         {
-            RootFolder? root = GetSelectedRootFolder();
-            if (root is null) return null;
+            private Random rand_int_generator;
+            List<string> Titles = new List<string>(["Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"]);
+            public RandomRetention(int seed)
+            {
+                rand_int_generator = new Random(seed);
+            }
+            public string Next()
+            {
+                return Titles[rand_int_generator.Next(0, Titles.Count)];
+            }
+        }
+        //return the folder hierarchy that match the path to the rootfolder.
+        private Folder? GetRootFolderTree(RootFolder root_folder)
+        {
+
+            RandomRetention retention_generator = new RandomRetention(0);
+
+            if (root_folder == null) return null;
             else
             {
                 int idCounter = 1;
@@ -103,10 +120,10 @@ namespace VSM.Client.Datamodel
                 {
                     Id = idCounter,
                     ParentId = idCounter,
-                    Name = root.Root_path,
+                    Name = root_folder.Root_path,
                     IsExpanded = true,
                     Level = 0,
-                    AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
+                    Retention = retention_generator.Next()
                 };
 
                 idCounter = the_root_folder.Id;
@@ -127,7 +144,7 @@ namespace VSM.Client.Datamodel
                             Name = $"Node {r}.{level}",
                             //IsExpanded = true,
                             Level = level,
-                            AttributDict = AttributeRow.GenerateRetentionDict(idCounter),
+                            Retention = retention_generator.Next()
                         };
 
                         parent.Children.Add(child);

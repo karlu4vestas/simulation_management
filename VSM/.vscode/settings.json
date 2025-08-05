@@ -90,5 +90,31 @@
     "vsintellicode.modify.editor.suggestSelection": "off",
     "vsintellicode.features.python.deepLearning": "disabled",
     "vsintellicode.features.typescript.deepLearning": "disabled",
-    "vsintellicode.features.csharp.deepLearning": "disabled"
+    "vsintellicode.features.csharp.deepLearning": "disabled",
+    
+    // Port forwarding configuration for VSM frontend
+    "remote.portsAttributes": {
+        "5000": {
+            "label": "VSM Development Server",
+            "onAutoForward": "openBrowser",
+            "protocol": "http"
+        },
+        "5001": {
+            "label": "VSM HTTPS Server", 
+            "onAutoForward": "openBrowser",
+            "protocol": "https"
+        },
+        "5002": {
+            "label": "VSM Staging/Test Server",
+            "onAutoForward": "openBrowser", 
+            "protocol": "http"
+        },
+        "5003": {
+            "label": "VSM Debug/Custom Server",
+            "onAutoForward": "openBrowser",
+            "protocol": "http"
+        }
+    },
+    "remote.autoForwardPorts": true,
+    "remote.autoForwardPortsSource": "hybrid"
 }

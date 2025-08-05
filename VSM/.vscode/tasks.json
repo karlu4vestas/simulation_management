@@ -14,6 +14,108 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "Kill Development Processes",
+      "command": "${workspaceFolder}/kill_process.sh",
+      "type": "shell",
+      "group": "build",
+      "isBackground": false,
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Primary HTTP - Port 5000",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/VSM/VSM.csproj",
+        "--launch-profile",
+        "VSM_HTTP"
+      ],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "dependsOn": "Kill Development Processes",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Alternative HTTP - Port 5002",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/VSM/VSM.csproj",
+        "--launch-profile",
+        "VSM_HTTP_Alt"
+      ],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "dependsOn": "Kill Development Processes",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Manual HTTP - Port 5003",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/VSM/VSM.csproj",
+        "--urls",
+        "http://0.0.0.0:5003"
+      ],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "dependsOn": "Kill Development Processes",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run VSM HTTPS - Port 5001",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/VSM/VSM.csproj",
+        "--launch-profile",
+        "VSM_HTTPS"
+      ],
+      "group": "build",
+      "isBackground": true,
+      "problemMatcher": [],
+      "dependsOn": "Kill Development Processes",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
     }
   ]
 }
