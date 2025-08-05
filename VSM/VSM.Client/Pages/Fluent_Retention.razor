@@ -32,7 +32,12 @@
                         <TemplateColumn TGridItem="Folder" Title="@key">
                             <ChildContent Context="item">
                                 @if( item.AttributDict.TryGetValue(key, out var val) ){
-                                    <button class="e-flat" @onclick="() => OnCellClick(item, key)">
+ 
+                                    var cellId = $"{item.Id}_{key}";
+                                    var isSelected = selectedCellId == cellId;
+                                    var buttonClass = isSelected ? "e-flat selected" : "e-flat";
+
+                                    <button class="@buttonClass" @onclick="() => OnCellClick(item, key)">
                                         @val
                                     </button>
                                 }
@@ -57,7 +62,8 @@
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
     private RootFolder? rootFolder;
-
+    string? selectedCellId;
+    
     //private Folder? current_cell;
     public string selected_folder_name = "No folder selected";
     public string selected_retention = "No retention selected";
@@ -114,15 +120,21 @@
 
     int clickCount = 0;
     string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
-    private void OnCellClick(Folder node, string column)
+    private void OnCellClick(Folder node, string key)
     {
-        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {column}");
+        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key}");
         if( clickCount < RetentionHeaders_max.Length )
         {
             int ix = Math.Min(clickCount, RetentionHeaders_max.Length - 1);
             RetentionHeaders.Add(RetentionHeaders_max[ix]);
             clickCount++;
             clicked = !clicked;
+        }
+
+        var cellId = $"{node.Id}_{key}";
+        if (selectedCellId != cellId)
+        {
+            selectedCellId = cellId; // Select new cell
         }
     }
     private void OnRowClick(FluentDataGridCell<Folder> cell)
