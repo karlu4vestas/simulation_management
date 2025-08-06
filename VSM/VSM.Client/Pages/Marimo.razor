@@ -8,14 +8,14 @@
 <FluentBodyContent>
     <FluentStack>
         <div class="grid">
-                 <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="Folder" Virtualize="true" ItemSize ="25" 
+                 <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="TreeNode" Virtualize="true" ItemSize ="25" 
                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
                                 OnCellClick="OnCellClick">
 
-                    <TemplateColumn TGridItem="Folder" Title="Folders" Width="350px">
+                    <TemplateColumn TGridItem="TreeNode" Title="TreeNodes" Width="350px">
                         <ChildContent Context="item">
                             <div style="padding-left:@(item.Level * 15)px;">
-                                @if (item.Children.Count() > 0)
+                                @if (item is InnerNode innerNode && innerNode.Children.Count() > 0)
                                 {
                                     <button class="e-flat" @onclick="() => ToggleExpand(item)">
                                         @(item.IsExpanded ? "▾" : "▸")
@@ -28,7 +28,7 @@
 
                     @foreach (var key in RetentionHeaders)
                     {
-                        <TemplateColumn TGridItem="Folder" Title="@key">
+                        <TemplateColumn TGridItem="TreeNode" Title="@key">
                             <ChildContent Context="item">
                                 @((item.AttributDict.TryGetValue(key, out var val)) ? val : null)
                             </ChildContent>
@@ -55,32 +55,38 @@
 
     bool clicked = false;
     List<string> RetentionHeaders = new  List<string>() ;
-    FluentDataGrid<Folder>? grid;
-    private List<Folder> TreeRoots = new();
-    private List<Folder> VisibleRows = new();
+    FluentDataGrid<TreeNode>? grid;
+    private List<TreeNode> TreeRoots = new();
+    private List<TreeNode> VisibleRows = new();
     private RootFolder? rootFolder;
 
-    //private Folder? current_cell;
-    public string selected_folder_name = "No folder selected";
+    //private TreeNode? current_cell;
+    public string selected_TreeNode_name = "No TreeNode selected";
     public string selected_retention = "No retention selected";
-    private void button_click(Folder cell)
+    private void button_click(TreeNode cell)
     {
     }
     protected override void OnInitialized()
     {
-        //looks like OnInitialized is called twice so lets check if we have already processed the root folder
+        //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
         if (rootFolder != DataModel.Instance.GetSelectedRootFolder())
         {
             rootFolder = DataModel.Instance.GetSelectedRootFolder();
-            if (rootFolder != null)
-            {
-                TreeRoots = rootFolder.FolderTree.Children;
+            if( rootFolder != null ){
+                if( rootFolder.FolderTree == null ){
+                    TreeRoots.Clear();
+                } else if( rootFolder.FolderTree is InnerNode innerNode ) {
+                    TreeRoots = innerNode.Children;
+                }
+
+                if( rootFolder.FolderTree != null )
+                    rootFolder.FolderTree.UpdateAggregation();
             }
             RefreshVisibleRows();
         }
     }
 
-    private void ToggleExpand(Folder node)
+    private void ToggleExpand(TreeNode node)
     {
         node.IsExpanded = !node.IsExpanded;
         RefreshVisibleRows();
@@ -91,15 +97,15 @@
         VisibleRows = FlattenVisible(TreeRoots);
     }
 
-    private List<Folder> FlattenVisible(IEnumerable<Folder> nodes)
+    private List<TreeNode> FlattenVisible(IEnumerable<TreeNode> nodes)
     {
-        var result = new List<Folder>();
+        var result = new List<TreeNode>();
         foreach (var node in nodes)
         {
             result.Add(node);
-            if (node.IsExpanded)
+            if (node.IsExpanded && node is InnerNode innerNode)
             {
-                result.AddRange(FlattenVisible(node.Children));
+                result.AddRange(FlattenVisible(innerNode.Children));
             }
         }
 
@@ -108,7 +114,7 @@
 
     int clickCount = 0;
     string[] RetentionHeaders_max = [ "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2" ];
-    private void OnCellClick(FluentDataGridCell<Folder> cell)
+    private void OnCellClick(FluentDataGridCell<TreeNode> cell)
     {
         Console.WriteLine($"Cell focused, clickCount : {cell.GridColumn},  {clickCount}");
         if( clickCount < RetentionHeaders_max.Length )
@@ -119,7 +125,7 @@
             clicked = !clicked;
         }
     }
-    private void OnRowClick(FluentDataGridCell<Folder> cell)
+    private void OnRowClick(FluentDataGridCell<TreeNode> cell)
     {
         //Console.WriteLine($"Cell focused : {cell.GridColumn}, {cell.Column.Title}");
         Console.WriteLine($"Cell focused : {cell.GridColumn}");

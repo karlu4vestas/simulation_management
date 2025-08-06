@@ -1,3 +1,5 @@
+using Folder = VSM.Client.Datamodel.TreeNode;
+
 namespace VSM.Client.Datamodel
 {
     public abstract class TreeNode
@@ -7,22 +9,37 @@ namespace VSM.Client.Datamodel
         public string Name { get; set; } = "";
         public bool IsExpanded { get; set; } = false;
         public int Level { get; set; } = 0;
-        public List<Folder> Children { get; set; } = new List<Folder>();
-        public bool HasChildren { get { return Children.Count > 0; } }
+        public Dictionary<string, int> AttributDict { get; set; } = new();
     }
 
-    public class Folder : TreeNode
+    public class LeafNode : TreeNode
     {
         public string Retention { get; set; } = "";
+    }
 
+    public class InnerNode : TreeNode
+    {
+        private readonly List<TreeNode> _children = [];
+        
+        public List<TreeNode> Children => _children;
+        
         public async Task ChangeRetention(string new_retention)
         {
-            Retention = new_retention;
+            //find all Simulation folders under this folder and change their retention 
+            //Retention = new_retention;
+
+            // The update the aggregations from the root folder and down
+            // 1) find the root 
+            // 2) call UpdateAggregation on the root folder
+        
+            // Alternatively let the caller do this
+            
 
             // Use Task.Run to offload the computation to a background thread
             // if UpdateAggregation is CPU-intensive
             await Task.Run(async () => await UpdateAggregation());
         }
+
         /// <summary>
         /// Aggregates counts of different retention values by iterating the folder tree using depth-first traversal.
         /// The iteration starts from the leaves and aggregates up to the current level using post-order processing.
@@ -35,7 +52,7 @@ namespace VSM.Client.Datamodel
             AttributDict.Clear();
 
             // Use a stack for iterative depth-first traversal (avoiding recursion)
-            var stack = new Stack<(Folder folder, bool visited)>();
+            var stack = new Stack<(TreeNode node, bool visited)>();
             var processedFolders = new HashSet<int>();
 
             // Start with current folder
@@ -43,56 +60,53 @@ namespace VSM.Client.Datamodel
 
             while (stack.Count > 0)
             {
-                var (currentFolder, visited) = stack.Pop();
+                var (currentNode, visited) = stack.Pop();
 
                 if (visited)
                 {
                     // Post-order processing: aggregate children's values
-                    if (!processedFolders.Contains(currentFolder.Id))
+                    if (!processedFolders.Contains(currentNode.Id))
                     {
-                        // Initialize this folder's AttributDict
-                        currentFolder.AttributDict.Clear();
+                        // Initialize this node's AttributDict
+                        currentNode.AttributDict.Clear();
 
-                        if (currentFolder.Children.Count == 0)
+                        if (currentNode is LeafNode leafNode)
                         {
-                            // Leaf node: count its own retention value
-                            if (!string.IsNullOrEmpty(currentFolder.Retention))
+                            // Leaf node: count its retention value
+                            if (!string.IsNullOrEmpty(leafNode.Retention))
                             {
-                                currentFolder.AttributDict[currentFolder.Retention] = 1;
+                                currentNode.AttributDict[leafNode.Retention] = 1;
                             }
                         }
-                        else
+                        else if (currentNode is InnerNode innerNode)
                         {
                             // Internal node: aggregate children's counts
-                            foreach (var child in currentFolder.Children)
+                            foreach (var child in innerNode.Children)
                             {
                                 foreach (var kvp in child.AttributDict)
                                 {
-                                    currentFolder.AttributDict[kvp.Key] =
-                                        currentFolder.AttributDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
+                                    currentNode.AttributDict[kvp.Key] =
+                                        currentNode.AttributDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
                                 }
                             }
-
-                            // Add this folder's own retention if it has one
-                            if (!string.IsNullOrEmpty(currentFolder.Retention))
-                            {
-                                currentFolder.AttributDict[currentFolder.Retention] =
-                                    currentFolder.AttributDict.GetValueOrDefault(currentFolder.Retention, 0) + 1;
-                            }
+                            // InnerNode doesn't have its own retention value to add
                         }
 
-                        processedFolders.Add(currentFolder.Id);
+                        processedFolders.Add(currentNode.Id);
                     }
                 }
                 else
                 {
                     // Pre-order processing: mark for post-order and add children
-                    stack.Push((currentFolder, true));
+                    stack.Push((currentNode, true));
 
-                    // Add children in reverse order so they're processed in correct order
-                    for (int i = currentFolder.Children.Count - 1; i >= 0; i--)
+                    // Add children in reverse order so they're processed in correct order (only for InnerNode)
+                    if (currentNode is InnerNode innerNode)
                     {
-                        stack.Push((currentFolder.Children[i], false));
+                        for (int i = innerNode.Children.Count - 1; i >= 0; i--)
+                        {
+                            stack.Push((innerNode.Children[i], false));
+                        }
                     }
                 }
 
@@ -103,6 +117,5 @@ namespace VSM.Client.Datamodel
                 }
             }
         }
-        public Dictionary<string, int> AttributDict { get; set; } = new();
     }
 }
