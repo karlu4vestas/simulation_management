@@ -32,9 +32,10 @@
                             <TemplateColumn TGridItem="Folder" Title="@key">
                                 <ChildContent Context="item">
                                     @if( item.AttributDict.TryGetValue(key, out var val) ){
-    
-                                        var cellId = $"{item.Id}_{key}";
-                                        var isSelected = selectedCellId == cellId;
+                                        RetentionCell cell = new RetentionCell(item,key);    
+                                        //var cellId = $"{item.Id}_{key}";
+
+                                        var isSelected  = selected_cell==null ? false : selected_cell == cell ;
                                         var buttonClass = isSelected ? "e-flat selected" : "e-flat";
 
                                         <button class="@buttonClass" @onclick="() => OnCellClick(item, key)">
@@ -52,25 +53,34 @@
     <FluentBodyContent>
         <hr />
         <h2> Review and change retention</h2>
-        @if( selected_cell != null && selected_cell is var (folder, retention_key) ){
-            string folder_name = folder.Name;
-            string retention   = retention_key;
+        @if( selected_cell != null ){
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span>Folder: </span>
-                <span>@folder_name</span>
+                <span>@selected_cell.folder.Name</span>
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span>Current Retention: </span>
-                <span>@folder_name</span>
+                <span>Current retention: </span>
+                <span>@selected_cell.retention_key</span>
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span>New retention: </span>
-                <FluentComboBox Items="@retentionOptions" 
-                                @bind="@selectedRetention"
-                                OnSelectedOptionChanged="@OnRetentionChanged"
-                                Placeholder="Select retention period">
-                </FluentComboBox>
-            </div>            
+                
+                <FluentCombobox Placeholder="Make a selection..." 
+                                Label="New retention" 
+                                Autofocus="true"
+                                Multiple=false
+                                Items="@retentionOptions"
+                                @bind-Value="@selected_cell.new_retention_key"
+                                @bind-Value:after="OnRetentionChangedAsync" 
+                                Height="200px" 
+                                Immediate ImmediateDelay="100"
+                                Disabled="@isProcessing" />
+            </div>
+            @if (isProcessing)
+            {
+                <div style="margin-top: 10px;">
+                    <FluentProgress Text="Updating retention settings..." />
+                </div>
+            }
         }
 
     </FluentBodyContent>
@@ -82,19 +92,8 @@
     private List<Folder> TreeRoots = new();
     private List<Folder> VisibleRows = new();
     public  RootFolder? rootFolder { get; set; }
-    private List<string> retentionOptions = new List<string>
-    {
-        "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"
-    };
+    public List<string> retentionOptions { get { return DataModel.Instance.RetentionOptions; } }
     
-    private string? selectedRetention;
-
-    // change selectedCellId to use selected_cell
-    string? selectedCellId;
-    (Folder folder, string retention_key)? selected_cell = null;
-    
-    public string selected_folder_name = "No folder selected";
-    public string selected_retention = "No retention selected";
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root folder
@@ -140,44 +139,89 @@
         return result;
     }
 
+
+
+    public class RetentionCell : IEquatable<RetentionCell>
+    {
+        public Folder? folder { get; set; }
+        public string? retention_key { get; set; }
+        public string? new_retention_key { get; set; }
+        public RetentionCell(Folder? folder, string? retention_key)
+        {
+            this.folder = folder;
+            this.retention_key = retention_key;
+            this.new_retention_key = this.retention_key; 
+        }
+        public bool Equals(RetentionCell? other)
+        {
+            if (other is null) return false;
+            if (ReferenceEquals(this, other)) return true;
+            
+            return folder?.Id == other.folder?.Id && 
+                string.Equals(retention_key, other.retention_key, StringComparison.Ordinal);
+        }
+        public override bool Equals(object? obj)
+        {
+            return obj is RetentionCell other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(folder?.Id, retention_key);
+        }
+
+        public static bool operator ==(RetentionCell? left, RetentionCell? right)
+        {
+            if (left is null) return right is null;
+            return left.Equals(right);
+        }
+
+        public static bool operator !=(RetentionCell? left, RetentionCell? right)
+        {
+            return !(left == right);
+        }
+
+        public async Task SyncRetentions()
+        {
+            if( new_retention_key != retention_key ){
+                Console.WriteLine($"sync the folder tree' retentions {folder.Name} retention {retention_key} new_retention {new_retention_key}");
+                await Task.Delay(4000);
+                retention_key = new_retention_key;
+            } 
+        }
+    }
+    RetentionCell selected_cell = null;
+    private bool isProcessing = false;
+
+    
     private void OnCellClick(Folder node, string key)
     {
-        selected_cell = (node,key);
+        //selected_cell = (node,key);
+        selected_cell = new RetentionCell(node,key);
         Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key}");
-
-        var cellId = $"{node.Id}_{key}";
-        if (selectedCellId != cellId)
-        {
-            selectedCellId = cellId; // Select new cell
-        }
     }
 
-    private void OnRetentionChanged(string? newRetention)
+    private async Task OnRetentionChangedAsync()
     {
-        selectedRetention = newRetention;
-        Console.WriteLine($"Retention changed to: {newRetention}");
-        
-        // If you have a selected cell, you can update the folder's retention here
-        if (selected_cell is var (folder, retention_key) && newRetention != null)
+        if (selected_cell != null)
         {
-            // Update the folder's retention or perform other actions
-            folder.Retention = newRetention;
-            Console.WriteLine($"Updated folder {folder.Name} retention to {newRetention}");
+            isProcessing = true;
+            StateHasChanged(); // Update UI to show progress
             
-            // Optionally refresh the grid or perform other updates
-            StateHasChanged();
+            try
+            {
+                await selected_cell.SyncRetentions();
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error syncing retentions: {ex.Message}");
+            }
+            finally
+            {
+                isProcessing = false;
+                StateHasChanged(); // Hide progress indicator
+            }
         }
     }
-
-    /*private async Task OnRetentionChangedAsync(string? newRetention)
-    {
-        selectedRetention = newRetention;
-        Console.WriteLine($"Retention changed to: {newRetention}");
-        
-        if (selected_cell is var (folder, retention_key) && newRetention != null)
-        {
-            folder.Retention = newRetention;
-            await InvokeAsync(StateHasChanged);
-        }
-    }*/        
 }

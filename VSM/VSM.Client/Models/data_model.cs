@@ -1,7 +1,7 @@
 namespace VSM.Client.Datamodel
 {
 
-    class DataModel
+    public class DataModel
     {
         // Private static variable that holds the single instance
         private static readonly Lazy<DataModel> _instance = new Lazy<DataModel>(() => new DataModel());
@@ -11,7 +11,10 @@ namespace VSM.Client.Datamodel
 
         // Public static property to access the instance
         public static DataModel Instance => _instance.Value;
-
+        public List<string> RetentionOptions { get; } =
+        [
+            "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"
+        ];
         private RootFolder? selected_root_folder;
 
         public User? User { get; set; }
@@ -22,8 +25,6 @@ namespace VSM.Client.Datamodel
         }
         public RootFolder? GetSelectedRootFolder()
         {
-            if( selected_root_folder!=null && selected_root_folder.FolderTree==null )
-                selected_root_folder.FolderTree = DataModel.Instance.GetRootFolderTree(selected_root_folder);
             return selected_root_folder;
         }
 
@@ -39,45 +40,7 @@ namespace VSM.Client.Datamodel
             }
 
             if (rootFolders.Count == 0)
-            {
-
-                int rootId = 1;
-                rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = rootId,
-                        Is_registeredfor_cleanup = true,
-                        Users = [User, new("jajac"), new("misve")],
-                        Root_path = "\\\\domain.net\\root_1"
-                    });
-
-                rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = ++rootId,
-                        Is_registeredfor_cleanup = true,
-                        Users = [User, new("stefw"), new("misve")],
-                        Root_path = "\\\\domain.net\\root_2"
-                    });
-
-                rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = rootId,
-                        Users = [User, new("facap"), new("misve")],
-                        Root_path = "\\\\domain.net\\root_3"
-
-                    });
-
-                rootFolders.Add(
-                    new RootFolder
-                    {
-                        Id = ++rootId,
-                        Users = [User, new("caemh"), new("arlem")],
-                        Root_path = "\\\\domain.net\\root_4"
-                    });
-
-            }
+                rootFolders.AddRange(TestDataGenerator.GenTestRootFoldersForUser(User));
             return rootFolders;
         }
 
@@ -93,69 +56,5 @@ namespace VSM.Client.Datamodel
             return true;
         }
 
-        class RandomRetention
-        {
-            private Random rand_int_generator;
-            List<string> Titles = new List<string>(["Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"]);
-            public RandomRetention(int seed)
-            {
-                rand_int_generator = new Random(seed);
-            }
-            public string Next()
-            {
-                return Titles[rand_int_generator.Next(0, Titles.Count)];
-            }
-        }
-        //return the folder hierarchy that match the path to the rootfolder.
-        private Folder? GetRootFolderTree(RootFolder root_folder)
-        {
-
-            RandomRetention retention_generator = new RandomRetention(0);
-
-            if (root_folder == null) return null;
-            else
-            {
-                int idCounter = 1;
-                Folder the_root_folder = new()
-                {
-                    Id = idCounter,
-                    ParentId = idCounter,
-                    Name = root_folder.Root_path,
-                    IsExpanded = true,
-                    Level = 0,
-                    Retention = retention_generator.Next()
-                };
-
-                idCounter = the_root_folder.Id;
-
-                //generate 10 children under the root folder
-                for (int r = 1; r < 10; r++)
-                {
-                    Folder parent = the_root_folder;
-
-                    //generate one child pr level
-                    for (int level = 1; level <= 3; level++)
-                    {
-                        var childId = ++idCounter;
-                        var child = new Folder
-                        {
-                            Id = childId,
-                            ParentId = parent.Id,
-                            Name = $"Node {r}.{level}",
-                            //IsExpanded = true,
-                            Level = level,
-                            Retention = retention_generator.Next()
-                        };
-
-                        parent.Children.Add(child);
-
-                        parent = child; // for the newt level 
-                    }
-                }
-                return the_root_folder;
-            }
-        }
-
     }
-
 }
