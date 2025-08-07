@@ -19,7 +19,7 @@ namespace VSM.Client.Datamodel
 
         public User? User { get; set; }
 
-        public void SetRootFolder(RootFolder rootFolder)
+        public void SetSelectedRootFolder(RootFolder rootFolder)
         {
             selected_root_folder = rootFolder;
         }

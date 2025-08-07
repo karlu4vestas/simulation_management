@@ -3,19 +3,43 @@ namespace VSM.Client.Datamodel
     public class RootFolder
     {
         private InnerNode? _folderTree;
+        private Task<InnerNode?>? _folderTreeTask;
+        
         public int Id { get; set; }
         public bool Is_registeredfor_cleanup { get; set; } = false;
         public string Root_path { get; set; } = ""; // the folder to scan if we do not know it already
+        
         public InnerNode? FolderTree
         {
             get
             {
-                if (_folderTree == null)
-                    _folderTree = TestDataGenerator.GetRootFolderTree(this);
+                if (_folderTree == null && _folderTreeTask?.IsCompleted == true)
+                {
+                    _folderTree = _folderTreeTask.Result;
+                }
                 return _folderTree;
             }
             set => _folderTree = value;
         }
+
+        // Async method to get folder tree
+        public async Task<InnerNode?> GetFolderTreeAsync()
+        {
+            if (_folderTree != null)
+                return _folderTree;
+                
+            if (_folderTreeTask == null)
+            {
+                _folderTreeTask = TestDataGenerator.GetRootFolderTreeAsync(this);
+            }
+            
+            _folderTree = await _folderTreeTask;
+            return _folderTree;
+        }
+
+        // Check if tree generation is in progress
+        public bool IsLoadingFolderTree => _folderTreeTask != null && !_folderTreeTask.IsCompleted;
+        
         public List<User> Users { get; set; } = [];
         public List<string> RetentionHeaders => FolderTree == null ? [] : FolderTree.AttributDict.Keys.ToList();
     }
@@ -37,22 +61,23 @@ namespace VSM.Client.Datamodel
             }
         }
         public class BooleanGenerator
-{
-    Random rnd;
+        {
+            Random rnd;
 
-    public BooleanGenerator()
-    {
-        rnd = new Random();
-    }
+            public BooleanGenerator()
+            {
+                rnd = new Random();
+            }
 
-    public bool NextBoolean()
-    {
-        return rnd.Next(0, 2) == 1;
-    }
-}
+            public bool NextBoolean()
+            {
+                return rnd.Next(0, 2) == 1;
+            }
+        }
+
 
         //return the folder hierarchy that match the path to the rootfolder.
-        public static InnerNode? GetRootFolderTree(RootFolder root_folder)
+        public static async Task<InnerNode?> GetRootFolderTreeAsync(RootFolder root_folder)
         {
             if (root_folder == null)
                 return null;
@@ -74,65 +99,103 @@ namespace VSM.Client.Datamodel
             // Generate n_levels=10 levels in the folder tree with InnerNode (can have children) and LeafNode (no children)
             // generate up to n_children=4 at each level
             // at any level chose randomly between generating an InnerNodes or a LeafNode 
-            // ------ to be replaced start ---------
             Random random = new Random(42); // Use fixed seed for reproducible results
-            GenerateTreeRecursively(the_root_folder, ref idCounter, retention_generator, new BooleanGenerator(), random, maxLevel: 10);
-            // ------ to be replaced end ---------
+            await GenerateTreeRecursivelyAsync(the_root_folder, idCounter, retention_generator, new BooleanGenerator(), random, maxLevel: 15);
             return the_root_folder;
         }
 
-        private static void GenerateTreeRecursively(InnerNode parent, ref int idCounter, RandomRetention retentionGenerator, BooleanGenerator boolGen, Random random, int maxLevel)
+        private static async Task GenerateTreeRecursivelyAsync(InnerNode parent, int idCounter, RandomRetention retentionGenerator, BooleanGenerator boolGen, Random random, int maxLevel)
         {
-            // Stop if we've reached the maximum level
-            if (parent.Level >= maxLevel)
-                return;
+            Console.WriteLine($"Start GenerateTreeRecursivelyAsync: maxLevel = {maxLevel}");
 
-            // Randomly decide how many children this node should have (0-9)
-            int numberOfChildren = random.Next(0, 10); // 0 to 9 children
-
-            for (int i = 0; i < numberOfChildren; i++)
+            // Simple level-by-level processing using a queue
+            var currentLevelNodes = new List<InnerNode> { parent };
+            int nodesGenerated = 0;
+            const int YIELD_EVERY_N_NODES = 100; // Yield every 100 nodes
+            
+            for (int level = 0; level < maxLevel; level++)
             {
-                var childId = ++idCounter;
-                var childLevel = parent.Level + 1;
+                var nextLevelNodes = new List<InnerNode>();
                 
-                // Randomly decide if this should be an InnerNode (can have children) or a LeafNode (terminal)
-                // Higher probability of InnerNode at shallow levels, higher probability of LeafNode at deep levels
-                bool shouldBeLeafNode = childLevel >= maxLevel || boolGen.NextBoolean();
+                foreach (var currentParent in currentLevelNodes)
+                {
+                    // Randomly decide how many children this node should have (5-9)
+                    int numberOfChildren = random.Next(4, 7); // Adjusted to 2-5 for more variability
 
-                TreeNode child;
+                    for (int i = 0; i < numberOfChildren; i++)
+                    {
+                        var childId = ++idCounter;
+                        var childLevel = level + 1;
+                        
+                        TreeNode child;
+                        
+                        if (childLevel == maxLevel)
+                        {
+                            // At the final level, create only LeafNodes
+                            child = new LeafNode
+                            {
+                                Id = childId,
+                                ParentId = currentParent.Id,
+                                Parent = currentParent,
+                                Name = $"SimData_{childLevel}_{i + 1}",
+                                Level = childLevel,
+                                Retention = retentionGenerator.Next()
+                            };
+                        }
+                        else
+                        {
+                            // Before the final level, randomly choose between InnerNode and LeafNode
+                            bool shouldBeLeafNode = boolGen.NextBoolean();
+                            
+                            if (shouldBeLeafNode)
+                            {
+                                child = new LeafNode
+                                {
+                                    Id = childId,
+                                    ParentId = currentParent.Id,
+                                    Parent = currentParent,
+                                    Name = $"SimData_{childLevel}_{i + 1}",
+                                    Level = childLevel,
+                                    Retention = retentionGenerator.Next()
+                                };
+                            }
+                            else
+                            {
+                                child = new InnerNode
+                                {
+                                    Id = childId,
+                                    ParentId = currentParent.Id,
+                                    Parent = currentParent,
+                                    Name = $"Folder_{childLevel}_{i + 1}",
+                                    Level = childLevel
+                                };
+                                
+                                // Add InnerNode to next level for processing
+                                nextLevelNodes.Add((InnerNode)child);
+                            }
+                        }
+                        
+                        currentParent.Children.Add(child);
+                        nodesGenerated++;
+                        
+                        // Yield control every N nodes to prevent UI blocking
+                        if (nodesGenerated % YIELD_EVERY_N_NODES == 0)
+                        {
+                            Console.WriteLine($"GenerateTreeRecursivelyAsync: YIELD_EVERY_N_NODES : Total nodes generated = {nodesGenerated}");
+                            await Task.Yield();
+                        }
+                    }
+                }
                 
-                if (shouldBeLeafNode || childLevel >= maxLevel)
-                {
-                    // Create a LeafNode with retention value
-                    child = new LeafNode
-                    {
-                        Id = childId,
-                        ParentId = parent.Id,
-                        Name = $"SimData_{childLevel}_{i + 1}",
-                        Level = childLevel,
-                        Retention = retentionGenerator.Next()
-                    };
-                }
-                else
-                {
-                    // Create an InnerNode that can have children
-                    child = new InnerNode
-                    {
-                        Id = childId,
-                        ParentId = parent.Id,
-                        Name = $"Folder_{childLevel}_{i + 1}",
-                        Level = childLevel
-                    };
-                }
-
-                parent.Children.Add(child);
-
-                // If this is an InnerNode and we haven't reached max depth, recursively generate its children
-                if (child is InnerNode innerNode && childLevel < maxLevel)
-                {
-                    GenerateTreeRecursively(innerNode, ref idCounter, retentionGenerator, boolGen, random, maxLevel);
-                }
+                // Move to next level
+                currentLevelNodes = nextLevelNodes;
+                
+                // If no more InnerNodes to process, we're done
+                if (currentLevelNodes.Count == 0)
+                    break;
             }
+            
+            Console.WriteLine($"GenerateTreeRecursivelyAsync: Total nodes generated = {nodesGenerated}");
         }
 
         public static List<RootFolder> GenTestRootFoldersForUser( User user)

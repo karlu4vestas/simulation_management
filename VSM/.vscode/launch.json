@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [ 
     {
-      "name": "🌐 VSM Server - Development (Port 5000)",
+      "name": "🌐 VSM Server - Development (Port 5000) [Debug]",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
@@ -10,6 +10,28 @@
       "args": [],
       "cwd": "${workspaceFolder}/VSM",
       "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Now listening on: (https?://\\S+)",
+        "uriFormat": "%s"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://0.0.0.0:5000"
+      }
+    },
+    {
+      "name": "🚀 VSM Server - Development (Port 5000) [Run]",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/VSM",
+      "stopAtEntry": false,
+      "justMyCode": false,
+      "enableStepFiltering": false,
+      "suppressJITOptimizations": false,
       "serverReadyAction": {
         "action": "openExternally",
         "pattern": "Now listening on: (https?://\\S+)",
@@ -86,7 +108,7 @@
     },
     {
       "name": "🌐 Debug Blazor Client - Development (Port 5000)",
-      "type": "chrome",
+      "type": "coreclr",
       "request": "launch",
       "url": "http://localhost:5000",
       "webRoot": "${workspaceFolder}/VSM.Client"
@@ -110,7 +132,7 @@
     {
       "name": "🚀 Full Stack Debug - Development Environment",
       "configurations": [
-        "🌐 VSM Server - Development (Port 5000)",
+        "🌐 VSM Server - Development (Port 5000) [Debug]",
         "🌐 Debug Blazor Client - Development (Port 5000)"
       ],
       "stopAll": true

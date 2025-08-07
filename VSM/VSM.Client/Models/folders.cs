@@ -5,7 +5,8 @@ namespace VSM.Client.Datamodel
     public abstract class TreeNode
     {
         public int Id { get; set; }
-        public int? ParentId { get; set; }
+        public int ParentId { get; set; } = 0; // Default to 0, indicating no parent
+        public TreeNode? Parent { get; set; } = null; // Default to null, indicating no parent
         public string Name { get; set; } = "";
         public bool IsExpanded { get; set; } = false;
         public int Level { get; set; } = 0;
@@ -22,22 +23,31 @@ namespace VSM.Client.Datamodel
         private readonly List<TreeNode> _children = [];
         
         public List<TreeNode> Children => _children;
-        
-        public async Task ChangeRetention(string new_retention)
+
+        public void ChangeLeafRetentions(string old_retention, string new_retention)
         {
-            //find all Simulation folders under this folder and change their retention 
-            //Retention = new_retention;
+            //change retention for all leaf nodes in this inner node without recursion
+            var stack = new Stack<TreeNode>();
+            stack.Push(this);
 
-            // The update the aggregations from the root folder and down
-            // 1) find the root 
-            // 2) call UpdateAggregation on the root folder
-        
-            // Alternatively let the caller do this
-            
+            while (stack.Count > 0)
+            {
+                var currentNode = stack.Pop();
 
-            // Use Task.Run to offload the computation to a background thread
-            // if UpdateAggregation is CPU-intensive
-            await Task.Run(async () => await UpdateAggregation());
+                if (currentNode is LeafNode leafNode && leafNode.Retention == old_retention)
+                {
+                    // Found a leaf node - update its retention
+                    leafNode.Retention = new_retention;
+                }
+                else if (currentNode is InnerNode innerNode)
+                {
+                    // Inner node - add all children to stack for processing
+                    foreach (var child in innerNode.Children)
+                    {
+                        stack.Push(child);
+                    }
+                }
+            }
         }
 
         /// <summary>

@@ -2,6 +2,7 @@
 .grid {
     height: 25rem;
     overflow-y: auto;
+    position: relative
 }
 
 .grid ::deep table {

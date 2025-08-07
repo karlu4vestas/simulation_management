@@ -4,22 +4,22 @@
     "remote.portsAttributes": {
         "5000": {
             "label": "VSM Development Server",
-            "onAutoForward": "openBrowser",
+            "onAutoForward": "notify",
             "protocol": "http"
         },
         "5001": {
             "label": "VSM HTTPS Server", 
-            "onAutoForward": "openBrowser",
+            "onAutoForward": "notify",
             "protocol": "https"
         },
         "5002": {
             "label": "VSM Staging/Test Server",
-            "onAutoForward": "openBrowser", 
+            "onAutoForward": "notify", 
             "protocol": "http"
         },
         "5003": {
             "label": "VSM Debug/Custom Server",
-            "onAutoForward": "openBrowser",
+            "onAutoForward": "notify",
             "protocol": "http"
         }
     },

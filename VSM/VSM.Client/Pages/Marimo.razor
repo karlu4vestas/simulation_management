@@ -58,7 +58,7 @@
     FluentDataGrid<TreeNode>? grid;
     private List<TreeNode> TreeRoots = new();
     private List<TreeNode> VisibleRows = new();
-    private RootFolder? rootFolder;
+    //private RootFolder? rootFolder;
 
     //private TreeNode? current_cell;
     public string selected_TreeNode_name = "No TreeNode selected";
@@ -69,21 +69,21 @@
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
-        if (rootFolder != DataModel.Instance.GetSelectedRootFolder())
+        /*if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
         {
-            rootFolder = DataModel.Instance.GetSelectedRootFolder();
+            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
             if( rootFolder != null ){
                 if( rootFolder.FolderTree == null ){
                     TreeRoots.Clear();
                 } else if( rootFolder.FolderTree is InnerNode innerNode ) {
                     TreeRoots = innerNode.Children;
                 }
-
+    
                 if( rootFolder.FolderTree != null )
-                    rootFolder.FolderTree.UpdateAggregation();
+                    await rootFolder.FolderTree.UpdateAggregation();
             }
-            RefreshVisibleRows();
-        }
+        }*/
+        RefreshVisibleRows();
     }
 
     private void ToggleExpand(TreeNode node)

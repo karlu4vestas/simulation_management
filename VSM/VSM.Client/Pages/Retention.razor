@@ -53,12 +53,10 @@
 
 @code {
 
-    bool clicked = false;
     List<string> RetentionHeaders = new List<string>();
-    QuickGrid<TreeNode>? grid;
     private List<TreeNode> TreeRoots = new();
     private List<TreeNode> VisibleRows = new();
-    private RootFolder? rootFolder;
+    //private RootFolder? rootFolder;
 
     //private TreeNode? current_cell;
     public string selected_TreeNode_name = "No TreeNode selected";
@@ -67,23 +65,23 @@
     {
     }
     protected override void OnInitialized()
-    {
-        //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
-        rootFolder = DataModel.Instance.GetSelectedRootFolder();
-        if (rootFolder != null)
-        {
-            if (rootFolder.FolderTree == null)
-            {
-                TreeRoots.Clear();
-            }
-            else if (rootFolder.FolderTree is InnerNode innerNode)
-            {
-                TreeRoots = innerNode.Children;
-            }
+    {/*
 
-            if (rootFolder.FolderTree != null)
-                rootFolder.FolderTree.UpdateAggregation();
-        }
+        //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
+        if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
+        {
+            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
+            if( rootFolder != null ){
+                if( rootFolder.FolderTree == null ){
+                    TreeRoots.Clear();
+                } else if( rootFolder.FolderTree is InnerNode innerNode ) {
+                    TreeRoots = innerNode.Children;
+                }
+    
+                if( rootFolder.FolderTree != null )
+                    await rootFolder.FolderTree.UpdateAggregation();
+            }
+        }*/
         RefreshVisibleRows();
     }
 
@@ -114,7 +112,6 @@
         return result;
     }
 
-    int clickCount = 0;
     string[] RetentionHeaders_max = ["Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"];
     private void OnCellClick(TreeNode node, string column)
     {
