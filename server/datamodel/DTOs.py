@@ -18,12 +18,10 @@ class FolderNodeDTO(SQLModel, table=True):
     parent_id: int = Field(default=0)
     name: str = Field(default="")
     type_id: int = Field(default=0)
-    node_attributes: int
 
 
 class NodeAttributesDTO(SQLModel, table=True):
-    node_id: int | None = Field(default=None, primary_key=True)
-    retention_id: int = Field(default=0)
+    foldernode_id: int | None = Field(default=None, foreign_key="foldernodedto.id", primary_key=True)
     retention_date: str | None = None
     modified: str | None = None
 

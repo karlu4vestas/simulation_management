@@ -56,8 +56,7 @@ def sample_folder_node_data():
     return {
         "parent_id": 0,
         "name": "TestFolder",
-        "type_id": 1,
-        "node_attributes": 0
+        "type_id": 1
     }
 
 

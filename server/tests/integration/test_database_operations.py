@@ -113,7 +113,7 @@ class TestDatabaseOperations:
         
         with Session(engine) as session:
             # Create a folder node
-            node = FolderNodeDTO(name="TestNode", type_id=1, node_attributes=0)
+            node = FolderNodeDTO(name="TestNode", type_id=1)
             session.add(node)
             session.commit()
             session.refresh(node)
@@ -121,8 +121,7 @@ class TestDatabaseOperations:
             # Create node attributes for this node
             assert node.id is not None
             attrs = NodeAttributesDTO(
-                node_id=node.id,
-                retention_id=5,
+                foldernode_id=node.id,
                 retention_date="2025-12-31",
                 modified="2025-08-11"
             )
@@ -130,11 +129,11 @@ class TestDatabaseOperations:
             session.commit()
             
             # Verify the relationship
-            statement = select(NodeAttributesDTO).where(NodeAttributesDTO.node_id == node.id)
+            statement = select(NodeAttributesDTO).where(NodeAttributesDTO.foldernode_id == node.id)
             retrieved_attrs = session.exec(statement).first()
             
             assert retrieved_attrs is not None
-            assert retrieved_attrs.node_id == node.id
+            assert retrieved_attrs.foldernode_id == node.id
             assert retrieved_attrs.retention_date == "2025-12-31"
 
     def test_folder_type_enum_like_behavior(self, database_with_tables):
