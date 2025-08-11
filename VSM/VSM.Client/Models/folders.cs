@@ -1,5 +1,3 @@
-using Folder = VSM.Client.Datamodel.TreeNode;
-
 namespace VSM.Client.Datamodel
 {
     public abstract class TreeNode
