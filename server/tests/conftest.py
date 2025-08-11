@@ -16,6 +16,14 @@ def clean_database():
 
 
 @pytest.fixture(scope="function")
+def database_with_tables(clean_database):
+    """Get a database instance with tables created"""
+    db = Database.get_db()
+    db.create_db_and_tables()
+    return db
+
+
+@pytest.fixture(scope="function")
 def test_engine():
     """Create a fresh test database engine for each test"""
     engine = create_engine("sqlite:///:memory:", echo=False)

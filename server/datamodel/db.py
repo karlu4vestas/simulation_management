@@ -14,10 +14,22 @@ class Database:
 
     def _initialize(self, sqlite_url: str):
         self._engine = create_engine(sqlite_url, echo=False)
-        SQLModel.metadata.create_all(self._engine)
+
+    #only call this if we need to create the tables
+    def create_db_and_tables(self):
+        if self._engine is not None:
+            SQLModel.metadata.create_all(self._engine)
+
+    @classmethod
+    def get_db(cls):
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     @classmethod
     def get_engine(cls):
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance._engine
+        return Database.get_db()._engine
+
+if __name__ == "__main__":
+    db:Database = Database.get_db()
+    db.create_db_and_tables()

@@ -7,7 +7,7 @@ from datamodel.db import Database
 class TestDatabaseOperations:
     """Test database operations with DTOs"""
 
-    def test_create_and_retrieve_root_folder(self, clean_database, sample_root_folder_data):
+    def test_create_and_retrieve_root_folder(self, database_with_tables, sample_root_folder_data):
         """Test creating and retrieving a RootFolderDTO from database"""
         engine = Database.get_engine()
         
@@ -31,7 +31,7 @@ class TestDatabaseOperations:
             assert retrieved_folder.owner == "JD"
             assert retrieved_folder.active_cleanup is False
 
-    def test_create_multiple_folder_nodes(self, clean_database):
+    def test_create_multiple_folder_nodes(self, database_with_tables):
         """Test creating multiple FolderNodeDTO records"""
         engine = Database.get_engine()
         
@@ -43,6 +43,7 @@ class TestDatabaseOperations:
             session.refresh(parent)
             
             # Create child nodes
+            assert parent.id is not None
             child1 = FolderNodeDTO(parent_id=parent.id, name="Child1", type_id=2, node_attributes=0)
             child2 = FolderNodeDTO(parent_id=parent.id, name="Child2", type_id=2, node_attributes=0)
             
@@ -59,7 +60,7 @@ class TestDatabaseOperations:
             assert "Child1" in child_names
             assert "Child2" in child_names
 
-    def test_update_folder_node(self, clean_database, sample_folder_node_data):
+    def test_update_folder_node(self, database_with_tables, sample_folder_node_data):
         """Test updating a FolderNodeDTO record"""
         engine = Database.get_engine()
         
@@ -80,10 +81,11 @@ class TestDatabaseOperations:
             statement = select(FolderNodeDTO).where(FolderNodeDTO.id == node.id)
             updated_node = session.exec(statement).first()
             
+            assert updated_node is not None
             assert updated_node.name == "UpdatedFolder"
             assert updated_node.type_id == 99
 
-    def test_delete_retention_record(self, clean_database, sample_retention_data):
+    def test_delete_retention_record(self, database_with_tables, sample_retention_data):
         """Test deleting a RetentionDTO record"""
         engine = Database.get_engine()
         
@@ -105,7 +107,7 @@ class TestDatabaseOperations:
             
             assert deleted_retention is None
 
-    def test_node_attributes_relationship(self, clean_database):
+    def test_node_attributes_relationship(self, database_with_tables):
         """Test NodeAttributesDTO with FolderNodeDTO relationship"""
         engine = Database.get_engine()
         
@@ -117,6 +119,7 @@ class TestDatabaseOperations:
             session.refresh(node)
             
             # Create node attributes for this node
+            assert node.id is not None
             attrs = NodeAttributesDTO(
                 node_id=node.id,
                 retention_id=5,
@@ -134,7 +137,7 @@ class TestDatabaseOperations:
             assert retrieved_attrs.node_id == node.id
             assert retrieved_attrs.retention_date == "2025-12-31"
 
-    def test_folder_type_enum_like_behavior(self, clean_database):
+    def test_folder_type_enum_like_behavior(self, database_with_tables):
         """Test FolderTypeDTO as an enum-like structure"""
         engine = Database.get_engine()
         
@@ -159,7 +162,7 @@ class TestDatabaseOperations:
             assert "VTSSimulation" in type_names
             assert "LeafNode" in type_names
 
-    def test_retention_display_ranking(self, clean_database):
+    def test_retention_display_ranking(self, database_with_tables):
         """Test RetentionDTO display ranking functionality"""
         engine = Database.get_engine()
         
@@ -186,7 +189,7 @@ class TestDatabaseOperations:
             assert ordered_retentions[1].name == "New"      # rank 1
             assert ordered_retentions[-1].name == "longterm"  # rank 10
 
-    def test_database_persistence_across_sessions(self, clean_database, sample_root_folder_data):
+    def test_database_persistence_across_sessions(self, database_with_tables, sample_root_folder_data):
         """Test that data persists across different database sessions"""
         engine = Database.get_engine()
         

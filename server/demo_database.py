@@ -22,7 +22,10 @@ def main():
     print("\n2. Testing singleton behavior:")
     engine2 = Database.get_engine()
     print(f"   ✓ Same engine instance: {engine is engine2}")
-    
+
+    print("\n2. Create tables:")
+    Database.get_db().create_db_and_tables()
+
     # Test 3: Test database operations
     print("\n3. Testing database operations:")
     with Session(engine) as session:
