@@ -32,41 +32,58 @@ class TestRootFolderDTO:
 
     def test_root_folder_update_and_retrieve(self, test_session, sample_root_folder_data):
         """Test updating and retrieving a RootFolderDTO"""
-        # Create and save
+        # Create and save initial folder
         folder = RootFolderDTO(**sample_root_folder_data)
         test_session.add(folder)
         test_session.commit()
         test_session.refresh(folder)
         folder_id = folder.id
         
-        # Update attributes
-        folder.path = "/updated/path"
-        folder.owner = "UpdatedOwner"
-        folder.active_cleanup = True
+        # Create expected updated state
+        expected_folder = RootFolderDTO(
+            id=folder_id,
+            path="/updated/path",
+            folder_id=sample_root_folder_data["folder_id"],  # Unchanged
+            owner="UpdatedOwner",
+            approvers=sample_root_folder_data["approvers"],  # Unchanged
+            active_cleanup=True
+        )
+        
+        # Apply updates from expected object
+        folder.path = expected_folder.path
+        folder.owner = expected_folder.owner
+        folder.active_cleanup = expected_folder.active_cleanup
         test_session.commit()
         
         # Clear session and retrieve fresh
         test_session.expunge_all()
         retrieved_folder = test_session.get(RootFolderDTO, folder_id)
         
-        # Verify updated values
-        assert retrieved_folder.path == "/updated/path"
-        assert retrieved_folder.owner == "UpdatedOwner"
-        assert retrieved_folder.active_cleanup is True
-        assert retrieved_folder.folder_id == sample_root_folder_data["folder_id"]  # Unchanged
-        assert retrieved_folder.approvers == sample_root_folder_data["approvers"]  # Unchanged
+        # Verify against expected values
+        assert retrieved_folder.path == expected_folder.path
+        assert retrieved_folder.owner == expected_folder.owner
+        assert retrieved_folder.active_cleanup == expected_folder.active_cleanup
+        assert retrieved_folder.folder_id == expected_folder.folder_id  # Unchanged
+        assert retrieved_folder.approvers == expected_folder.approvers  # Unchanged
 
     def test_root_folder_query_by_attributes(self, test_session):
         """Test querying RootFolderDTO by various attributes"""
-        # Create multiple folders
-        folders_data = [
-            {"path": "/folder1", "folder_id": 1, "owner": "Owner1", "approvers": "A,B", "active_cleanup": False},
-            {"path": "/folder2", "folder_id": 2, "owner": "Owner2", "approvers": "C,D", "active_cleanup": True},
-            {"path": "/folder3", "folder_id": 3, "owner": "Owner1", "approvers": "E,F", "active_cleanup": False}
+        # Define expected test folders
+        expected_folders = [
+            RootFolderDTO(path="/folder1", folder_id=1, owner="Owner1", approvers="A,B", active_cleanup=False),
+            RootFolderDTO(path="/folder2", folder_id=2, owner="Owner2", approvers="C,D", active_cleanup=True),
+            RootFolderDTO(path="/folder3", folder_id=3, owner="Owner1", approvers="E,F", active_cleanup=False)
         ]
         
-        for data in folders_data:
-            folder = RootFolderDTO(**data)
+        # Create folders from expected data
+        for expected_folder in expected_folders:
+            folder = RootFolderDTO(
+                path=expected_folder.path,
+                folder_id=expected_folder.folder_id,
+                owner=expected_folder.owner,
+                approvers=expected_folder.approvers,
+                active_cleanup=expected_folder.active_cleanup
+            )
             test_session.add(folder)
         test_session.commit()
         
@@ -74,15 +91,17 @@ class TestRootFolderDTO:
         owner1_folders = test_session.exec(
             select(RootFolderDTO).where(RootFolderDTO.owner == "Owner1")
         ).all()
-        assert len(owner1_folders) == 2
+        expected_owner1_count = len([f for f in expected_folders if f.owner == "Owner1"])
+        assert len(owner1_folders) == expected_owner1_count
         assert all(f.owner == "Owner1" for f in owner1_folders)
         
         # Query by active_cleanup
         active_folders = test_session.exec(
             select(RootFolderDTO).where(RootFolderDTO.active_cleanup == True)
         ).all()
-        assert len(active_folders) == 1
-        assert active_folders[0].path == "/folder2"
+        expected_active_paths = [f.path for f in expected_folders if f.active_cleanup]
+        assert len(active_folders) == len(expected_active_paths)
+        assert active_folders[0].path in expected_active_paths
 
 
 class TestFolderNodeDTO:
@@ -132,45 +151,65 @@ class TestFolderNodeDTO:
 
     def test_folder_node_hierarchy_creation(self, test_session):
         """Test creating parent-child folder relationships and retrieving them"""
-        # Create parent folder
-        parent = FolderNodeDTO(name="ParentFolder", type_id=1, node_attributes=100)
+        # Create expected parent folder
+        expected_parent = FolderNodeDTO(
+            name="ParentFolder", 
+            type_id=1, 
+            node_attributes=100,
+            parent_id=0  # Root level
+        )
+        
+        # Create and save parent
+        parent = FolderNodeDTO(
+            name=expected_parent.name,
+            type_id=expected_parent.type_id,
+            node_attributes=expected_parent.node_attributes
+        )
         test_session.add(parent)
         test_session.commit()
         test_session.refresh(parent)
-        parent_id = parent.id
+        parent_id = parent.id  # Store ID before expunge
         
-        # Create child folder
-        child = FolderNodeDTO(
-            parent_id=parent.id,  # Use parent.id directly instead of parent_id variable
-            name="ChildFolder", 
-            type_id=2, 
+        # Create expected child folder
+        expected_child = FolderNodeDTO(
+            parent_id=parent_id or 0,  # Use stored ID
+            name="ChildFolder",
+            type_id=2,
             node_attributes=200
+        )
+        
+        # Create child folder from expected values
+        child = FolderNodeDTO(
+            parent_id=expected_child.parent_id,
+            name=expected_child.name,
+            type_id=expected_child.type_id,
+            node_attributes=expected_child.node_attributes
         )
         test_session.add(child)
         test_session.commit()
         test_session.refresh(child)
-        child_id = child.id
+        child_id = child.id  # Store ID before expunge
         
         # Clear session and retrieve both
         test_session.expunge_all()
         retrieved_parent = test_session.get(FolderNodeDTO, parent_id)
         retrieved_child = test_session.get(FolderNodeDTO, child_id)
         
-        # Verify parent attributes
-        assert retrieved_parent.name == "ParentFolder"
-        assert retrieved_parent.parent_id == 0  # Root level
-        assert retrieved_parent.type_id == 1
-        assert retrieved_parent.node_attributes == 100
+        # Verify parent attributes match expected
+        assert retrieved_parent.name == expected_parent.name
+        assert retrieved_parent.parent_id == expected_parent.parent_id
+        assert retrieved_parent.type_id == expected_parent.type_id
+        assert retrieved_parent.node_attributes == expected_parent.node_attributes
         
-        # Verify child attributes and relationship
-        assert retrieved_child.name == "ChildFolder"
-        assert retrieved_child.parent_id == retrieved_parent.id  # Points to parent
-        assert retrieved_child.type_id == 2
-        assert retrieved_child.node_attributes == 200
+        # Verify child attributes match expected
+        assert retrieved_child.name == expected_child.name
+        assert retrieved_child.parent_id == parent_id  # Use stored parent ID
+        assert retrieved_child.type_id == expected_child.type_id
+        assert retrieved_child.node_attributes == expected_child.node_attributes
         
         # Query children by parent_id
         children = test_session.exec(
-            select(FolderNodeDTO).where(FolderNodeDTO.parent_id == retrieved_parent.id)
+            select(FolderNodeDTO).where(FolderNodeDTO.parent_id == parent_id)
         ).all()
         assert len(children) == 1
         assert children[0].id == child_id
@@ -222,26 +261,34 @@ class TestNodeAttributesDTO:
 
     def test_node_attributes_update_and_retrieve(self, test_session):
         """Test updating and retrieving NodeAttributesDTO"""
-        # Create and save
-        attrs = NodeAttributesDTO(node_id=10, retention_id=1)
-        test_session.add(attrs)
+        # Create and save initial attributes
+        initial_attrs = NodeAttributesDTO(node_id=10, retention_id=1)
+        test_session.add(initial_attrs)
         test_session.commit()
         
-        # Update attributes
-        attrs.retention_id = 5
-        attrs.retention_date = "2026-01-01"
-        attrs.modified = "2025-08-12"
+        # Create expected updated state
+        expected_attrs = NodeAttributesDTO(
+            node_id=10,  # Unchanged (primary key)
+            retention_id=5,
+            retention_date="2026-01-01",
+            modified="2025-08-12"
+        )
+        
+        # Apply updates from expected object
+        initial_attrs.retention_id = expected_attrs.retention_id
+        initial_attrs.retention_date = expected_attrs.retention_date
+        initial_attrs.modified = expected_attrs.modified
         test_session.commit()
         
         # Clear session and retrieve fresh
         test_session.expunge_all()
         retrieved_attrs = test_session.get(NodeAttributesDTO, 10)
         
-        # Verify updated values
-        assert retrieved_attrs.retention_id == 5
-        assert retrieved_attrs.retention_date == "2026-01-01"
-        assert retrieved_attrs.modified == "2025-08-12"
-        assert retrieved_attrs.node_id == 10  # Unchanged (primary key)
+        # Verify against expected values
+        assert retrieved_attrs.retention_id == expected_attrs.retention_id
+        assert retrieved_attrs.retention_date == expected_attrs.retention_date
+        assert retrieved_attrs.modified == expected_attrs.modified
+        assert retrieved_attrs.node_id == expected_attrs.node_id  # Unchanged (primary key)
 
 
 class TestFolderTypeDTO:
@@ -285,28 +332,29 @@ class TestFolderTypeDTO:
 
     def test_folder_type_query_by_name(self, test_session):
         """Test querying FolderTypeDTO by name"""
-        # Create multiple folder types
-        types_data = ["InnerNode", "LeafNode", "VTSSimulation", "CustomType"]
-        created_types = []
+        # Define expected folder types
+        expected_type_names = ["InnerNode", "LeafNode", "VTSSimulation", "CustomType"]
+        expected_types = [FolderTypeDTO(name=name) for name in expected_type_names]
         
-        for name in types_data:
-            folder_type = FolderTypeDTO(name=name)
+        # Create folder types from expected data
+        for expected_type in expected_types:
+            folder_type = FolderTypeDTO(name=expected_type.name)
             test_session.add(folder_type)
-            created_types.append(folder_type)
         test_session.commit()
         
         # Query by specific name
+        target_name = "VTSSimulation"
         vts_type = test_session.exec(
-            select(FolderTypeDTO).where(FolderTypeDTO.name == "VTSSimulation")
+            select(FolderTypeDTO).where(FolderTypeDTO.name == target_name)
         ).first()
         assert vts_type is not None
-        assert vts_type.name == "VTSSimulation"
+        assert vts_type.name == target_name
         
         # Query all types
         all_types = test_session.exec(select(FolderTypeDTO)).all()
-        assert len(all_types) == 4
-        type_names = [t.name for t in all_types]
-        assert set(type_names) == set(types_data)
+        assert len(all_types) == len(expected_type_names)
+        retrieved_names = [t.name for t in all_types]
+        assert set(retrieved_names) == set(expected_type_names)
 
 
 class TestRetentionDTO:
@@ -354,11 +402,18 @@ class TestRetentionDTO:
 
     def test_retention_system_managed_create_and_retrieve(self, test_session):
         """Test RetentionDTO system managed flag through database round-trip"""
-        # Create system managed retention
-        original_retention = RetentionDTO(
+        # Create expected system managed retention
+        expected_retention = RetentionDTO(
             name="Auto-Cleanup",
             is_system_managed="true",
             display_rank=99
+        )
+        
+        # Create retention from expected values
+        original_retention = RetentionDTO(
+            name=expected_retention.name,
+            is_system_managed=expected_retention.is_system_managed,
+            display_rank=expected_retention.display_rank
         )
         test_session.add(original_retention)
         test_session.commit()
@@ -369,23 +424,28 @@ class TestRetentionDTO:
         test_session.expunge_all()
         retrieved_retention = test_session.get(RetentionDTO, retention_id)
         
-        # Verify system managed attributes
-        assert retrieved_retention.name == "Auto-Cleanup"
-        assert retrieved_retention.is_system_managed == "true"
-        assert retrieved_retention.display_rank == 99
+        # Verify against expected values
+        assert retrieved_retention.name == expected_retention.name
+        assert retrieved_retention.is_system_managed == expected_retention.is_system_managed
+        assert retrieved_retention.display_rank == expected_retention.display_rank
 
     def test_retention_query_by_display_rank(self, test_session):
         """Test querying RetentionDTO by display rank"""
-        # Create multiple retention policies
-        retentions_data = [
-            {"name": "7 days", "is_system_managed": "false", "display_rank": 1},
-            {"name": "30 days", "is_system_managed": "false", "display_rank": 2},
-            {"name": "90 days", "is_system_managed": "false", "display_rank": 3},
-            {"name": "Never", "is_system_managed": "true", "display_rank": 99}
+        # Define expected retention policies
+        expected_retentions = [
+            RetentionDTO(name="7 days", is_system_managed="false", display_rank=1),
+            RetentionDTO(name="30 days", is_system_managed="false", display_rank=2),
+            RetentionDTO(name="90 days", is_system_managed="false", display_rank=3),
+            RetentionDTO(name="Never", is_system_managed="true", display_rank=99)
         ]
         
-        for data in retentions_data:
-            retention = RetentionDTO(**data)
+        # Create retention policies from expected data
+        for expected_retention in expected_retentions:
+            retention = RetentionDTO(
+                name=expected_retention.name,
+                is_system_managed=expected_retention.is_system_managed,
+                display_rank=expected_retention.display_rank
+            )
             test_session.add(retention)
         test_session.commit()
         
@@ -393,14 +453,15 @@ class TestRetentionDTO:
         system_managed = test_session.exec(
             select(RetentionDTO).where(RetentionDTO.is_system_managed == "true")
         ).all()
-        assert len(system_managed) == 1
-        assert system_managed[0].name == "Never"
+        expected_system_managed = [r for r in expected_retentions if r.is_system_managed == "true"]
+        assert len(system_managed) == len(expected_system_managed)
+        assert system_managed[0].name == expected_system_managed[0].name
         
         # Query by display rank order
         ordered_retentions = test_session.exec(
             select(RetentionDTO).order_by(asc(RetentionDTO.display_rank))
         ).all()
-        expected_order = ["7 days", "30 days", "90 days", "Never"]
+        expected_order = [r.name for r in sorted(expected_retentions, key=lambda x: x.display_rank)]
         actual_order = [r.name for r in ordered_retentions]
         assert actual_order == expected_order
 
@@ -483,8 +544,8 @@ class TestDTODatabaseIntegration:
 
     def test_dto_field_data_integrity(self, test_session):
         """Test that all field types preserve data correctly through database round-trip"""
-        # Test all data types and edge cases
-        root_folder = RootFolderDTO(
+        # Define expected complex test data
+        expected_root_folder = RootFolderDTO(
             path="/very/long/path/with/special/chars/äöü/测试",
             folder_id=999999,
             owner="Owner with spaces and åæø",
@@ -492,17 +553,39 @@ class TestDTODatabaseIntegration:
             active_cleanup=True
         )
         
-        node_attrs = NodeAttributesDTO(
+        expected_node_attrs = NodeAttributesDTO(
             node_id=123456,
             retention_id=789,
             retention_date="2025-12-31",
             modified="2025-08-11T14:30:00Z"
         )
         
-        retention = RetentionDTO(
+        expected_retention = RetentionDTO(
             name="Very long retention policy name with special characters ñü",
             is_system_managed="true",
             display_rank=2147483647  # Max int value
+        )
+        
+        # Create DTOs from expected data
+        root_folder = RootFolderDTO(
+            path=expected_root_folder.path,
+            folder_id=expected_root_folder.folder_id,
+            owner=expected_root_folder.owner,
+            approvers=expected_root_folder.approvers,
+            active_cleanup=expected_root_folder.active_cleanup
+        )
+        
+        node_attrs = NodeAttributesDTO(
+            node_id=expected_node_attrs.node_id,
+            retention_id=expected_node_attrs.retention_id,
+            retention_date=expected_node_attrs.retention_date,
+            modified=expected_node_attrs.modified
+        )
+        
+        retention = RetentionDTO(
+            name=expected_retention.name,
+            is_system_managed=expected_retention.is_system_managed,
+            display_rank=expected_retention.display_rank
         )
         
         test_session.add_all([root_folder, node_attrs, retention])
@@ -514,21 +597,21 @@ class TestDTODatabaseIntegration:
         test_session.expunge_all()
         
         retrieved_folder = test_session.get(RootFolderDTO, root_folder.id)
-        retrieved_attrs = test_session.get(NodeAttributesDTO, 123456)
+        retrieved_attrs = test_session.get(NodeAttributesDTO, expected_node_attrs.node_id)
         retrieved_retention = test_session.get(RetentionDTO, retention.id)
         
-        # Verify all complex data preserved exactly
-        assert retrieved_folder.path == "/very/long/path/with/special/chars/äöü/测试"
-        assert retrieved_folder.folder_id == 999999
-        assert retrieved_folder.owner == "Owner with spaces and åæø"
-        assert retrieved_folder.approvers == "A1,B2,C3,D4,E5"
-        assert retrieved_folder.active_cleanup is True
+        # Verify all complex data preserved exactly against expected values
+        assert retrieved_folder.path == expected_root_folder.path
+        assert retrieved_folder.folder_id == expected_root_folder.folder_id
+        assert retrieved_folder.owner == expected_root_folder.owner
+        assert retrieved_folder.approvers == expected_root_folder.approvers
+        assert retrieved_folder.active_cleanup == expected_root_folder.active_cleanup
         
-        assert retrieved_attrs.node_id == 123456
-        assert retrieved_attrs.retention_id == 789
-        assert retrieved_attrs.retention_date == "2025-12-31"
-        assert retrieved_attrs.modified == "2025-08-11T14:30:00Z"
+        assert retrieved_attrs.node_id == expected_node_attrs.node_id
+        assert retrieved_attrs.retention_id == expected_node_attrs.retention_id
+        assert retrieved_attrs.retention_date == expected_node_attrs.retention_date
+        assert retrieved_attrs.modified == expected_node_attrs.modified
         
-        assert retrieved_retention.name == "Very long retention policy name with special characters ñü"
-        assert retrieved_retention.is_system_managed == "true"
-        assert retrieved_retention.display_rank == 2147483647
+        assert retrieved_retention.name == expected_retention.name
+        assert retrieved_retention.is_system_managed == expected_retention.is_system_managed
+        assert retrieved_retention.display_rank == expected_retention.display_rank
