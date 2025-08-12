@@ -86,12 +86,12 @@
             }
         },
         {
-            "name": "Run Database Operations Tests",
+            "name": "Run FastsAPI Tests",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
-                "tests/integration/test_database_operations.py",
+                "tests/api/test_endpoints.py",
                 "-v",
                 "--tb=short"
             ],

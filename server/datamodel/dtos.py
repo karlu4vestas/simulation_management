@@ -52,6 +52,12 @@ class RetentionTypeBase(SQLModel):
 #used to CRUD retention types
 class RetentionTypeDTO(RetentionTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(default="")
+    is_system_managed: bool = Field(default=False)
+    display_rank: int = Field(default=0)
+
+class RetentionTypeBaseCreate(RetentionTypeBase):
+    pass
 
 #Use by the endpoint to only read the retention types
 class RetentionTypePublic(RetentionTypeBase):

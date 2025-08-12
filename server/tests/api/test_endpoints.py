@@ -1,6 +1,9 @@
 import pytest
+from sqlmodel import Session, select
 from fastapi.testclient import TestClient
 from app.web_api import app
+from datamodel.dtos import RetentionTypeDTO
+from datamodel.db import Database
 
 
 @pytest.fixture
@@ -43,6 +46,34 @@ class TestRootEndpoint:
         # The actual tag verification would require inspecting the OpenAPI schema
         response = client.get("/")
         assert response.status_code == 200
+
+
+class TestConfigEndpoint:
+    """Test cases for the config endpoint"""
+
+    def test_get_test_mode_endpoint(self, client):
+        """Test GET /config/test-mode endpoint"""
+        response = client.get("/config/test-mode")
+        
+        # Verify response status
+        assert response.status_code == 200
+        
+        # Verify response content
+        data = response.json()
+        expected_keys = {"test_mode", "is_unit_test", "is_client_test", "is_production"}
+        assert set(data.keys()) == expected_keys
+        
+        # Verify data types
+        assert isinstance(data["test_mode"], str)
+        assert isinstance(data["is_unit_test"], bool)
+        assert isinstance(data["is_client_test"], bool)
+        assert isinstance(data["is_production"], bool)
+        
+        # Verify valid test_mode values
+        assert data["test_mode"] in ["unit_test", "client_test", "production"]
+        
+        # Verify content type
+        assert response.headers["content-type"] == "application/json"
 
 
 class TestRootFolderAPI:
@@ -90,16 +121,39 @@ class TestFolderNodeAPI:
 class TestRetentionAPI:
     """Test API endpoints for Retention operations"""
 
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_get_retention_options_endpoint(self):
-        """Test GET /retention-options endpoint"""
-        pass
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_update_folder_retention_endpoint(self):
-        """Test PUT /folders/{id}/retention endpoint"""
-        pass
-
+    def test_get_retention_options_endpoint_structure(self, client):
+        """Test GET /retentiontypes/ endpoint returns proper structure"""
+        #from app.web_api import setup_shared_test_database, cleanup_shared_test_database
+        
+        #try:
+        # Set up shared test database that works across threads
+        #    setup_shared_test_database()
+            
+            # Test the endpoint
+        response = client.get("/retentiontypes/")
+            
+        # Verify the response
+        assert response.status_code == 200
+            
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) > 0  # Should have test data
+            
+        # Verify content type
+        assert response.headers["content-type"] == "application/json"
+            
+        # Test the structure of the first item
+        first_item = data[0]
+        expected_keys = {"name", "display_rank", "is_system_managed", "id"}
+        assert set(first_item.keys()) == expected_keys
+        assert isinstance(first_item["name"], str)
+        assert isinstance(first_item["display_rank"], int)
+        assert isinstance(first_item["is_system_managed"], bool)
+        assert isinstance(first_item["id"], int)
+            
+        #finally:
+        #    # Clean up the shared test database
+        #    cleanup_shared_test_database()
 
 # Example of how future API tests will look:
 """

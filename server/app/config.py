@@ -18,7 +18,8 @@ class AppConfig:
     """Application configuration class that manages global settings."""
     
     _instance = None
-    _test_mode: TestMode = TestMode.UNIT_TEST
+    #_test_mode: TestMode = TestMode.UNIT_TEST
+    _test_mode: TestMode = TestMode.CLIENT_TEST
     
     def __new__(cls):
         if cls._instance is None:
@@ -30,20 +31,20 @@ class AppConfig:
         """Get the current test mode."""
         return self._test_mode
     
-    @test_mode.setter
-    def test_mode(self, mode: TestMode | str) -> None:
-        """Set the test mode."""
-        if isinstance(mode, str):
-            # Convert string to TestMode enum
-            try:
-                mode = TestMode(mode)
-            except ValueError:
-                raise ValueError(f"Invalid test mode: {mode}. Valid modes are: {list(TestMode)}")
-        AppConfig._test_mode = mode
+    # @test_mode.setter
+    # def test_mode(self, mode: TestMode | str) -> None:
+    #     """Set the test mode."""
+    #     if isinstance(mode, str):
+    #         # Convert string to TestMode enum
+    #         try:
+    #             mode = TestMode(mode)
+    #         except ValueError:
+    #             raise ValueError(f"Invalid test mode: {mode}. Valid modes are: {list(TestMode)}")
+    #     AppConfig._test_mode = mode
     
-    def set_test_mode(self, mode: TestMode | str) -> None:
-        """Alternative method to set test mode."""
-        self.test_mode = mode
+    # def set_test_mode(self, mode: TestMode | str) -> None:
+    #     """Alternative method to set test mode."""
+    #     self.test_mode = mode
     
     def is_unit_test(self) -> bool:
         """Check if current mode is unit_test."""
@@ -56,6 +57,15 @@ class AppConfig:
     def is_production(self) -> bool:
         """Check if current mode is production."""
         return self._test_mode == TestMode.PRODUCTION
+    
+    def get_db_url(self) -> str:
+        """Get the database URL based on the current test mode."""
+        if self._test_mode == TestMode.UNIT_TEST:
+            return "sqlite:///:memory:"  # In-memory database for unit tests
+        elif self._test_mode == TestMode.CLIENT_TEST:
+            return "sqlite:///test_db.sqlite"  # Separate test database file
+        else:  # PRODUCTION
+            return "sqlite:///db.sqlite"  # Production database file
 
 
 # Global configuration instance
@@ -85,3 +95,8 @@ def is_client_test() -> bool:
 def is_production() -> bool:
     """Check if current mode is production."""
     return config.is_production()
+
+
+def get_db_url() -> str:
+    """Get the database URL based on the current test mode."""
+    return config.get_db_url()

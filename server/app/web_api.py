@@ -1,10 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO
 from datamodel.db import Database
 
 from .config import get_test_mode, is_unit_test, is_client_test, is_production
+import tempfile
+import os
+from sqlalchemy import create_engine
+
 
 app = FastAPI()
 
@@ -54,7 +58,7 @@ async def get_current_test_mode() -> dict:
 
 # endpoint for reading the RetentionTypeDTO
 # it must not be able to change the RetentionTypeDTO
-@app.get("/retentiontypes", response_model=list[RetentionTypePublic])
+@app.get("/retentiontypes/", response_model=list[RetentionTypePublic])
 def read_retention_types():
     with Session(Database.get_engine()) as session:
         retention_types = session.exec(select(RetentionTypeDTO)).all()

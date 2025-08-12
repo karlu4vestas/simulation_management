@@ -2,17 +2,20 @@ from sqlmodel import SQLModel, create_engine, Session, select
 from sqlalchemy import Engine, text
 from typing import Optional
 from .dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
+from app.config import AppConfig
 
 class Database:
-    sqlite_url: str = "sqlite:///:memory:"  # in memory db and disk the name could be db.sqlite
     _instance: Optional["Database"] = None
     _engine: Optional[Engine] = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(Database, cls).__new__(cls)
-            # at some point we will read the sqlite_url from the environment or elsewhere. For now just create it in memory
-            cls._instance._initialize(cls.sqlite_url)
+            # Get the database URL from AppConfig based on test mode
+            config = AppConfig()
+            sqlite_url = config.get_db_url()
+            cls._instance._initialize(sqlite_url)
+            print("create new db instance")
         return cls._instance
 
     def _initialize(self, sqlite_url: str):
