@@ -41,7 +41,7 @@ namespace VSM.Client.Datamodel
         public bool IsLoadingFolderTree => _folderTreeTask != null && !_folderTreeTask.IsCompleted;
         
         public List<User> Users { get; set; } = [];
-        public List<string> RetentionHeaders => FolderTree == null ? [] : FolderTree.AttributDict.Keys.ToList();
+        public List<string> RetentionHeaders => FolderTree == null ? new List<string>() : DataModel.Instance.RetentionOptions; // FolderTree.AttributDict.Keys.ToList();
     }
 
     //  ------------------------------ Test data generation ------------------------------
@@ -100,7 +100,7 @@ namespace VSM.Client.Datamodel
             // generate up to n_children=4 at each level
             // at any level chose randomly between generating an InnerNodes or a LeafNode 
             Random random = new Random(42); // Use fixed seed for reproducible results
-            await GenerateTreeRecursivelyAsync(the_root_folder, idCounter, retention_generator, new BooleanGenerator(), random, maxLevel: 15);
+            await GenerateTreeRecursivelyAsync(the_root_folder, idCounter, retention_generator, new BooleanGenerator(), random, maxLevel: 12);
             return the_root_folder;
         }
 
@@ -145,8 +145,8 @@ namespace VSM.Client.Datamodel
                         else
                         {
                             // Before the final level, randomly choose between InnerNode and LeafNode
-                            bool shouldBeLeafNode = boolGen.NextBoolean();
-                            
+                            bool shouldBeLeafNode = childLevel > 3 ? boolGen.NextBoolean() : false;
+
                             if (shouldBeLeafNode)
                             {
                                 child = new LeafNode

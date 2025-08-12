@@ -88,3 +88,7 @@ All configurations tested and working:
 4. Press `F5` to run
 
 The launch configuration is ready to use and will provide you with comprehensive testing capabilities directly within VS Code!
+
+### To see the mode 
+
+curl http://localhost:5173/config/test-mode

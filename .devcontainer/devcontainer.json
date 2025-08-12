@@ -31,7 +31,7 @@
         "DOTNET_MULTILEVEL_LOOKUP": "0",
         "TARGET": "net9.0"
     },
-	"forwardPorts": [5000, 5001],
+	"forwardPorts": [5000, 5001, 5173],
     "portsAttributes": {
         "5000": {
             "label": "API",
@@ -39,6 +39,10 @@
         },
         "5001": {
             "label": "Front End",
+            "onAutoForward": "notify"
+        },
+        "5173": {
+            "label": "FastAPI",
             "onAutoForward": "notify"
         }
     },

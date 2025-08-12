@@ -2,6 +2,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Start FastAPI Server",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "args": []
+        },
+        {
             "name": "Run All Tests",
             "type": "debugpy",
             "request": "launch",
@@ -27,24 +40,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "tests/unit/",
-                "-v",
-                "--tb=short"
-            ],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Run Integration Tests Only",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "args": [
-                "tests/integration/",
+                "tests/dtos_db/",
                 "-v",
                 "--tb=short"
             ],
@@ -61,7 +57,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "tests/unit/test_database.py",
+                "tests/dtos_db/test_database.py",
                 "-v",
                 "--tb=short"
             ],
@@ -78,7 +74,7 @@
             "request": "launch",
             "module": "pytest",
             "args": [
-                "tests/unit/test_dtos.py",
+                "tests/dtos_db/test_dtos.py",
                 "-v",
                 "--tb=short"
             ],

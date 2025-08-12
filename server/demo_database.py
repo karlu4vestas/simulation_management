@@ -6,7 +6,7 @@ import sys
 sys.path.append('.')
 
 from datamodel.db import Database
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, RetentionDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, RetentionTypeDTO
 from sqlmodel import Session, select
 
 def main():
@@ -38,9 +38,9 @@ def main():
             active_cleanup=False
         )
         
-        retention = RetentionDTO(
+        retention = RetentionTypeDTO(
             name="30 days",
-            is_system_managed="false",
+            is_system_managed=False,
             display_rank=1
         )
         

@@ -1,8 +1,48 @@
 import pytest
 from fastapi.testclient import TestClient
-# from api.main import app  # This will be created when we implement FastAPI
+from app.web_api import app
 
-# Placeholder for future API tests
+
+@pytest.fixture
+def client():
+    """FastAPI test client fixture"""
+    return TestClient(app)
+
+
+class TestRootEndpoint:
+    """Test cases for the root endpoint"""
+
+    def test_read_root_endpoint(self, client):
+        """Test GET / endpoint returns welcome message and test mode"""
+        response = client.get("/")
+        
+        # Verify response status
+        assert response.status_code == 200
+        
+        # Verify response content
+        data = response.json()
+        expected_keys = {"message", "test_mode"}
+        assert set(data.keys()) == expected_keys
+        assert data["message"] == "Welcome to your todo list."
+        assert data["test_mode"] in ["unit_test", "client_test", "production"]
+        
+        # Verify response structure
+        assert "message" in data
+        assert "test_mode" in data
+        assert isinstance(data["message"], str)
+        assert isinstance(data["test_mode"], str)
+        
+    def test_root_endpoint_content_type(self, client):
+        """Test that root endpoint returns JSON content type"""
+        response = client.get("/")
+        assert response.headers["content-type"] == "application/json"
+        
+    def test_root_endpoint_tags(self, client):
+        """Test that root endpoint is properly tagged"""
+        # This test verifies the endpoint exists and is accessible
+        # The actual tag verification would require inspecting the OpenAPI schema
+        response = client.get("/")
+        assert response.status_code == 200
 
 
 class TestRootFolderAPI:

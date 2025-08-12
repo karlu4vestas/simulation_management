@@ -3,7 +3,7 @@ Example of more valuable DTO tests that test actual business logic and database 
 """
 import pytest
 from sqlmodel import Session
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO
 
 
 class TestRootFolderDTOValidation:

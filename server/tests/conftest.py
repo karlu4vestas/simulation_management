@@ -78,6 +78,6 @@ def sample_retention_data():
     """Sample data for RetentionDTO testing"""
     return {
         "name": "30 days",
-        "is_system_managed": "false",
+        "is_system_managed": False,
         "display_rank": 1
     }

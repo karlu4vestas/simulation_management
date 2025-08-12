@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Field, Session, select, asc
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
 
 
 class TestRootFolderDTO:
@@ -347,7 +347,7 @@ class TestRetentionDTO:
     def test_retention_create_and_retrieve(self, test_session, sample_retention_data):
         """Test creating, saving, and retrieving a RetentionDTO"""
         # Create and save
-        original_retention = RetentionDTO(**sample_retention_data)
+        original_retention = RetentionTypeDTO(**sample_retention_data)
         test_session.add(original_retention)
         test_session.commit()
         test_session.refresh(original_retention)
@@ -357,7 +357,7 @@ class TestRetentionDTO:
         retention_id = original_retention.id
         
         # Retrieve from database
-        retrieved_retention = test_session.get(RetentionDTO, retention_id)
+        retrieved_retention = test_session.get(RetentionTypeDTO, retention_id)
         
         # Verify all attributes are identical
         assert retrieved_retention is not None
@@ -369,7 +369,7 @@ class TestRetentionDTO:
     def test_retention_with_defaults_create_and_retrieve(self, test_session):
         """Test RetentionDTO with default values through database round-trip"""
         # Create with defaults
-        original_retention = RetentionDTO()
+        original_retention = RetentionTypeDTO()
         test_session.add(original_retention)
         test_session.commit()
         test_session.refresh(original_retention)
@@ -377,24 +377,24 @@ class TestRetentionDTO:
 
         # Clear session and retrieve fresh
         test_session.expunge_all()
-        retrieved_retention = test_session.get(RetentionDTO, retention_id)
+        retrieved_retention = test_session.get(RetentionTypeDTO, retention_id)
         
         # Verify defaults persisted correctly
         assert retrieved_retention.name == ""          # Default value
-        assert retrieved_retention.is_system_managed == ""  # Default value
+        assert retrieved_retention.is_system_managed == False  # Default value
         assert retrieved_retention.display_rank == 0   # Default value
 
     def test_retention_system_managed_create_and_retrieve(self, test_session):
         """Test RetentionDTO system managed flag through database round-trip"""
         # Create expected system managed retention
-        expected_retention = RetentionDTO(
+        expected_retention = RetentionTypeDTO(
             name="Auto-Cleanup",
-            is_system_managed="true",
+            is_system_managed=True,
             display_rank=99
         )
         
         # Create retention from expected values
-        original_retention = RetentionDTO(
+        original_retention = RetentionTypeDTO(
             name=expected_retention.name,
             is_system_managed=expected_retention.is_system_managed,
             display_rank=expected_retention.display_rank
@@ -406,7 +406,7 @@ class TestRetentionDTO:
         
         # Clear session and retrieve fresh
         test_session.expunge_all()
-        retrieved_retention = test_session.get(RetentionDTO, retention_id)
+        retrieved_retention = test_session.get(RetentionTypeDTO, retention_id)
         
         # Verify against expected values
         assert retrieved_retention.name == expected_retention.name
@@ -417,15 +417,15 @@ class TestRetentionDTO:
         """Test querying RetentionDTO by display rank"""
         # Define expected retention policies
         expected_retentions = [
-            RetentionDTO(name="7 days", is_system_managed="false", display_rank=1),
-            RetentionDTO(name="30 days", is_system_managed="false", display_rank=2),
-            RetentionDTO(name="90 days", is_system_managed="false", display_rank=3),
-            RetentionDTO(name="Never", is_system_managed="true", display_rank=99)
+            RetentionTypeDTO(name="7 days", is_system_managed=False, display_rank=1),
+            RetentionTypeDTO(name="30 days", is_system_managed=False, display_rank=2),
+            RetentionTypeDTO(name="90 days", is_system_managed=False, display_rank=3),
+            RetentionTypeDTO(name="Never", is_system_managed=True, display_rank=99)
         ]
         
         # Create retention policies from expected data
         for expected_retention in expected_retentions:
-            retention = RetentionDTO(
+            retention = RetentionTypeDTO(
                 name=expected_retention.name,
                 is_system_managed=expected_retention.is_system_managed,
                 display_rank=expected_retention.display_rank
@@ -435,15 +435,15 @@ class TestRetentionDTO:
         
         # Query system managed retentions
         system_managed = test_session.exec(
-            select(RetentionDTO).where(RetentionDTO.is_system_managed == "true")
+            select(RetentionTypeDTO).where(RetentionTypeDTO.is_system_managed == True)
         ).all()
-        expected_system_managed = [r for r in expected_retentions if r.is_system_managed == "true"]
+        expected_system_managed = [r for r in expected_retentions if r.is_system_managed == True]
         assert len(system_managed) == len(expected_system_managed)
         assert system_managed[0].name == expected_system_managed[0].name
         
         # Query by display rank order
         ordered_retentions = test_session.exec(
-            select(RetentionDTO).order_by(asc(RetentionDTO.display_rank))
+            select(RetentionTypeDTO).order_by(asc(RetentionTypeDTO.display_rank))
         ).all()
         expected_order = [r.name for r in sorted(expected_retentions, key=lambda x: x.display_rank)]
         actual_order = [r.name for r in ordered_retentions]
@@ -461,7 +461,7 @@ class TestDTODatabaseIntegration:
         )
         folder_node = FolderNodeDTO(parent_id=0, name="test", type_id=0)
         folder_type = FolderTypeDTO(name="TestType")
-        retention = RetentionDTO(name="TestRetention")
+        retention = RetentionTypeDTO(name="TestRetention")
         
         # Add all to session
         test_session.add_all([root_folder, folder_node, folder_type, retention])
@@ -481,7 +481,7 @@ class TestDTODatabaseIntegration:
         retrieved_root = test_session.get(RootFolderDTO, root_folder.id)
         retrieved_node = test_session.get(FolderNodeDTO, folder_node.id)
         retrieved_type = test_session.get(FolderTypeDTO, folder_type.id)
-        retrieved_retention = test_session.get(RetentionDTO, retention.id)
+        retrieved_retention = test_session.get(RetentionTypeDTO, retention.id)
         
         assert all([
             retrieved_root is not None,
@@ -510,9 +510,9 @@ class TestDTODatabaseIntegration:
             modified="2025-08-11T14:30:00Z"
         )
         
-        expected_retention = RetentionDTO(
+        expected_retention = RetentionTypeDTO(
             name="Very long retention policy name with special characters ñü",
-            is_system_managed="true",
+            is_system_managed=True,
             display_rank=2147483647  # Max int value
         )
         
@@ -533,7 +533,7 @@ class TestDTODatabaseIntegration:
             modified=expected_folder_node.modified
         )
         
-        retention = RetentionDTO(
+        retention = RetentionTypeDTO(
             name=expected_retention.name,
             is_system_managed=expected_retention.is_system_managed,
             display_rank=expected_retention.display_rank
@@ -550,7 +550,7 @@ class TestDTODatabaseIntegration:
         
         retrieved_folder = test_session.get(RootFolderDTO, root_folder.id)
         retrieved_node = test_session.get(FolderNodeDTO, folder_node.id)
-        retrieved_retention = test_session.get(RetentionDTO, retention.id)
+        retrieved_retention = test_session.get(RetentionTypeDTO, retention.id)
         
         # Verify all complex data preserved exactly against expected values
         assert retrieved_folder.path == expected_root_folder.path

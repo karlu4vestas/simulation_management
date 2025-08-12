@@ -35,7 +35,7 @@ class TestDatabase:
         engine = Database.get_engine()
         
         # Check that tables are created by inspecting metadata
-        from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
+        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
         
         # Get table names from metadata
         table_names = [table.name for table in SQLModel.metadata.tables.values()]
@@ -45,7 +45,7 @@ class TestDatabase:
             "rootfolderdto",
             "foldernodedto", 
             "foldertypedto",
-            "retentiondto"
+            "retentiontypedto"
         ]
         
         for expected_table in expected_tables:
@@ -94,7 +94,7 @@ class TestDatabase:
         db.create_db_and_tables()
         
         # Verify tables exist by checking metadata
-        from datamodel.DTOs import RootFolderDTO, FolderNodeDTO
+        from datamodel.dtos import RootFolderDTO, FolderNodeDTO
         table_names = [table.name for table in SQLModel.metadata.tables.values()]
         
         assert "rootfolderdto" in table_names
@@ -116,3 +116,48 @@ class TestDatabase:
         
         # Engine should still be the same
         assert Database.get_engine() is engine
+
+    def test_database_is_empty_with_no_tables(self, clean_database):
+        """Test that is_empty returns True when no tables exist"""
+        db = Database.get_db()
+        
+        # Without creating tables, database should be considered empty
+        assert db.is_empty() is True
+
+    def test_database_is_empty_with_empty_tables(self, database_with_tables):
+        """Test that is_empty returns True when tables exist but are empty"""
+        db = database_with_tables
+        
+        # With tables created but no data, database should be empty
+        assert db.is_empty() is True
+
+    def test_database_is_not_empty_with_data(self, database_with_tables):
+        """Test that is_empty returns False when tables contain data"""
+        from sqlmodel import Session
+        from datamodel.dtos import RootFolderDTO
+        
+        db = database_with_tables
+        
+        # Add some data to make database non-empty
+        with Session(db.get_engine()) as session:
+            root_folder = RootFolderDTO(
+                path="/test/folder",
+                owner="testuser",
+                active_cleanup=False
+            )
+            session.add(root_folder)
+            session.commit()
+        
+        # Now database should not be empty
+        assert db.is_empty() is False
+
+    def test_database_is_empty_engine_none(self):
+        """Test that is_empty returns True when engine is None"""
+        # Create a database instance but don't initialize the engine
+        Database._instance = None
+        Database._engine = None
+        
+        db = Database.__new__(Database)
+        db._engine = None
+        
+        assert db.is_empty() is True

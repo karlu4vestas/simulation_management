@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Session, select
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
 from datamodel.db import Database
 
 
@@ -91,7 +91,7 @@ class TestDatabaseOperations:
         
         with Session(engine) as session:
             # Create
-            retention = RetentionDTO(**sample_retention_data)
+            retention = RetentionTypeDTO(**sample_retention_data)
             session.add(retention)
             session.commit()
             session.refresh(retention)
@@ -102,7 +102,7 @@ class TestDatabaseOperations:
             session.commit()
             
             # Verify deletion
-            statement = select(RetentionDTO).where(RetentionDTO.id == saved_id)
+            statement = select(RetentionTypeDTO).where(RetentionTypeDTO.id == saved_id)
             deleted_retention = session.exec(statement).first()
             
             assert deleted_retention is None
@@ -167,11 +167,11 @@ class TestDatabaseOperations:
         with Session(engine) as session:
             # Create retention periods with different ranks
             retentions = [
-                RetentionDTO(name="New", display_rank=1),
-                RetentionDTO(name="+1 round", display_rank=2),
-                RetentionDTO(name="+3 rounds", display_rank=3),
-                RetentionDTO(name="longterm", display_rank=10),
-                RetentionDTO(name="Cleaned", is_system_managed="true", display_rank=0)
+                RetentionTypeDTO(name="New", display_rank=1),
+                RetentionTypeDTO(name="+1 round", display_rank=2),
+                RetentionTypeDTO(name="+3 rounds", display_rank=3),
+                RetentionTypeDTO(name="longterm", display_rank=10),
+                RetentionTypeDTO(name="Cleaned", is_system_managed=True, display_rank=0)
             ]
             
             for retention in retentions:
@@ -179,7 +179,7 @@ class TestDatabaseOperations:
             session.commit()
             
             # Retrieve ordered by display rank
-            statement = select(RetentionDTO).order_by(RetentionDTO.display_rank)
+            statement = select(RetentionTypeDTO).order_by(RetentionTypeDTO.display_rank)
             ordered_retentions = session.exec(statement).all()
             
             assert len(ordered_retentions) == 5
