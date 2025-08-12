@@ -7,24 +7,19 @@ from datetime import date
 class RootFolderDTO(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     path: str
-    folder_id: int
+    folder_id: int | None = Field(default=None, foreign_key="foldernodedto.id")
     owner: str
-    approvers: str
+    approvers: str | None = Field(default=None)  # comma separated approvers
     active_cleanup: bool
-
 
 class FolderNodeDTO(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-    parent_id: int = Field(default=0)
+    parent_id: int = Field(default=0)  # 0 means no parent
     name: str = Field(default="")
-    type_id: int = Field(default=0)
-
-
-class NodeAttributesDTO(SQLModel, table=True):
-    foldernode_id: int | None = Field(default=None, foreign_key="foldernodedto.id", primary_key=True)
-    retention_date: str | None = None
+    type_id: int | None = Field(default=None, foreign_key="foldertypedto.id")
     modified: str | None = None
-
+    retention_date: str | None = None
+    retention_id: int | None = Field(default=None, foreign_key="retentiondto.id")
 
 class FolderTypeDTO(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)

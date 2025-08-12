@@ -35,7 +35,7 @@ class TestDatabase:
         engine = Database.get_engine()
         
         # Check that tables are created by inspecting metadata
-        from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, NodeAttributesDTO, FolderTypeDTO, RetentionDTO
+        from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
         
         # Get table names from metadata
         table_names = [table.name for table in SQLModel.metadata.tables.values()]
@@ -44,7 +44,6 @@ class TestDatabase:
         expected_tables = [
             "rootfolderdto",
             "foldernodedto", 
-            "nodeattributesdto",
             "foldertypedto",
             "retentiondto"
         ]

@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Field, Session, select, asc
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, NodeAttributesDTO, FolderTypeDTO, RetentionDTO
+from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
 
 
 class TestRootFolderDTO:
@@ -145,7 +145,76 @@ class TestFolderNodeDTO:
         # Verify defaults persisted correctly
         assert retrieved_node.parent_id == 0      # Default value
         assert retrieved_node.name == ""          # Default value
-        assert retrieved_node.type_id == 0        # Default value    def test_folder_node_hierarchy_creation(self, test_session):
+        assert retrieved_node.type_id is None     # Default value
+        assert retrieved_node.modified is None    # Default value  
+        assert retrieved_node.retention_date is None  # Default value
+        assert retrieved_node.retention_id is None    # Default value
+
+    def test_folder_node_with_attributes_create_and_retrieve(self, test_session):
+        """Test creating and retrieving a FolderNodeDTO with attributes"""
+        # Create and save
+        original_node = FolderNodeDTO(
+            parent_id=1,
+            name="TestNode",
+            type_id=2,
+            modified="2025-08-12T10:30:00Z",
+            retention_date="2025-12-31",
+            retention_id=5
+        )
+        test_session.add(original_node)
+        test_session.commit()
+        test_session.refresh(original_node)
+        
+        # Verify ID was assigned
+        assert original_node.id is not None
+        node_id = original_node.id
+        
+        # Retrieve from database
+        retrieved_node = test_session.get(FolderNodeDTO, node_id)
+        
+        # Verify all attributes are identical
+        assert retrieved_node is not None
+        assert retrieved_node.id == original_node.id
+        assert retrieved_node.parent_id == original_node.parent_id
+        assert retrieved_node.name == original_node.name
+        assert retrieved_node.type_id == original_node.type_id
+        assert retrieved_node.modified == original_node.modified
+        assert retrieved_node.retention_date == original_node.retention_date
+        assert retrieved_node.retention_id == original_node.retention_id
+
+    def test_folder_node_attributes_update_and_retrieve(self, test_session):
+        """Test updating and retrieving FolderNodeDTO attributes"""
+        # Create and save initial node
+        initial_node = FolderNodeDTO(
+            parent_id=1,
+            name="UpdateTest",
+            type_id=1
+        )
+        test_session.add(initial_node)
+        test_session.commit()
+        test_session.refresh(initial_node)
+        node_id = initial_node.id
+        
+        # Update attributes
+        initial_node.modified = "2025-08-12T15:45:00Z"
+        initial_node.retention_date = "2026-01-01"
+        initial_node.retention_id = 3
+        test_session.commit()
+        
+        # Clear session and retrieve fresh
+        test_session.expunge_all()
+        retrieved_node = test_session.get(FolderNodeDTO, node_id)
+        
+        # Verify updates persisted
+        assert retrieved_node.modified == "2025-08-12T15:45:00Z"
+        assert retrieved_node.retention_date == "2026-01-01"
+        assert retrieved_node.retention_id == 3
+        # Verify other fields unchanged
+        assert retrieved_node.parent_id == 1
+        assert retrieved_node.name == "UpdateTest"
+        assert retrieved_node.type_id == 1
+
+    def test_folder_node_hierarchy_creation(self, test_session):
         """Test creating parent-child folder relationships and retrieving them"""
         # Create expected parent folder
         expected_parent = FolderNodeDTO(
@@ -204,76 +273,6 @@ class TestFolderNodeDTO:
         ).all()
         assert len(children) == 1
         assert children[0].id == child_id
-
-
-class TestNodeAttributesDTO:
-    """Test NodeAttributesDTO database operations"""
-
-    def test_node_attributes_create_and_retrieve(self, test_session):
-        """Test creating, saving, and retrieving a NodeAttributesDTO"""
-        # Create and save
-        original_attrs = NodeAttributesDTO(
-            foldernode_id=1, 
-            retention_date="2025-12-31",
-            modified="2025-08-11"
-        )
-        test_session.add(original_attrs)
-        test_session.commit()
-        test_session.refresh(original_attrs)
-        
-        # Retrieve from database using node_id (primary key)
-        retrieved_attrs = test_session.get(NodeAttributesDTO, 1)
-        
-        # Verify all attributes are identical
-        assert retrieved_attrs is not None
-        assert retrieved_attrs.foldernode_id == original_attrs.foldernode_id
-        assert retrieved_attrs.retention_date == original_attrs.retention_date
-        assert retrieved_attrs.modified == original_attrs.modified
-
-    def test_node_attributes_with_defaults_create_and_retrieve(self, test_session):
-        """Test NodeAttributesDTO with default values through database round-trip"""
-        # Create with minimal data (testing defaults)
-        original_attrs = NodeAttributesDTO(foldernode_id=5)
-        test_session.add(original_attrs)
-        test_session.commit()
-        test_session.refresh(original_attrs)
-        
-        # Clear session and retrieve fresh
-        test_session.expunge_all()
-        retrieved_attrs = test_session.get(NodeAttributesDTO, 5)
-        
-        # Verify defaults persisted correctly
-        assert retrieved_attrs.foldernode_id == 5
-        assert retrieved_attrs.retention_date is None  # Default value
-        assert retrieved_attrs.modified is None       # Default value
-
-    def test_node_attributes_update_and_retrieve(self, test_session):
-        """Test updating and retrieving NodeAttributesDTO"""
-        # Create and save initial attributes
-        initial_attrs = NodeAttributesDTO(foldernode_id=10)
-        test_session.add(initial_attrs)
-        test_session.commit()
-        
-        # Create expected updated state
-        expected_attrs = NodeAttributesDTO(
-            foldernode_id=10,  # Unchanged (primary key)
-            retention_date="2026-01-01",
-            modified="2025-08-12"
-        )
-        
-        # Apply updates from expected object
-        initial_attrs.retention_date = expected_attrs.retention_date
-        initial_attrs.modified = expected_attrs.modified
-        test_session.commit()
-        
-        # Clear session and retrieve fresh
-        test_session.expunge_all()
-        retrieved_attrs = test_session.get(NodeAttributesDTO, 10)
-        
-        # Verify against expected values
-        assert retrieved_attrs.retention_date == expected_attrs.retention_date
-        assert retrieved_attrs.modified == expected_attrs.modified
-        assert retrieved_attrs.foldernode_id == expected_attrs.foldernode_id  # Unchanged (primary key)
 
 
 class TestFolderTypeDTO:
@@ -461,36 +460,32 @@ class TestDTODatabaseIntegration:
             path="/test", folder_id=1, owner="test", approvers="test", active_cleanup=False
         )
         folder_node = FolderNodeDTO(parent_id=0, name="test", type_id=0)
-        node_attrs = NodeAttributesDTO(foldernode_id=100)
         folder_type = FolderTypeDTO(name="TestType")
         retention = RetentionDTO(name="TestRetention")
         
         # Add all to session
-        test_session.add_all([root_folder, folder_node, node_attrs, folder_type, retention])
+        test_session.add_all([root_folder, folder_node, folder_type, retention])
         test_session.commit()
         test_session.refresh(root_folder)
         test_session.refresh(folder_node)
         test_session.refresh(folder_type)
         test_session.refresh(retention)
         
-        # Verify all have IDs assigned (except NodeAttributesDTO which uses node_id)
+        # Verify all have IDs assigned
         assert root_folder.id is not None
         assert folder_node.id is not None
-        assert node_attrs.foldernode_id == 100
         assert folder_type.id is not None
         assert retention.id is not None
         
         # Verify all can be retrieved
         retrieved_root = test_session.get(RootFolderDTO, root_folder.id)
         retrieved_node = test_session.get(FolderNodeDTO, folder_node.id)
-        retrieved_attrs = test_session.get(NodeAttributesDTO, 100)
         retrieved_type = test_session.get(FolderTypeDTO, folder_type.id)
         retrieved_retention = test_session.get(RetentionDTO, retention.id)
         
         assert all([
             retrieved_root is not None,
             retrieved_node is not None,
-            retrieved_attrs is not None,
             retrieved_type is not None,
             retrieved_retention is not None
         ])
@@ -507,8 +502,10 @@ class TestDTODatabaseIntegration:
             active_cleanup=True
         )
         
-        expected_node_attrs = NodeAttributesDTO(
-            foldernode_id=123456,
+        expected_folder_node = FolderNodeDTO(
+            parent_id=123456,
+            name="Test node with special chars äöü",
+            type_id=1,
             retention_date="2025-12-31",
             modified="2025-08-11T14:30:00Z"
         )
@@ -528,10 +525,12 @@ class TestDTODatabaseIntegration:
             active_cleanup=expected_root_folder.active_cleanup
         )
         
-        node_attrs = NodeAttributesDTO(
-            foldernode_id=expected_node_attrs.foldernode_id,
-            retention_date=expected_node_attrs.retention_date,
-            modified=expected_node_attrs.modified
+        folder_node = FolderNodeDTO(
+            parent_id=expected_folder_node.parent_id,
+            name=expected_folder_node.name,
+            type_id=expected_folder_node.type_id,
+            retention_date=expected_folder_node.retention_date,
+            modified=expected_folder_node.modified
         )
         
         retention = RetentionDTO(
@@ -540,16 +539,18 @@ class TestDTODatabaseIntegration:
             display_rank=expected_retention.display_rank
         )
         
-        test_session.add_all([root_folder, node_attrs, retention])
+        test_session.add_all([root_folder, folder_node, retention])
         test_session.commit()
         test_session.refresh(root_folder)
+        test_session.refresh(folder_node)
         test_session.refresh(retention)
         
         # Clear session and retrieve fresh
         test_session.expunge_all()
         
         retrieved_folder = test_session.get(RootFolderDTO, root_folder.id)
-        retrieved_attrs = test_session.get(NodeAttributesDTO, expected_node_attrs.foldernode_id)
+        retrieved_node = test_session.get(FolderNodeDTO, folder_node.id)
+        retrieved_retention = test_session.get(RetentionDTO, retention.id)
         
         # Verify all complex data preserved exactly against expected values
         assert retrieved_folder.path == expected_root_folder.path
@@ -558,7 +559,13 @@ class TestDTODatabaseIntegration:
         assert retrieved_folder.approvers == expected_root_folder.approvers
         assert retrieved_folder.active_cleanup == expected_root_folder.active_cleanup
         
-        assert retrieved_attrs.foldernode_id == expected_node_attrs.foldernode_id
-        assert retrieved_attrs.retention_date == expected_node_attrs.retention_date
-        assert retrieved_attrs.modified == expected_node_attrs.modified
+        assert retrieved_node.parent_id == expected_folder_node.parent_id
+        assert retrieved_node.name == expected_folder_node.name
+        assert retrieved_node.type_id == expected_folder_node.type_id
+        assert retrieved_node.retention_date == expected_folder_node.retention_date
+        assert retrieved_node.modified == expected_folder_node.modified
+        
+        assert retrieved_retention.name == expected_retention.name
+        assert retrieved_retention.is_system_managed == expected_retention.is_system_managed
+        assert retrieved_retention.display_rank == expected_retention.display_rank
         

@@ -47,7 +47,7 @@ server/
 - ✅ Default value testing
 - ✅ SQLModel table configuration
 - ✅ Primary key setup
-- ✅ All 5 DTO classes: RootFolderDTO, FolderNodeDTO, NodeAttributesDTO, FolderTypeDTO, RetentionDTO
+- ✅ All 4 DTO classes: RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
 
 #### **Integration Tests** (`test_database_operations.py`)
 - ✅ Create, Read, Update, Delete operations

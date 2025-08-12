@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Session, select
-from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, NodeAttributesDTO, FolderTypeDTO, RetentionDTO
+from datamodel.DTOs import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionDTO
 from datamodel.db import Database
 
 
@@ -37,15 +37,15 @@ class TestDatabaseOperations:
         
         with Session(engine) as session:
             # Create parent node
-            parent = FolderNodeDTO(name="Parent", type_id=1, node_attributes=0)
+            parent = FolderNodeDTO(name="Parent", type_id=1)
             session.add(parent)
             session.commit()
             session.refresh(parent)
             
             # Create child nodes
             assert parent.id is not None
-            child1 = FolderNodeDTO(parent_id=parent.id, name="Child1", type_id=2, node_attributes=0)
-            child2 = FolderNodeDTO(parent_id=parent.id, name="Child2", type_id=2, node_attributes=0)
+            child1 = FolderNodeDTO(parent_id=parent.id, name="Child1", type_id=2)
+            child2 = FolderNodeDTO(parent_id=parent.id, name="Child2", type_id=2)
             
             session.add(child1)
             session.add(child2)
@@ -107,34 +107,33 @@ class TestDatabaseOperations:
             
             assert deleted_retention is None
 
-    def test_node_attributes_relationship(self, database_with_tables):
-        """Test NodeAttributesDTO with FolderNodeDTO relationship"""
+    def test_folder_node_with_attributes(self, database_with_tables):
+        """Test FolderNodeDTO with attribute fields"""
         engine = Database.get_engine()
         
         with Session(engine) as session:
-            # Create a folder node
-            node = FolderNodeDTO(name="TestNode", type_id=1)
+            # Create a folder node with attributes
+            node = FolderNodeDTO(
+                name="TestNode", 
+                type_id=1,
+                modified="2025-08-11T10:30:00Z",
+                retention_date="2025-12-31",
+                retention_id=5
+            )
             session.add(node)
             session.commit()
             session.refresh(node)
             
-            # Create node attributes for this node
+            # Verify the node with its attributes
             assert node.id is not None
-            attrs = NodeAttributesDTO(
-                foldernode_id=node.id,
-                retention_date="2025-12-31",
-                modified="2025-08-11"
-            )
-            session.add(attrs)
-            session.commit()
+            statement = select(FolderNodeDTO).where(FolderNodeDTO.id == node.id)
+            retrieved_node = session.exec(statement).first()
             
-            # Verify the relationship
-            statement = select(NodeAttributesDTO).where(NodeAttributesDTO.foldernode_id == node.id)
-            retrieved_attrs = session.exec(statement).first()
-            
-            assert retrieved_attrs is not None
-            assert retrieved_attrs.foldernode_id == node.id
-            assert retrieved_attrs.retention_date == "2025-12-31"
+            assert retrieved_node is not None
+            assert retrieved_node.name == "TestNode"
+            assert retrieved_node.modified == "2025-08-11T10:30:00Z"
+            assert retrieved_node.retention_date == "2025-12-31"
+            assert retrieved_node.retention_id == 5
 
     def test_folder_type_enum_like_behavior(self, database_with_tables):
         """Test FolderTypeDTO as an enum-like structure"""

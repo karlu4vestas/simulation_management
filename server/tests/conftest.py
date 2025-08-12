@@ -60,6 +60,19 @@ def sample_folder_node_data():
     }
 
 
+@pytest.fixture(scope="function") 
+def sample_folder_node_with_attributes_data():
+    """Sample data for FolderNodeDTO testing with attributes"""
+    return {
+        "parent_id": 0,
+        "name": "TestFolderWithAttrs",
+        "type_id": 1,
+        "modified": "2025-08-12T10:30:00Z",
+        "retention_date": "2025-12-31",
+        "retention_id": 3
+    }
+
+
 @pytest.fixture(scope="function")
 def sample_retention_data():
     """Sample data for RetentionDTO testing"""
