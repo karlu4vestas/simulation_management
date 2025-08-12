@@ -13,7 +13,19 @@ namespace VSM.Client.Datamodel
         public static DataModel Instance => _instance.Value;
         public List<string> RetentionOptions { get; } =
         [
-            "Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"
+            "Cleaned",
+            "MarkedForCleanup", 
+            "CleanupIssue",    
+            "New",
+            "+1Next",
+            "+Q1",
+            "+Q3",
+            "+Q6",
+            "+1Y",
+            "+2Y",
+            "+3Y",
+            "longterm",
+            "path protected"            
         ];
         private RootFolder? selected_root_folder;
 
