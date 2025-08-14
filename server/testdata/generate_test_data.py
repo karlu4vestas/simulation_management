@@ -76,13 +76,6 @@ class RandomNodeType:
 
     def get_inner_node_type(self) -> FolderTypeDTO:
         return self.inner_node_type
-
-# helper to generate random testdata
-class BooleanGenerator:
-    def __init__(self):
-        self.rnd = random.Random()
-    def next_boolean(self):
-        return self.rnd.randint(0, 1) == 1
     
 def insert_root_folders_metadata_in_db(engine):
     with Session(engine) as session:
@@ -91,7 +84,7 @@ def insert_root_folders_metadata_in_db(engine):
             approvers="stefw, misve",
             active_cleanup=True,
             path="R1",
-            folder_id=generate_folder_tree("R1", 1)[0].id
+            folder_id=generate_folder_tree("R1", 10)[0].id
             ))
         
         session.add(RootFolderDTO(
@@ -99,7 +92,7 @@ def insert_root_folders_metadata_in_db(engine):
             approvers="stefw, jajac",
             active_cleanup=True,
             path="R2",
-            folder_id=generate_folder_tree("R2", 1)[0].id
+            folder_id=generate_folder_tree("R2", 5)[0].id
             ))
         
         session.add(RootFolderDTO(
@@ -107,7 +100,7 @@ def insert_root_folders_metadata_in_db(engine):
             approvers="arlem, jajac",
             active_cleanup=True,
             path="R3",
-            folder_id=generate_folder_tree("R3", 1)[0].id
+            folder_id=generate_folder_tree("R3", 5)[0].id
             ))
         
         session.add(RootFolderDTO(
@@ -115,7 +108,7 @@ def insert_root_folders_metadata_in_db(engine):
             approvers="arlem, jajac",
             active_cleanup=True,
             path="R4",
-            folder_id=generate_folder_tree("R4", 1)[0].id
+            folder_id=generate_folder_tree("R4", 5)[0].id
             ))
         
         #session.add(RootFolderDTO(path="VTS" ))
@@ -162,18 +155,18 @@ def generate_node(engine:Engine, parent_id:int, node_type:Optional[FolderTypeDTO
         with Session(engine) as session:
             session.add(child)
             session.commit()
-            print(f"FolderNodeDTO {child.id}")
 
     return child 
 
-def generate_folder_tree(name_root_folder:str, max_level:int=1) -> tuple[FolderNodeDTO, int]:
+def generate_folder_tree(name_root_folder:str, max_level:int=1) -> FolderNodeDTO:
     retention_generator:RandomRetention = RandomRetention(0)
-    bool_gen:BooleanGenerator = BooleanGenerator()
     rand:random.Random = random.Random(42)
     random_node_type: RandomNodeType = RandomNodeType(0)
     engine:Engine = Database.get_engine()
 
     print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
+
+    #generate the root
     id_counter:int = 1 
     root:Optional[FolderNodeDTO] = generate_node(   engine=engine, 
                                                     parent_id=0, 
@@ -184,206 +177,41 @@ def generate_folder_tree(name_root_folder:str, max_level:int=1) -> tuple[FolderN
     if root is None: 
         root = FolderNodeDTO(id=None, parent_id=0, name=name_root_folder)
     else:
-        pass     
-    # generate a folder tree for the rootfolder
-    """
+        # generate a folder tree under the rootfolder
         current_level_nodes = [root]
-        nodes_generated = 0
+        nodes_generated = 1
         YIELD_EVERY_N_NODES = 100
         for level in range(max_level):
             next_level_nodes = []
             for current_parent in current_level_nodes:
                 number_of_children = rand.randint(4, 6)
-                for i in range(number_of_children):
-                    child_id = id_counter + 1
-                    id_counter = child_id
-                    child_level = level + 1
-                    if child_level == max_level:
-                        child = LeafNode(
-                            id=child_id,
-                            parent_id=current_parent.id,
-                            parent=current_parent,
-                            name=f"SimData_{child_level}_{i + 1}",
-                            level=child_level,
-                            retention=retention_generator.next(),
-                        )
-                    else:
-                        should_be_leaf_node = child_level > 3 and bool_gen.next_boolean()
-                        if should_be_leaf_node:
-                            child = LeafNode(
-                                id=child_id,
-                                parent_id=current_parent.id,
-                                parent=current_parent,
-                                name=f"SimData_{child_level}_{i + 1}",
-                                level=child_level,
-                                retention=retention_generator.next(),
-                            )
+                if current_parent.id is None: 
+                    continue
+                else:
+                    #generate all siblings and add InnerNodes to next_level_nodes
+                    for i_sibling in range(number_of_children):
+                        id_counter = id_counter + 1
+                        child_level = level + 1
+
+                        if child_level == max_level:
+                            node_type = random_node_type.get_simulation_type()
+                        elif child_level <= 3 :
+                            node_type = random_node_type.get_inner_node_type()
                         else:
-                            child = InnerNode(
-                                id=child_id,
-                                parent_id=current_parent.id,
-                                parent=current_parent,
-                                name=f"Folder_{child_level}_{i + 1}",
-                                level=child_level,
-                            )
-                            next_level_nodes.append(child)
-                    current_parent.children.append(child)
-                    nodes_generated += 1
+                            node_type = random_node_type.next()
+
+                        child:Optional[FolderNodeDTO] = generate_node(  engine=engine, 
+                                                                        parent_id=current_parent.id, 
+                                                                        node_type=node_type, 
+                                                                        child_level=child_level, 
+                                                                        sibling_counter=i_sibling,
+                                                                        retention_generator=retention_generator)
+                        if not child is None:
+                            if node_type == random_node_type.get_inner_node_type():
+                                next_level_nodes.append(child)
+                            nodes_generated += 1
+
 
             current_level_nodes = next_level_nodes
-            if not current_level_nodes:
-                break
-        print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}")
-    """
-
-    return (root, id_counter)
-
-#-------------------------------------
-"""
-import asyncio
-import random
-
-class RootFolder:
-    def __init__(self, id, root_path="", is_registeredfor_cleanup=False, users=None):
-        self.id = id
-        self.is_registeredfor_cleanup = is_registeredfor_cleanup
-        self.root_path = root_path
-        self._folder_tree = None
-        self._folder_tree_task = None
-        self.users = users if users is not None else []
-
-    @property
-    def folder_tree(self):
-        if self._folder_tree is None and self._folder_tree_task and self._folder_tree_task.done():
-            self._folder_tree = self._folder_tree_task.result()
-        return self._folder_tree
-
-    @folder_tree.setter
-    def folder_tree(self, value):
-        self._folder_tree = value
-
-    async def get_folder_tree_async(self):
-        if self._folder_tree is not None:
-            return self._folder_tree
-        if self._folder_tree_task is None:
-            self._folder_tree_task = asyncio.create_task(TestDataGenerator.get_root_folder_tree_async(self))
-        self._folder_tree = await self._folder_tree_task
-        return self._folder_tree
-
-    @property
-    def is_loading_folder_tree(self):
-        return self._folder_tree_task is not None and not self._folder_tree_task.done()
-
-    @property
-    def retention_headers(self):
-        # Assuming DataModel.Instance.RetentionOptions is a list
-        return [] if self.folder_tree is None else DataModel.Instance.RetentionOptions
-
-
-class TestDataGenerator:
-    @staticmethod
-    async def get_root_folder_tree_async(root_folder):
-        if root_folder is None:
-            return None
-        id_counter = 1
-        the_root_folder = InnerNode(
-            id=id_counter,
-            parent_id=id_counter,
-            name=root_folder.root_path,
-            is_expanded=True,
-            level=0,
-        )
-        id_counter = the_root_folder.id
-        await TestDataGenerator.generate_tree_recursively_async(
-            the_root_folder, id_counter, max_level=12
-        )
-        return the_root_folder
-
-    @staticmethod
-    async def generate_tree_recursively_async(parent, id_counter:int, max_level:int):
-        retention_generator:RandomRetention = RandomRetention(0)
-        bool_gen:BooleanGenerator = BooleanGenerator()
-        rand:random.Random = random.Random(42)
-        print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
-
-        # generate a folder tree for the rootfolder
-        current_level_nodes = [parent]
-        nodes_generated = 0
-        YIELD_EVERY_N_NODES = 100
-        for level in range(max_level):
-            next_level_nodes = []
-            for current_parent in current_level_nodes:
-                number_of_children = rand.randint(4, 6)
-                for i in range(number_of_children):
-                    child_id = id_counter + 1
-                    id_counter = child_id
-                    child_level = level + 1
-                    if child_level == max_level:
-                        child = LeafNode(
-                            id=child_id,
-                            parent_id=current_parent.id,
-                            parent=current_parent,
-                            name=f"SimData_{child_level}_{i + 1}",
-                            level=child_level,
-                            retention=retention_generator.next(),
-                        )
-                    else:
-                        should_be_leaf_node = child_level > 3 and bool_gen.next_boolean()
-                        if should_be_leaf_node:
-                            child = LeafNode(
-                                id=child_id,
-                                parent_id=current_parent.id,
-                                parent=current_parent,
-                                name=f"SimData_{child_level}_{i + 1}",
-                                level=child_level,
-                                retention=retention_generator.next(),
-                            )
-                        else:
-                            child = InnerNode(
-                                id=child_id,
-                                parent_id=current_parent.id,
-                                parent=current_parent,
-                                name=f"Folder_{child_level}_{i + 1}",
-                                level=child_level,
-                            )
-                            next_level_nodes.append(child)
-                    current_parent.children.append(child)
-                    nodes_generated += 1
-                    if nodes_generated % YIELD_EVERY_N_NODES == 0:
-                        print(f"GenerateTreeRecursivelyAsync: YIELD_EVERY_N_NODES : Total nodes generated = {nodes_generated}")
-                        await asyncio.sleep(0)
-            current_level_nodes = next_level_nodes
-            if not current_level_nodes:
-                break
-        print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}")
-
-    @staticmethod
-    def gen_test_root_folders_for_user(user):
-        root_folders = []
-        root_id = 1
-        root_folders.append(RootFolder(
-            id=root_id,
-            is_registeredfor_cleanup=True,
-            users=[user, User("jajac"), User("misve")],
-            root_path="\\\\domain.net\\root_1"
-        ))
-        root_id += 1
-        root_folders.append(RootFolder(
-            id=root_id,
-            is_registeredfor_cleanup=True,
-            users=[user, User("stefw"), User("misve")],
-            root_path="\\\\domain.net\\root_2"
-        ))
-        root_folders.append(RootFolder(
-            id=root_id,
-            users=[user, User("facap"), User("misve")],
-            root_path="\\\\domain.net\\root_3"
-        ))
-        root_id += 1
-        root_folders.append(RootFolder(
-            id=root_id,
-            users=[user, User("caemh"), User("arlem")],
-            root_path="\\\\domain.net\\root_4"
-        ))
-        return root_folders
-"""
+    print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {id_counter}, maxLevel = {max_level}")
+    return root
