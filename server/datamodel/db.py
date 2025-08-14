@@ -15,7 +15,7 @@ class Database:
             config = AppConfig()
             sqlite_url = config.get_db_url()
             cls._instance._initialize(sqlite_url)
-            print("create new db instance")
+            print(f"create new db instance at: {sqlite_url}")
         return cls._instance
 
     def _initialize(self, sqlite_url: str):
@@ -60,6 +60,22 @@ class Database:
         except Exception:
             # If there's an error (e.g., tables don't exist), consider it empty
             return True
+
+    def clear_all_tables_and_schemas(self):
+        """
+        Clear all tables and drop all schemas from the database.
+        This will completely reset the database structure and data.
+        """
+        if self._engine is None:
+            return
+            
+        try:
+            # Drop all tables defined in SQLModel metadata
+            SQLModel.metadata.drop_all(self._engine)
+            print("All tables and schemas have been cleared from the database")
+        except Exception as e:
+            print(f"Error clearing tables and schemas: {e}")
+            raise
 
 if __name__ == "__main__":
     db:Database = Database.get_db()

@@ -1,14 +1,14 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO
+from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, FolderNodePublic
 from datamodel.db import Database
-
-from .config import get_test_mode, is_unit_test, is_client_test, is_production
-import tempfile
-import os
-from sqlalchemy import create_engine
-
+from sqlalchemy import create_engine, text
+from app.config import AppConfig
+import csv
+import io
+from zstandard import ZstdCompressor
 
 app = FastAPI()
 
@@ -31,17 +31,21 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     db = Database.get_db()
-    if db.is_empty():
+    if AppConfig.is_client_test():
+        db.clear_all_tables_and_schemas()
         db.create_db_and_tables()
-    if is_client_test:
         from testdata.generate_test_data import insert_test_data_in_db
         insert_test_data_in_db(db.get_engine()) 
+    
+    if db.is_empty():
+        db.create_db_and_tables()
+
 
 @app.get("/", tags=["root"])
 async def read_root() -> dict:
     return {
         "message": "Welcome to your todo list.",
-        "test_mode": get_test_mode().value
+        "test_mode": AppConfig.get_test_mode().value
     }
 
 
@@ -49,17 +53,146 @@ async def read_root() -> dict:
 async def get_current_test_mode() -> dict:
     """Get the current test mode configuration."""
     return {
-        "test_mode": get_test_mode().value,
-        "is_unit_test": is_unit_test(),
-        "is_client_test": is_client_test(),
-        "is_production": is_production()
+        "test_mode": AppConfig.get_test_mode().value,
+        "is_unit_test": AppConfig.is_unit_test(),
+        "is_client_test": AppConfig.is_client_test(),
+        "is_production": AppConfig.is_production()
     }
 
 
-# endpoint for reading the RetentionTypeDTO
-# it must not be able to change the RetentionTypeDTO
+# we must only allow the webclient to read the RetentionTypeDTOs
 @app.get("/retentiontypes/", response_model=list[RetentionTypePublic])
 def read_retention_types():
     with Session(Database.get_engine()) as session:
         retention_types = session.exec(select(RetentionTypeDTO)).all()
         return retention_types
+    
+# we must only allow the webclient to read the FolderTypeDTOs
+@app.get("/foldertypes/", response_model=list[FolderTypePublic])
+def read_folder_types():
+    with Session(Database.get_engine()) as session:
+        retention_types = session.exec(select(FolderTypeDTO)).all()
+        return retention_types    
+    
+# we must only allow the webclient to read the RootFolders
+@app.get("/rootfolders/", response_model=list[RootFolderPublic])
+def read_root_folders():
+    with Session(Database.get_engine()) as session:
+        retention_types = session.exec(select(RootFolderDTO)).all()
+        return retention_types        
+
+#develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
+@app.get("/folders/", response_model=list[FolderNodePublic])
+def read_folders():
+    with Session(Database.get_engine()) as session:
+        folders = session.exec(select(FolderNodeDTO)).all()
+        return folders
+
+@app.get("/folders/", response_model=list[FolderNodePublic])
+def read_folders():
+    with Session(Database.get_engine()) as session:
+        folders = session.exec(select(FolderNodeDTO)).all()
+        return folders
+
+
+
+
+# Endpoint to extract and send all FolderNodeDTOs as CSV
+@app.get("/folders/csv")
+def read_folders_csv():
+    def generate_csv():
+        engine = Database.get_engine()
+        conn = engine.raw_connection()
+        if conn is None:
+            return io.StringIO()
+        else :
+            cursor = conn.cursor()
+            
+            # Get column names
+            cursor.execute("PRAGMA table_info(foldernodedto)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            # Create CSV header
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(columns)
+            yield output.getvalue()
+            
+            # Stream data in chunks
+            chunk_size = 10000
+            offset = 0
+            
+            while True:
+                cursor.execute(f"SELECT * FROM foldernodedto LIMIT {chunk_size} OFFSET {offset}")
+                rows = cursor.fetchall()
+                
+                if not rows:
+                    conn.close()
+                    conn=None
+                    break
+                
+                # Write chunk to CSV
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerows(rows)
+                yield output.getvalue()
+                
+                offset += chunk_size
+        
+    return StreamingResponse(
+        generate_csv(), 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=folders.csv"}
+    )
+
+# Endpoint to extract and send all FolderNodeDTOs as compressed CSV using zstd
+@app.get("/folders/csv-zstd")
+def read_folders_csv_zstd():
+    def generate_compressed_csv():
+        compressor = ZstdCompressor(level=3)
+        engine = Database.get_engine()
+        
+        conn = engine.raw_connection()
+        if conn is None:
+            return io.StringIO()
+        else :
+            cursor = conn.cursor()
+            
+            # Get column names and create header
+            cursor.execute("PRAGMA table_info(foldernodedto)")
+            columns = [row[1] for row in cursor.fetchall()]
+            
+            output = io.StringIO()
+            writer = csv.writer(output)
+            writer.writerow(columns)
+            yield compressor.compress(output.getvalue().encode('utf-8'))
+            
+            # Stream data in chunks
+            chunk_size = 10000
+            offset = 0
+            
+            while True:
+                cursor.execute(f"SELECT * FROM foldernodedto LIMIT {chunk_size} OFFSET {offset}")
+                rows = cursor.fetchall()
+                
+                if not rows:
+                    conn.close()
+                    conn=None
+                    break
+                
+                # Write chunk to CSV and compress
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerows(rows)
+                yield compressor.compress(output.getvalue().encode('utf-8'))
+                
+                offset += chunk_size
+        
+    return StreamingResponse(
+        generate_compressed_csv(), 
+        media_type="application/zstd",
+        headers={
+            "Content-Disposition": "attachment; filename=folders.csv.zst",
+            "Content-Encoding": "zstd"
+        }
+    )

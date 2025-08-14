@@ -26,6 +26,13 @@ class AppConfig:
             cls._instance = super(AppConfig, cls).__new__(cls)
         return cls._instance
     
+    @classmethod
+    def Instance(cls):
+        """Get the singleton instance of AppConfig."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+    
     @property
     def test_mode(self) -> TestMode:
         """Get the current test mode."""
@@ -45,58 +52,35 @@ class AppConfig:
     # def set_test_mode(self, mode: TestMode | str) -> None:
     #     """Alternative method to set test mode."""
     #     self.test_mode = mode
-    
-    def is_unit_test(self) -> bool:
+
+    @staticmethod
+    def get_test_mode() -> TestMode:
         """Check if current mode is unit_test."""
-        return self._test_mode == TestMode.UNIT_TEST
+        return AppConfig.Instance().test_mode
+
+    @staticmethod
+
+    def is_unit_test() -> bool:
+        """Check if current mode is unit_test."""
+        return AppConfig.Instance().test_mode == TestMode.UNIT_TEST
     
-    def is_client_test(self) -> bool:
+    @staticmethod
+    def is_client_test() -> bool:
         """Check if current mode is client_test."""
-        return self._test_mode == TestMode.CLIENT_TEST
-    
-    def is_production(self) -> bool:
+        return AppConfig.Instance().test_mode == TestMode.CLIENT_TEST
+
+    @staticmethod
+    def is_production() -> bool:
         """Check if current mode is production."""
-        return self._test_mode == TestMode.PRODUCTION
+        return AppConfig.Instance().test_mode == TestMode.PRODUCTION
     
-    def get_db_url(self) -> str:
+    @staticmethod
+    def get_db_url() -> str:
+        inst=AppConfig.Instance()
         """Get the database URL based on the current test mode."""
-        if self._test_mode == TestMode.UNIT_TEST:
+        if inst.test_mode == TestMode.UNIT_TEST:
             return "sqlite:///:memory:"  # In-memory database for unit tests
-        elif self._test_mode == TestMode.CLIENT_TEST:
+        elif inst.test_mode == TestMode.CLIENT_TEST:
             return "sqlite:///test_db.sqlite"  # Separate test database file
         else:  # PRODUCTION
             return "sqlite:///db.sqlite"  # Production database file
-
-
-# Global configuration instance
-config = AppConfig()
-
-
-def get_test_mode() -> TestMode:
-    """Get the current test mode."""
-    return config.test_mode
-
-
-def set_test_mode(mode: TestMode | str) -> None:
-    """Set the test mode globally."""
-    config.test_mode = mode
-
-
-def is_unit_test() -> bool:
-    """Check if current mode is unit_test."""
-    return config.is_unit_test()
-
-
-def is_client_test() -> bool:
-    """Check if current mode is client_test."""
-    return config.is_client_test()
-
-
-def is_production() -> bool:
-    """Check if current mode is production."""
-    return config.is_production()
-
-
-def get_db_url() -> str:
-    """Get the database URL based on the current test mode."""
-    return config.get_db_url()
