@@ -22,8 +22,12 @@ namespace VSM.Client.Datamodel
         
         public List<TreeNode> Children => _children;
 
-        public void ChangeLeafRetentions(string old_retention, string new_retention)
+        public void ChangeLeafRetentions(RetentionType old_retention_type, RetentionType new_retention_type)
         {
+            //@todo
+            string old_retention = old_retention_type.name;
+            string new_retention = new_retention_type.name;
+
             //change retention for all leaf nodes in this inner node without recursion
             var stack = new Stack<TreeNode>();
             stack.Push(this);

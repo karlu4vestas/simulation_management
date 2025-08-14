@@ -1,6 +1,22 @@
 {
   "version": "0.2.0",
-  "configurations": [ 
+  "configurations": [
+    {
+      "name": "🐍 Start FastAPI Server (Port 5173)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/main.py",
+      "python": "${workspaceFolder}/server/.venv/bin/python",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/server/.venv",
+        "PATH": "${workspaceFolder}/server/.venv/bin:${env:PATH}"
+      },
+      "args": []
+    },
     {
       "name": "🌐 VSM Server - Development (Port 5000) [Debug]",
       "type": "coreclr",
@@ -108,7 +124,7 @@
     },
     {
       "name": "🌐 Debug Blazor Client - Development (Port 5000)",
-      "type": "coreclr",
+      "type": "chrome",
       "request": "launch",
       "url": "http://localhost:5000",
       "webRoot": "${workspaceFolder}/VSM.Client"
@@ -149,6 +165,33 @@
       "name": "🚀 Full Stack Debug - Custom Environment",
       "configurations": [
         "⚙️ VSM Server - Debug/Custom (Port 5003)", 
+        "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "🐍🌐 FastAPI + VSM - Development Environment",
+      "configurations": [
+        "🐍 Start FastAPI Server (Port 5173)",
+        "🌐 VSM Server - Development (Port 5000) [Debug]",
+        "🌐 Debug Blazor Client - Development (Port 5000)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "🐍🔄 FastAPI + VSM - Staging/Test Environment",
+      "configurations": [
+        "🐍 Start FastAPI Server (Port 5173)",
+        "🔄 VSM Server - Staging/Test (Port 5002)",
+        "🔄 Debug Blazor Client - Staging/Test (Port 5002)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "🐍⚙️ FastAPI + VSM - Custom Environment",
+      "configurations": [
+        "🐍 Start FastAPI Server (Port 5173)",
+        "⚙️ VSM Server - Debug/Custom (Port 5003)",
         "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)"
       ],
       "stopAll": true

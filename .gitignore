@@ -39,6 +39,9 @@ ScaffoldingReadMe.txt
 # NuGet Symbol Packages
 *.snupkg
 
+#.sqlite
+.sqlite
+
 # Others
 ~$*
 *~

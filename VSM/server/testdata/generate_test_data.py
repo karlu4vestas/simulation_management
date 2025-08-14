@@ -10,11 +10,11 @@ def insert_test_data_in_db(engine):
 
 def insert_folder_metadata_in_db(engine):
     with Session(engine) as session:
-        session.add(RetentionTypeDTO(name="Cleaned",          display_rank=1,  is_system_managed=True ))
-        session.add(RetentionTypeDTO(name="MarkedForCleanup", display_rank=2,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="CleanupIssue",     display_rank=3,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="New",              display_rank=4,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+1Next",           display_rank=5,  is_system_managed=False ))  
+        session.add(RetentionTypeDTO(name="Clean",            display_rank=1,  is_system_managed=True ))
+        session.add(RetentionTypeDTO(name="Marked",           display_rank=2,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="Issue",            display_rank=3,  is_system_managed=False ))
+        #session.add(RetentionTypeDTO(name="New",              display_rank=4,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+Next",            display_rank=5,  is_system_managed=False ))  
         session.add(RetentionTypeDTO(name="+Q1",              display_rank=6,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="+Q3",              display_rank=7,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="+Q6",              display_rank=8,  is_system_managed=False ))
@@ -22,7 +22,7 @@ def insert_folder_metadata_in_db(engine):
         session.add(RetentionTypeDTO(name="+2Y",              display_rank=10, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="+3Y",              display_rank=11, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="longterm",         display_rank=12, is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="path protected",   display_rank=13, is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="path",             display_rank=13, is_system_managed=False ))
 
         session.commit()
 
@@ -72,48 +72,33 @@ class RandomNodeType:
         return self.folder_types[self.rand_int_generator.randint(0, len(self.folder_types) - 1)]
 
     def get_simulation_type(self) -> FolderTypeDTO:
+        if self.simulation_type is None : raise ValueError("vts folder type not found") # for pylance' sake
         return self.simulation_type
 
     def get_inner_node_type(self) -> FolderTypeDTO:
+        if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
-    
-def insert_root_folders_metadata_in_db(engine):
+
+def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path, levels):
+    folder_id = generate_folder_tree(engine, path, levels)
     with Session(engine) as session:
         session.add(RootFolderDTO(
-            owner="jajac",
-            approvers="stefw, misve",
-            active_cleanup=True,
-            path="R1",
-            folder_id=generate_folder_tree("R1", 10)[0].id
+            owner=owner,
+            approvers=approvers,
+            active_cleanup=active_cleanup,
+            path=path,
+            folder_id=folder_id
             ))
-        
-        session.add(RootFolderDTO(
-            owner="misve",
-            approvers="stefw, jajac",
-            active_cleanup=True,
-            path="R2",
-            folder_id=generate_folder_tree("R2", 5)[0].id
-            ))
-        
-        session.add(RootFolderDTO(
-            owner="karlu",
-            approvers="arlem, jajac",
-            active_cleanup=True,
-            path="R3",
-            folder_id=generate_folder_tree("R3", 5)[0].id
-            ))
-        
-        session.add(RootFolderDTO(
-            owner="caemh",
-            approvers="arlem, jajac",
-            active_cleanup=True,
-            path="R4",
-            folder_id=generate_folder_tree("R4", 5)[0].id
-            ))
-        
-        #session.add(RootFolderDTO(path="VTS" ))
         session.commit()
 
+def insert_root_folders_metadata_in_db(engine):
+
+    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R1",2)
+    generate_root_folder(engine, "misve", "stefw, jajac", True,  "R2",2)
+    generate_root_folder(engine, "karlu", "arlem, jajac", False, "R3",2)
+    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R4",2)
+
+    with Session(engine) as session:
         root_folders = session.exec(select(RootFolderDTO)).all()
         print("Test data for root_folders inserted successfully:")
         for rf in root_folders:
@@ -131,7 +116,7 @@ def insert_root_folders_metadata_in_db(engine):
 
 from typing import Optional
 
-def generate_node(engine:Engine, parent_id:int, node_type:Optional[FolderTypeDTO], child_level:int, sibling_counter:int, retention_generator:RandomRetention) -> Optional[FolderNodeDTO]:
+def generate_node(session: Session, parent_id:int, node_type:Optional[FolderTypeDTO], child_level:int, sibling_counter:int, retention_generator:RandomRetention) -> Optional[FolderNodeDTO]:
     child: Optional[FolderNodeDTO] = None
     if node_type is None: 
         return None
@@ -152,66 +137,84 @@ def generate_node(engine:Engine, parent_id:int, node_type:Optional[FolderTypeDTO
         raise Exception("unknown nodetype")
 
     if not child is None:
-        with Session(engine) as session:
-            session.add(child)
-            session.commit()
+        session.add(child)
+        session.flush()  # Flush to get the ID without committing
 
     return child 
 
-def generate_folder_tree(name_root_folder:str, max_level:int=1) -> FolderNodeDTO:
+def generate_folder_tree(engine:Engine, name_root_folder:str, max_level:int=1) -> int:
     retention_generator:RandomRetention = RandomRetention(0)
     rand:random.Random = random.Random(42)
     random_node_type: RandomNodeType = RandomNodeType(0)
-    engine:Engine = Database.get_engine()
+    
 
-    print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
+    print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level} engine:{not engine is None}")
 
-    #generate the root
-    id_counter:int = 1 
-    root:Optional[FolderNodeDTO] = generate_node(   engine=engine, 
-                                                    parent_id=0, 
-                                                    node_type=random_node_type.get_inner_node_type(), 
-                                                    child_level=1, 
-                                                    sibling_counter=0,
-                                                    retention_generator=retention_generator)
-    if root is None: 
-        root = FolderNodeDTO(id=None, parent_id=0, name=name_root_folder)
-    else:
-        # generate a folder tree under the rootfolder
-        current_level_nodes = [root]
-        nodes_generated = 1
-        YIELD_EVERY_N_NODES = 100
-        for level in range(max_level):
-            next_level_nodes = []
-            for current_parent in current_level_nodes:
-                number_of_children = rand.randint(4, 6)
-                if current_parent.id is None: 
-                    continue
-                else:
-                    #generate all siblings and add InnerNodes to next_level_nodes
-                    for i_sibling in range(number_of_children):
-                        id_counter = id_counter + 1
-                        child_level = level + 1
+    with Session(engine) as session:
+        #generate the root
+        id_counter:int = 1 
+        root:Optional[FolderNodeDTO] = generate_node(   session=session, 
+                                                        parent_id=0, 
+                                                        node_type=random_node_type.get_inner_node_type(), 
+                                                        child_level=1, 
+                                                        sibling_counter=0,
+                                                        retention_generator=retention_generator)
+        if root is None: 
+            root = FolderNodeDTO(id=None, parent_id=0, name=name_root_folder)
+            session.add(root)
+            session.flush()
+        else:
+            # generate a folder tree under the rootfolder
+            current_level_nodes = [root]
+            nodes_generated = 1
+            YIELD_EVERY_N_NODES = 100
+            for level in range(max_level):
+                next_level_nodes = []
+                for current_parent in current_level_nodes:
+                    number_of_children = rand.randint(4, 6)
+                    if current_parent is None : 
+                        print(f"Skipping. current_parent is None")
+                        continue  # Skip to next iteration of the loop
+                    elif current_parent.id is None: 
+                        print(f"current_parent.id is None ")
+                        continue  # Skip to next iteration of the loop
+                    else:
+                        current_parent_id:int = current_parent.id
+          
+                        #generate all siblings and add InnerNodes to next_level_nodes
+                        for i_sibling in range(number_of_children):
+                            id_counter = id_counter + 1
+                            child_level = level + 1
 
-                        if child_level == max_level:
-                            node_type = random_node_type.get_simulation_type()
-                        elif child_level <= 3 :
-                            node_type = random_node_type.get_inner_node_type()
-                        else:
-                            node_type = random_node_type.next()
+                            if child_level == max_level:
+                                node_type = random_node_type.get_simulation_type()
+                            elif child_level <= 3 :
+                                node_type = random_node_type.get_inner_node_type()
+                            else:
+                                node_type = random_node_type.next()
 
-                        child:Optional[FolderNodeDTO] = generate_node(  engine=engine, 
-                                                                        parent_id=current_parent.id, 
-                                                                        node_type=node_type, 
-                                                                        child_level=child_level, 
-                                                                        sibling_counter=i_sibling,
-                                                                        retention_generator=retention_generator)
-                        if not child is None:
-                            if node_type == random_node_type.get_inner_node_type():
-                                next_level_nodes.append(child)
-                            nodes_generated += 1
+                            child:Optional[FolderNodeDTO] = generate_node(  session=session, 
+                                                                            parent_id=current_parent_id, 
+                                                                            node_type=node_type, 
+                                                                            child_level=child_level, 
+                                                                            sibling_counter=i_sibling,
+                                                                            retention_generator=retention_generator)
+                            if not child is None:
+                                if node_type == random_node_type.get_inner_node_type():
+                                    next_level_nodes.append(child)
+                                nodes_generated += 1
 
 
-            current_level_nodes = next_level_nodes
+                current_level_nodes = next_level_nodes
+        
+        # Commit all changes at the end
+        session.commit()
+        
+        # Access the ID before the session closes to avoid DetachedInstanceError
+        if root is not None and root.id is not None:
+            root_id = root.id
+        else:
+            raise ValueError("Root folder was not created properly")
+    
     print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {id_counter}, maxLevel = {max_level}")
-    return root
+    return root_id
