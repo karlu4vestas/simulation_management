@@ -1,15 +1,20 @@
+
 namespace VSM.Client.Datamodel
 {
+        /*
         public class RootFolder
         {
                 private InnerNode? _folderTree;
                 private Task<InnerNode?>? _folderTreeTask;
-
-                public int Id { get; set; }
+                public int Id { get; set; }                
                 public bool Is_registeredfor_cleanup { get; set; } = false;
-                public string Root_path { get; set; } = ""; // the folder to scan if we do not know it already
+                public string Root_path { get; set; } = "";
+                
+                public string Owner { get; set; } = "";
+                
+                public string Approvers { get; set; } = "";
 
-                public InnerNode? FolderTree
+                public FolderNode? FolderTree
                 {
                         get
                         {
@@ -23,14 +28,14 @@ namespace VSM.Client.Datamodel
                 }
 
                 // Async method to get folder tree
-                public async Task<InnerNode?> GetFolderTreeAsync()
+                public async Task<FolderNode?> GetFolderTreeAsync()
                 {
                         if (_folderTree != null)
                                 return _folderTree;
 
                         if (_folderTreeTask == null)
                         {
-                                _folderTreeTask = TestDataGenerator.GetRootFolderTreeAsync(this);
+                                _folderTreeTask = DataModel.Instance.GetFolderTreeAsync(this);
                         }
 
                         _folderTree = await _folderTreeTask;
@@ -79,7 +84,7 @@ namespace VSM.Client.Datamodel
 
 
                 //return the folder hierarchy that match the path to the rootfolder.
-                public static async Task<InnerNode?> GetRootFolderTreeAsync(RootFolder root_folder)
+                public static async Task<FolderNode?> GetRootFolderTreeAsync(RootFolder root_folder)
                 {
                         if (root_folder == null)
                                 return null;
@@ -243,5 +248,6 @@ namespace VSM.Client.Datamodel
                         return rootFolders;
                 }
         }
+        */
 
 }

@@ -7,7 +7,7 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (!is_logged_in)
+    @if (!is_logged_in  )
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
@@ -16,7 +16,7 @@
             <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
         </div>
     }
-    else
+    else if(rootFolders!=null)
     {
         <FluentBodyContent>
             <hr />
@@ -78,13 +78,14 @@
             }
         </FluentBodyContent>
 
+    } else{
+        <p>???? Bug bug bug ????</p>
     }
 
 </FluentStack>
 @code {
     FluentDataGrid<RootFolder>? grid;
     RootFolder? selected_root_folder;
-
     string? initials;
     string? user
     {
@@ -94,13 +95,15 @@
 
     bool is_logged_in { get { return DataModel.Instance.User != null && DataModel.Instance.User.Initials.Length > 0; } }
 
-    List<RootFolder> rootFolders { get{ return DataModel.Instance.GetRootFoldersForUser();} }
+    List<RootFolder>? rootFolders;
+
 
     async Task OnLoginClicked()
     {
-        if (initials != null && initials.Length > 0 && DataModel.Instance.User==null)
+        if (initials != null && initials.Length > 0)
         {
             DataModel.Instance.User = new User(initials);
+            await LoadDataAsync();
             await Task.Delay(2000);
         }
     }
@@ -124,7 +127,7 @@
     {
         if (root_folder != null)
         {
-            DataModel.Instance.SetSelectedRootFolder(root_folder);
+            DataModel.Instance.SelectedRootFolder = root_folder;
             //_ = Task.Run(() => Navigation.NavigateTo("fluent_retention"));
             
             //InvokeAsync(() => Navigation.NavigateTo("fluent_retention",forceLoad: true));
@@ -132,4 +135,20 @@
                 
         }
     }
+
+    private async Task LoadDataAsync()
+    {
+        try
+        {
+            // Ensure UI shows loading state
+            await InvokeAsync(StateHasChanged);
+
+            // first load retention options because we need them to generate testdata and folder structure
+            rootFolders = await DataModel.Instance.GetTheUsersRootFolders();
+        }
+        finally
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }    
 }

@@ -1,5 +1,5 @@
 ﻿@page "/retention"
-@rendermode InteractiveAuto
+/*@rendermode InteractiveAuto
 @using Microsoft.AspNetCore.Components.QuickGrid
 @using VSM.Client.Datamodel
 
@@ -54,8 +54,8 @@
 @code {
 
     List<string> RetentionHeaders = new List<string>();
-    private List<TreeNode> TreeRoots = new();
-    private List<TreeNode> VisibleRows = new();
+    private List<FolderNode> TreeRoots = new();
+    private List<FolderNode> VisibleRows = new();
     //private RootFolder? rootFolder;
 
     //private TreeNode? current_cell;

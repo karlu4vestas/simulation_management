@@ -1,50 +1,61 @@
 namespace VSM.Client.Datamodel
 {
-    public abstract class TreeNode
-    {
+
+    public class FolderBaseNode{
         public int Id { get; set; }
-        public int ParentId { get; set; } = 0; // Default to 0, indicating no parent
-        public TreeNode? Parent { get; set; } = null; // Default to null, indicating no parent
+        public int ParentId { get; set; } = 0;   //Default to 0, indicating no parent
         public string Name { get; set; } = "";
-        public bool IsExpanded { get; set; } = false;
-        public int Level { get; set; } = 0;
-        public Dictionary<string, int> AttributDict { get; set; } = new();
-    }
+        public int Type_Id { get; set; } = 0;
+        public int Retention_Id { get; set; } = 0;
 
-    public class LeafNode : TreeNode
-    {
-        public string Retention { get; set; } = "";
     }
-
-    public class InnerNode : TreeNode
+    public class FolderNode
     {
-        private readonly List<TreeNode> _children = [];
+        protected FolderBaseNode dto;
+
+        public FolderNode(FolderBaseNode dto)
+        {
+            this.dto = dto;
+        }
         
-        public List<TreeNode> Children => _children;
+        //mapped to server fields
+        public int Id { get => dto.Id; set => dto.Id = value; }
+        public int ParentId { get => dto.ParentId; set => dto.ParentId = value; }
+        public string Name { get => dto.Name; set => dto.Name = value; }
+        public int Type_Id { get => dto.Type_Id; set => dto.Type_Id = value; }
+        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
 
-        public void ChangeLeafRetentions(RetentionType old_retention_type, RetentionType new_retention_type)
+        //@todo client side help fields for display and navigation
+        public bool IsLeaf { get { return !Children.Any(); } }
+        public Dictionary<int, int> AttributDict { get; set; } = new();
+        public int Level { get; set; } = 0;
+        public bool IsExpanded { get; set; } = false;
+        public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
+
+        public List<FolderNode> Children { get; set; } = new();
+
+        public void ChangeRetentions(RetentionType from, RetentionType to)
         {
             //@todo
-            string old_retention = old_retention_type.name;
-            string new_retention = new_retention_type.name;
-
             //change retention for all leaf nodes in this inner node without recursion
-            var stack = new Stack<TreeNode>();
+            var stack = new Stack<FolderNode>();
             stack.Push(this);
 
             while (stack.Count > 0)
             {
                 var currentNode = stack.Pop();
 
-                if (currentNode is LeafNode leafNode && leafNode.Retention == old_retention)
-                {
-                    // Found a leaf node - update its retention
-                    leafNode.Retention = new_retention;
+                if (currentNode.IsLeaf) {
+                    if (currentNode.Retention_Id == from.Id)
+                    {
+                        // Found a leaf node - update its retention
+                        currentNode.Retention_Id = to.Id;
+                    }
                 }
-                else if (currentNode is InnerNode innerNode)
+                else
                 {
                     // Inner node - add all children to stack for processing
-                    foreach (var child in innerNode.Children)
+                    foreach (var child in currentNode.Children)
                     {
                         stack.Push(child);
                     }
@@ -64,7 +75,7 @@ namespace VSM.Client.Datamodel
             AttributDict.Clear();
 
             // Use a stack for iterative depth-first traversal (avoiding recursion)
-            var stack = new Stack<(TreeNode node, bool visited)>();
+            var stack = new Stack<(FolderNode node, bool visited)>();
             var processedFolders = new HashSet<int>();
 
             // Start with current folder
@@ -73,7 +84,6 @@ namespace VSM.Client.Datamodel
             while (stack.Count > 0)
             {
                 var (currentNode, visited) = stack.Pop();
-
                 if (visited)
                 {
                     // Post-order processing: aggregate children's values
@@ -82,18 +92,18 @@ namespace VSM.Client.Datamodel
                         // Initialize this node's AttributDict
                         currentNode.AttributDict.Clear();
 
-                        if (currentNode is LeafNode leafNode)
+                        if (currentNode.IsLeaf)
                         {
                             // Leaf node: count its retention value
-                            if (!string.IsNullOrEmpty(leafNode.Retention))
+                            if (currentNode!=null)
                             {
-                                currentNode.AttributDict[leafNode.Retention] = 1;
+                                currentNode.AttributDict[currentNode.Retention_Id] = 1;
                             }
                         }
-                        else if (currentNode is InnerNode innerNode)
+                        else
                         {
                             // Internal node: aggregate children's counts
-                            foreach (var child in innerNode.Children)
+                            foreach (var child in currentNode.Children)
                             {
                                 foreach (var kvp in child.AttributDict)
                                 {
@@ -103,8 +113,8 @@ namespace VSM.Client.Datamodel
                             }
                             // InnerNode doesn't have its own retention value to add
                         }
-
-                        processedFolders.Add(currentNode.Id);
+                        if( currentNode!=null ) //get rid of the warning
+                            processedFolders.Add(currentNode.Id);
                     }
                 }
                 else
@@ -113,11 +123,11 @@ namespace VSM.Client.Datamodel
                     stack.Push((currentNode, true));
 
                     // Add children in reverse order so they're processed in correct order (only for InnerNode)
-                    if (currentNode is InnerNode innerNode)
+                    if (!currentNode.IsLeaf)
                     {
-                        for (int i = innerNode.Children.Count - 1; i >= 0; i--)
+                        for (int i = currentNode.Children.Count - 1; i >= 0; i--)
                         {
-                            stack.Push((innerNode.Children[i], false));
+                            stack.Push((currentNode.Children[i], false));
                         }
                     }
                 }

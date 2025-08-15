@@ -19,14 +19,14 @@
                     </div>
                 </div>
             } else {
-            
-                <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="TreeNode" Virtualize="true" ItemSize ="25" 
+
+                <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="FolderNode" Virtualize="true" ItemSize ="25" 
                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
 
-                        <TemplateColumn TGridItem="TreeNode" Title="TreeNodes" Width="350px">
+                        <TemplateColumn TGridItem="FolderNode" Title="TreeNodes" Width="350px">
                             <ChildContent Context="item">
                                 <div style="padding-left:@(item.Level * 15)px;">
-                                    @if (item is InnerNode innerNode && innerNode.Children.Count() > 0)
+                                    @if (!item.IsLeaf && item.Children.Count() > 0)
                                     {
                                         <button class="e-flat" @onclick="() => ToggleExpand(item)">
                                             @(item.IsExpanded ? "▾" : "▸")
@@ -40,9 +40,9 @@
                         @if( rootFolder!=null ){
                             @foreach (var key in retentionOptions)
                             {
-                                <TemplateColumn TGridItem="TreeNode" Title="@key.name">
+                                <TemplateColumn TGridItem="FolderNode" Title="@key.Name">
                                     <ChildContent Context="item">
-                                        @if( item.AttributDict.TryGetValue(key.name, out var val) ){
+                                        @if( item.AttributDict.TryGetValue(key.Id, out var val) ){
                                             RetentionCell cell = new RetentionCell(item,key);    
                                             //var cellId = $"{item.Id}_{key}";
 
@@ -72,7 +72,7 @@
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span>Current retention: </span>
-                <span>@selected_cell.retention_key.name</span>
+                <span>@selected_cell.retention_key.Name</span>
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
                 
@@ -80,8 +80,8 @@
                                 Label="New retention" 
                                 Autofocus="true"
                                 Multiple=false
-                                Items="@retentionOptions.Select(r => r.name).ToList()"
-                                @bind-Value="@selected_cell.new_retention_key.name"
+                                Items="@retentionOptions.Select(r => r.Name).ToList()"
+                                @bind-Value="@selected_cell.new_retention_key.Name"
                                 @bind-Value:after="OnRetentionChangedAsync" 
                                 Height="200px"
                                 Position="SelectPosition.Above" 
@@ -99,9 +99,9 @@
 </FluentStack>
 
 @code {
-    FluentDataGrid<TreeNode>? grid;
-    private List<TreeNode> TreeRoots = new();
-    private List<TreeNode> VisibleRows = new();
+    FluentDataGrid<FolderNode>? grid;
+    private List<FolderNode> TreeRoots = new();
+    private List<FolderNode> VisibleRows = new();
     public  RootFolder? rootFolder { get; set; }
     private List<RetentionType> retentionOptions = new();
     private bool isLoading = true;
@@ -110,9 +110,9 @@
     protected override void OnInitialized()
     {
         // Just set up initial state, don't block with async operations
-        if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
+        if( rootFolder != DataModel.Instance.SelectedRootFolder ) 
         {
-            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
+            rootFolder = DataModel.Instance.SelectedRootFolder; 
             // Don't await here - let the UI render first
         }
     }
@@ -150,8 +150,8 @@
                 var folderTree = await rootFolder.GetFolderTreeAsync();
                 if( folderTree == null ){
                     TreeRoots.Clear();
-                } else if( folderTree is InnerNode innerNode ) {
-                    TreeRoots = innerNode.Children;
+                } else if( !folderTree.IsLeaf ) {
+                    TreeRoots = folderTree.Children;
                 }
             }
         }
@@ -172,13 +172,9 @@
             await LoadRetentionOptionsAsync();
 
             
-            if( rootFolder!=null)
+            if( rootFolder!=null){
                 await LoadRootFolderTreeAsync(rootFolder);
-
-            if( rootFolder!=null && rootFolder.FolderTree != null ){
-
-                if( rootFolder.FolderTree != null )
-                    await rootFolder.FolderTree.UpdateAggregation();
+                await rootFolder.UpdateAggregation();
             }            
         }
         finally
@@ -189,7 +185,7 @@
         }
     }
     
-    private void ToggleExpand(TreeNode node)
+    private void ToggleExpand(FolderNode node)
     {
         node.IsExpanded = !node.IsExpanded;
         RefreshVisibleRows();
@@ -200,15 +196,15 @@
         VisibleRows = FlattenVisible(TreeRoots);
     }
 
-    private List<TreeNode> FlattenVisible(IEnumerable<TreeNode> nodes)
+    private List<FolderNode> FlattenVisible(IEnumerable<FolderNode> nodes)
     {
-        var result = new List<TreeNode>();
+        var result = new List<FolderNode>();
         foreach (var node in nodes)
         {
             result.Add(node);
-            if (node.IsExpanded && node is InnerNode innerNode)
+            if (node.IsExpanded && !node.IsLeaf)
             {
-                result.AddRange(FlattenVisible(innerNode.Children));
+                result.AddRange(FlattenVisible(node.Children));
             }
         }
 
@@ -217,10 +213,10 @@
 
     public class RetentionCell : IEquatable<RetentionCell>
     {
-        public TreeNode TreeNode { get; set; }
+        public FolderNode TreeNode { get; set; }
         public RetentionType retention_key { get; set; }
         public RetentionType new_retention_key { get; set; }
-        public RetentionCell(TreeNode TreeNode, RetentionType retention_key)
+        public RetentionCell(FolderNode TreeNode, RetentionType retention_key)
         {
             this.TreeNode = TreeNode;
             this.retention_key = retention_key;
@@ -231,7 +227,7 @@
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
-            return TreeNode?.Id == other.TreeNode?.Id && retention_key.id == other.retention_key.id;
+            return TreeNode?.Id == other.TreeNode?.Id && retention_key.Id == other.retention_key.Id;
         }
         public override bool Equals(object? obj)
         {
@@ -239,7 +235,7 @@
         }
         public override int GetHashCode()
         {
-            return HashCode.Combine(TreeNode?.Id, retention_key.id);
+            return HashCode.Combine(TreeNode?.Id, retention_key.Id);
         }
 
         public static bool operator ==(RetentionCell? left, RetentionCell? right)
@@ -255,14 +251,10 @@
 
         public async Task SyncRetentions()
         {
-            if( new_retention_key.id != retention_key.id ){
-                Console.WriteLine($"sync the TreeNode tree' retentions {TreeNode.Name} retention {retention_key.name} new_retention {new_retention_key.name}");
+            if( new_retention_key.Id != retention_key.Id ){
+                Console.WriteLine($"sync the TreeNode tree' retentions {TreeNode.Name} retention {retention_key.Name} new_retention {new_retention_key.Name}");
 
-                if( TreeNode is InnerNode innerNode )
-                    innerNode.ChangeLeafRetentions(retention_key, new_retention_key);
-                else if( TreeNode is LeafNode leafNode )
-                    leafNode.Retention = new_retention_key.name;
-                
+                TreeNode.ChangeRetentions(retention_key, new_retention_key);                
                 retention_key = new_retention_key;
 
                 //finde the root folder by iteration untill the parent is null
@@ -271,8 +263,8 @@
                 {
                     currentFolder = currentFolder.Parent;
                 }
-                if( currentFolder is InnerNode  currentFolderInnerNode )
-                    await currentFolderInnerNode.UpdateAggregation();
+                if( !currentFolder.IsLeaf )
+                    await currentFolder.UpdateAggregation();
             }
         }
     }
@@ -280,11 +272,11 @@
     private bool isProcessing = false;
 
     
-    private void OnCellClick(TreeNode node, RetentionType key)
+    private void OnCellClick(FolderNode node, RetentionType key)
     {
         //selected_cell = (node,key);
         selected_cell = new RetentionCell(node,key);
-        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key.name}");
+        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key.Name}");
     }
 
     private async Task OnRetentionChangedAsync()
