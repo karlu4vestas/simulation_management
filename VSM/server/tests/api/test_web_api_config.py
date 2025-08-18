@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from app.web_api import app
-from app.config import set_test_mode, TestMode
+from app.config import AppConfig, AppTestMode
 
 
 class TestWebAPIConfig:
@@ -39,10 +39,10 @@ class TestWebAPIConfig:
         assert data["is_production"] is False
 
     def test_config_endpoint_reflects_mode_changes(self):
-        """Test that the config endpoint reflects test mode changes."""
+        #Test that the config endpoint reflects test mode changes.
         # Change to client_test mode
-        set_test_mode(TestMode.CLIENT_TEST)
-        
+        AppConfig.set_test_mode(AppTestMode.CLIENT_TEST)
+
         response = self.client.get("/config/test-mode")
         assert response.status_code == 200
         data = response.json()
@@ -53,5 +53,5 @@ class TestWebAPIConfig:
         assert data["is_production"] is False
 
     def teardown_method(self):
-        """Reset test mode to default after each test."""
-        set_test_mode(TestMode.UNIT_TEST)
+        #Reset test mode to default after each test-
+        AppConfig.set_test_mode(AppTestMode.UNIT_TEST)

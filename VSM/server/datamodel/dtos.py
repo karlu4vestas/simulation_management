@@ -3,13 +3,13 @@ from typing import Optional
 from datetime import date
 
 # VSM.Datamodel namespace - Python DTOs translated from C#
-
+#we assume that -1 means unassigned for the db
 class RootFolderBase(SQLModel):
     owner: str
     approvers: str | None = Field(default=None)  # comma separated approvers
     active_cleanup: bool
-    path: str           #fullpath including the domain. Maybe only the domains because folder_id points to the foldername 
-    folder_id: int | None = Field(default=None, foreign_key="foldernodedto.id")
+    path: str           #fullpath including the domain. Maybe only the domains because folder_id points to the foldername
+    folder_id: int | None = Field(default=None, foreign_key="foldernodedto.id") 
 
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -22,9 +22,10 @@ class RootFolderPublic(RootFolderBase):
 
 
 class FolderNodeBase(SQLModel):
-    parent_id: int = Field(default=0)  # 0 means no parent
-    name: str = Field(default="")
-    type_id: int | None = Field(default=None, foreign_key="foldertypedto.id")
+    rootfolder_id: int   = Field(default=None, foreign_key="rootfolderdto.id")
+    parent_id: int       = Field(default=0)  # 0 means no parent
+    name: str            = Field(default="")
+    type_id: int | None  = Field(default=None, foreign_key="foldertypedto.id")
     modified: str | None = None
     retention_date: str | None = None
     retention_id: int | None = Field(default=None, foreign_key="retentiontypedto.id")

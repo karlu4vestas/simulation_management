@@ -1,14 +1,15 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, FolderNodePublic
 from datamodel.db import Database
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, or_, func
 from app.config import AppConfig
 import csv
 import io
 from zstandard import ZstdCompressor
+from typing import Optional
 
 app = FastAPI()
 
@@ -31,6 +32,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     db = Database.get_db()
+
     if AppConfig.is_client_test():
         db.clear_all_tables_and_schemas()
         db.create_db_and_tables()
@@ -51,7 +53,7 @@ async def read_root() -> dict:
 
 @app.get("/config/test-mode", tags=["config"])
 async def get_current_test_mode() -> dict:
-    """Get the current test mode configuration."""
+    # Get the current test mode configuration.
     return {
         "test_mode": AppConfig.get_test_mode().value,
         "is_unit_test": AppConfig.is_unit_test(),
@@ -76,22 +78,23 @@ def read_folder_types():
     
 # we must only allow the webclient to read the RootFolders
 @app.get("/rootfolders/", response_model=list[RootFolderPublic])
-def read_root_folders():
+def read_root_folders(initials: Optional[str] = Query(default=None)):
     with Session(Database.get_engine()) as session:
-        retention_types = session.exec(select(RootFolderDTO)).all()
+        if initials is None or len(initials) == 0:
+            retention_types = session.exec(select(RootFolderDTO)).all()
+        else:
+            retention_types = session.exec(
+                select(RootFolderDTO).where(
+                    (RootFolderDTO.owner == initials) | (RootFolderDTO.approvers.like(f"%{initials}%"))
+                )
+            ).all()
         return retention_types        
 
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
 @app.get("/folders/", response_model=list[FolderNodePublic])
-def read_folders():
+def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
-        folders = session.exec(select(FolderNodeDTO)).all()
-        return folders
-
-@app.get("/folders/", response_model=list[FolderNodePublic])
-def read_folders():
-    with Session(Database.get_engine()) as session:
-        folders = session.exec(select(FolderNodeDTO)).all()
+        folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
         return folders
 
 

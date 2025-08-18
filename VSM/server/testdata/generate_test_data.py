@@ -10,7 +10,6 @@ def insert_test_data_in_db(engine):
 
 def insert_folder_metadata_in_db(engine):
     with Session(engine) as session:
-        session.add(RetentionTypeDTO(name="Clean",            display_rank=1,  is_system_managed=True ))
         session.add(RetentionTypeDTO(name="Marked",           display_rank=2,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="Issue",            display_rank=3,  is_system_managed=False ))
         #session.add(RetentionTypeDTO(name="New",              display_rank=4,  is_system_managed=False ))
@@ -23,6 +22,7 @@ def insert_folder_metadata_in_db(engine):
         session.add(RetentionTypeDTO(name="+3Y",              display_rank=11, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="longterm",         display_rank=12, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="path",             display_rank=13, is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="Clean",            display_rank=14,  is_system_managed=True  ))
 
         session.commit()
 
@@ -82,21 +82,34 @@ class RandomNodeType:
 def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path, levels):
     folder_id = generate_folder_tree(engine, path, levels)
     with Session(engine) as session:
-        session.add(RootFolderDTO(
+        root_folder = RootFolderDTO(
             owner=owner,
             approvers=approvers,
             active_cleanup=active_cleanup,
             path=path,
-            folder_id=folder_id
-            ))
+            #folder_id=folder_id
+        )
+        session.add(root_folder)
         session.commit()
+
+        root_folder_id:int = root_folder.id if root_folder.id else 0
+        root_folder_name:str = root_folder.path
+        root_folder.folder_id=generate_folder_tree(engine, root_folder_id, root_folder_name, levels)
+        session.commit()
+
+
 
 def insert_root_folders_metadata_in_db(engine):
 
     generate_root_folder(engine, "jajac", "stefw, misve", True,  "R1",2)
-    generate_root_folder(engine, "misve", "stefw, jajac", True,  "R2",2)
-    generate_root_folder(engine, "karlu", "arlem, jajac", False, "R3",2)
-    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R4",2)
+    generate_root_folder(engine, "jajac", "stefw, misve", False, "R2",3)
+    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R3",4)
+    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R4",5)
+    generate_root_folder(engine, "misve", "stefw, arlem", True,  "R5",6)
+    generate_root_folder(engine, "karlu", "arlem, caemh", False, "R6",7)
+    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R7",8)
+    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R8",9)
+    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R9",10)
 
     with Session(engine) as session:
         root_folders = session.exec(select(RootFolderDTO)).all()
@@ -116,12 +129,20 @@ def insert_root_folders_metadata_in_db(engine):
 
 from typing import Optional
 
-def generate_node(session: Session, parent_id:int, node_type:Optional[FolderTypeDTO], child_level:int, sibling_counter:int, retention_generator:RandomRetention) -> Optional[FolderNodeDTO]:
+def generate_node( session: Session, 
+                   root_folder_id:int, 
+                   parent_id:int, 
+                   node_type:FolderTypeDTO, 
+                   child_level:int, 
+                   sibling_counter:int, 
+                   retention_generator:RandomRetention 
+                 ) -> Optional[FolderNodeDTO]:
     child: Optional[FolderNodeDTO] = None
     if node_type is None: 
         return None
     elif node_type.name=="VTS":
         child = FolderNodeDTO(
+            rootfolder_id=root_folder_id,
             parent_id=parent_id,
             name=f"VTS_{child_level}_{sibling_counter + 1}",
             type_id=node_type.id,  
@@ -129,6 +150,7 @@ def generate_node(session: Session, parent_id:int, node_type:Optional[FolderType
         )
     elif node_type.name=="InnerNode":
         child = FolderNodeDTO(
+            rootfolder_id=root_folder_id,
             parent_id=parent_id,
             name=f"Inner_{child_level}_{sibling_counter + 1}",
             type_id=node_type.id
@@ -142,7 +164,7 @@ def generate_node(session: Session, parent_id:int, node_type:Optional[FolderType
 
     return child 
 
-def generate_folder_tree(engine:Engine, name_root_folder:str, max_level:int=1) -> int:
+def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str, max_level:int=1) -> int:
     retention_generator:RandomRetention = RandomRetention(0)
     rand:random.Random = random.Random(42)
     random_node_type: RandomNodeType = RandomNodeType(0)
@@ -152,15 +174,16 @@ def generate_folder_tree(engine:Engine, name_root_folder:str, max_level:int=1) -
 
     with Session(engine) as session:
         #generate the root
-        id_counter:int = 1 
+        id_counter:int = 1
         root:Optional[FolderNodeDTO] = generate_node(   session=session, 
+                                                        root_folder_id=root_folder_id,
                                                         parent_id=0, 
                                                         node_type=random_node_type.get_inner_node_type(), 
                                                         child_level=1, 
                                                         sibling_counter=0,
                                                         retention_generator=retention_generator)
         if root is None: 
-            root = FolderNodeDTO(id=None, parent_id=0, name=name_root_folder)
+            root = FolderNodeDTO(id=None, rootfolder_id=root_folder_id, parent_id=0, name=root_folder_name)
             session.add(root)
             session.flush()
         else:
@@ -194,6 +217,7 @@ def generate_folder_tree(engine:Engine, name_root_folder:str, max_level:int=1) -
                                 node_type = random_node_type.next()
 
                             child:Optional[FolderNodeDTO] = generate_node(  session=session, 
+                                                                            root_folder_id=root_folder_id,
                                                                             parent_id=current_parent_id, 
                                                                             node_type=node_type, 
                                                                             child_level=child_level, 

@@ -19,6 +19,8 @@
     else if(rootFolders!=null)
     {
         <FluentBodyContent>
+            <p>Logged in as: @initials</p>
+            <p>User:         @user.initials</p>
             <hr />
             <div class="grid">
                 <FluentDataGrid @ref="grid" Items="@rootFolders.AsQueryable()" TGridItem="RootFolder"
@@ -93,7 +95,8 @@
         set { initials = value; }
     }
 
-    bool is_logged_in { get { return DataModel.Instance.User != null && DataModel.Instance.User.Initials.Length > 0; } }
+    //bool is_logged_in { get { return DataModel.Instance.User != null && DataModel.Instance.User.Initials.Length > 0; } }
+    bool is_logged_in { get { return rootFolders!=null && rootFolders.Count > 0; } }
 
     List<RootFolder>? rootFolders;
 

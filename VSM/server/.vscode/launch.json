@@ -15,6 +15,23 @@
             "args": []
         },
         {
+            "name": "Test FastAPI endpoints",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "tests/api/test_endpoints.py",
+                "-v",
+                "--tb=short"
+            ],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "Run All Tests",
             "type": "debugpy",
             "request": "launch",
@@ -75,23 +92,6 @@
             "module": "pytest",
             "args": [
                 "tests/dtos_db/test_dtos.py",
-                "-v",
-                "--tb=short"
-            ],
-            "cwd": "${workspaceFolder}",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "Run FastsAPI Tests",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "pytest",
-            "args": [
-                "tests/api/test_endpoints.py",
                 "-v",
                 "--tb=short"
             ],

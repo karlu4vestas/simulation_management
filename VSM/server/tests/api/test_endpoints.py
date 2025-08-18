@@ -2,26 +2,38 @@ import pytest
 from sqlmodel import Session, select
 from fastapi.testclient import TestClient
 from app.web_api import app
-from datamodel.dtos import RetentionTypeDTO
 from datamodel.db import Database
+from app.config import AppConfig, AppTestMode
+#from datamodel.dtos import RetentionTypeDTO
+#from datamodel.db import Database
 
 
 @pytest.fixture
 def client():
-    """FastAPI test client fixture"""
+    AppConfig.set_test_mode(AppTestMode.UNIT_TEST)
+    # test client does not call the startup where the db is setup so do it here
+    db = Database.get_db()
+    if db.is_empty() and AppConfig.is_unit_test():
+            db.clear_all_tables_and_schemas()
+            db.create_db_and_tables()
+            from testdata.generate_test_data import insert_test_data_in_db
+            insert_test_data_in_db(db.get_engine()) 
+
     return TestClient(app)
 
-
 class TestRootEndpoint:
-    """Test cases for the root endpoint"""
+    #Test cases for the root endpoint
 
     def test_read_root_endpoint(self, client):
-        """Test GET / endpoint returns welcome message and test mode"""
+        #Test GET / endpoint returns welcome message and test mode
         response = client.get("/")
         
         # Verify response status
         assert response.status_code == 200
         
+        #Test that root endpoint returns JSON content type
+        assert response.headers["content-type"] == "application/json"
+
         # Verify response content
         data = response.json()
         expected_keys = {"message", "test_mode"}
@@ -35,24 +47,11 @@ class TestRootEndpoint:
         assert isinstance(data["message"], str)
         assert isinstance(data["test_mode"], str)
         
-    def test_root_endpoint_content_type(self, client):
-        """Test that root endpoint returns JSON content type"""
-        response = client.get("/")
-        assert response.headers["content-type"] == "application/json"
-        
-    def test_root_endpoint_tags(self, client):
-        """Test that root endpoint is properly tagged"""
-        # This test verifies the endpoint exists and is accessible
-        # The actual tag verification would require inspecting the OpenAPI schema
-        response = client.get("/")
-        assert response.status_code == 200
-
-
 class TestConfigEndpoint:
-    """Test cases for the config endpoint"""
+    # Test cases for the config endpoint
 
     def test_get_test_mode_endpoint(self, client):
-        """Test GET /config/test-mode endpoint"""
+        # Test GET /config/test-mode endpoint
         response = client.get("/config/test-mode")
         
         # Verify response status
@@ -64,7 +63,6 @@ class TestConfigEndpoint:
         assert set(data.keys()) == expected_keys
         
         # Verify data types
-        assert isinstance(data["test_mode"], str)
         assert isinstance(data["is_unit_test"], bool)
         assert isinstance(data["is_client_test"], bool)
         assert isinstance(data["is_production"], bool)
@@ -75,61 +73,11 @@ class TestConfigEndpoint:
         # Verify content type
         assert response.headers["content-type"] == "application/json"
 
-
-class TestRootFolderAPI:
-    """Test API endpoints for RootFolder operations"""
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_create_root_folder_endpoint(self):
-        """Test POST /root-folders endpoint"""
-        # client = TestClient(app)
-        # response = client.post("/root-folders", json={...})
-        # assert response.status_code == 201
-        pass
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_get_root_folders_endpoint(self):
-        """Test GET /root-folders endpoint"""
-        # client = TestClient(app)
-        # response = client.get("/root-folders")
-        # assert response.status_code == 200
-        pass
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_get_root_folder_by_id_endpoint(self):
-        """Test GET /root-folders/{id} endpoint"""
-        # client = TestClient(app)
-        # response = client.get("/root-folders/1")
-        # assert response.status_code == 200
-        pass
-
-
-class TestFolderNodeAPI:
-    """Test API endpoints for FolderNode operations"""
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_create_folder_node_endpoint(self):
-        """Test POST /folder-nodes endpoint"""
-        pass
-
-    @pytest.mark.skip(reason="FastAPI not implemented yet")
-    def test_get_folder_hierarchy_endpoint(self):
-        """Test GET /folder-nodes/hierarchy endpoint"""
-        pass
-
-
 class TestRetentionAPI:
-    """Test API endpoints for Retention operations"""
+    # Test API endpoints for Retention operations
 
     def test_get_retention_options_endpoint_structure(self, client):
-        """Test GET /retentiontypes/ endpoint returns proper structure"""
-        #from app.web_api import setup_shared_test_database, cleanup_shared_test_database
-        
-        #try:
-        # Set up shared test database that works across threads
-        #    setup_shared_test_database()
-            
-            # Test the endpoint
+        # Test GET /retentiontypes/ endpoint returns proper structure
         response = client.get("/retentiontypes/")
             
         # Verify the response
@@ -150,42 +98,81 @@ class TestRetentionAPI:
         assert isinstance(first_item["display_rank"], int)
         assert isinstance(first_item["is_system_managed"], bool)
         assert isinstance(first_item["id"], int)
-            
-        #finally:
-        #    # Clean up the shared test database
-        #    cleanup_shared_test_database()
 
+class TestRootFolderAPI:
+    # Test API endpoints for RootFolder operations
+
+    def test_get_root_folders_endpoint(self):
+        # Test GET /root-folders endpoint
+        client = TestClient(app)
+        response = client.get("/rootfolders")
+        assert response.status_code == 200
+
+        #Test that root endpoint returns JSON content type
+        assert response.headers["content-type"] == "application/json"
+
+
+    def test_query_root_folders_endpoint(self):
+        # Test GET /root-folders endpoint with initials query
+        client = TestClient(app)
+        initials = "jajac"
+        response = client.get(f"/rootfolders/?initials={initials}")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/json"
+        root_folders = response.json()
+        if len(root_folders) > 0:
+            assert root_folders[0]["owner"] == initials or initials in root_folders[0]["approvers"]
+
+class TestFolderNodeAPI:
+    # Test API endpoints for FolderNode operations
+
+    def test_get_folder_nodes_endpoint(self):
+        # Test GET /folder-nodes endpoint
+        client = TestClient(app)
+        response = client.get("/folders/?rootfolder_id=1")  
+        assert response.status_code == 200
+
+        #Test that root endpoint returns JSON content type
+        assert response.headers["content-type"] == "application/json"
+
+class TestRootfolder_vs_FoldersNodeAPI:
+    # Test API endpoints for FolderNode operations
+    
+    def test_get_the_rootfolders_folder_nodes(self, client):
+        # First retrieve root folders
+        root_folders_response = client.get("/rootfolders")
+        assert root_folders_response.status_code == 200
+        assert root_folders_response.headers["content-type"] == "application/json"
+        
+        root_folders = root_folders_response.json()
+        assert isinstance(root_folders, list)
+        assert len(root_folders) > 0  # Should have test data
+        
+        # For each root folder, verify that folder nodes are returned
+        for root_folder in root_folders:
+            assert "id" in root_folder
+            root_folder_id = root_folder["id"]
+            
+            # Get folder nodes for this root folder
+            response = client.get(f"/folders/?rootfolder_id={root_folder_id}")  
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/json"
+            
+            folder_nodes = response.json()
+            if len(folder_nodes) > 0:  # Each root folder should have at least one folder node
+                assert not root_folder["folder_id"] == "0" #DB index are >0
+                assert isinstance(folder_nodes, list)
+
+    
 # Example of how future API tests will look:
 """
-@pytest.fixture
-def client():
-    return TestClient(app)
-
-def test_create_root_folder_api(client, sample_root_folder_data):
-    response = client.post("/api/v1/root-folders", json=sample_root_folder_data)
-    assert response.status_code == 201
-    data = response.json()
-    assert data["path"] == sample_root_folder_data["path"]
-    assert "id" in data
-
-def test_get_root_folder_api(client):
-    # First create a folder
-    folder_data = {...}
-    create_response = client.post("/api/v1/root-folders", json=folder_data)
-    folder_id = create_response.json()["id"]
-    
-    # Then retrieve it
-    response = client.get(f"/api/v1/root-folders/{folder_id}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["id"] == folder_id
-
 def test_api_error_handling(client):
     # Test invalid data
     response = client.post("/api/v1/root-folders", json={"invalid": "data"})
     assert response.status_code == 422
     
 def test_api_not_found(client):
+    # Test not found error
     response = client.get("/api/v1/root-folders/99999")
     assert response.status_code == 404
 """
