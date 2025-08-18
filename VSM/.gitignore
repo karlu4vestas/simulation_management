@@ -1,4 +1,4 @@
-# SQLite database files
+# Ignore SQLite database files
 *.db
 *.db3
 *.sqlite

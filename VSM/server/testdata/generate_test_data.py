@@ -108,8 +108,8 @@ def insert_root_folders_metadata_in_db(engine):
     generate_root_folder(engine, "misve", "stefw, arlem", True,  "R5",6)
     generate_root_folder(engine, "karlu", "arlem, caemh", False, "R6",7)
     generate_root_folder(engine, "jajac", "stefw, misve", True,  "R7",8)
-    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R8",9)
-    generate_root_folder(engine, "caemh", "arlem, jajac", False, "R9",10)
+    #generate_root_folder(engine, "caemh", "arlem, jajac", False, "R8",9)
+    #generate_root_folder(engine, "caemh", "arlem, jajac", False, "R9",10)
 
     with Session(engine) as session:
         root_folders = session.exec(select(RootFolderDTO)).all()

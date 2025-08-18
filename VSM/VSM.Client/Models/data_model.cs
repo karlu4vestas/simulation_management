@@ -157,16 +157,17 @@ public async Task UpdateAggregation()
             return new List<FolderType>();
         }
     }
-    public async Task<List<RootFolder>> GetRootFoldersAsync()
+    public async Task<List<RootFolder>> GetRootFoldersAsync(User user=null)
     {
 
-        return _rootFolders ??= await GetRootFoldersFromApiAsync();
+        return _rootFolders ??= await GetRootFoldersFromApiAsync(user);
     }
-    private async Task<List<RootFolder>> GetRootFoldersFromApiAsync()
+    private async Task<List<RootFolder>> GetRootFoldersFromApiAsync(User user = null)
     {
         try
         {
-            List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>("http://127.0.0.1:5173/rootfolders/", new JsonSerializerOptions
+            string endpoint = user != null? $"http://127.0.0.1:5173/rootfolders/?initials={user.Initials}" : "http://127.0.0.1:5173/rootfolders/";
+            List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(endpoint, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? new List<RootFolderDTO>();
@@ -207,7 +208,7 @@ public async Task UpdateAggregation()
         }
         else
         {
-            var allRootFolders = await GetRootFoldersAsync();
+            var allRootFolders = await GetRootFoldersAsync(User);
             _the_users_rootFolders = allRootFolders.Where(rf =>
                 rf.Owner == User.Initials ||
                 rf.Approvers.Contains(User.Initials)).ToList();

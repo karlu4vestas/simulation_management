@@ -33,7 +33,7 @@ app.add_middleware(
 def on_startup():
     db = Database.get_db()
 
-    if AppConfig.is_client_test():
+    if db.is_empty() and AppConfig.is_client_test():
         db.clear_all_tables_and_schemas()
         db.create_db_and_tables()
         from testdata.generate_test_data import insert_test_data_in_db
