@@ -148,12 +148,12 @@ public async Task UpdateAggregation()
             return new List<FolderType>();
         }
     }
-    public async Task<List<RootFolder>> GetRootFoldersAsync(User user=null)
+    public async Task<List<RootFolder>> GetRootFoldersAsync(User? user=null)
     {
 
         return _rootFolders ??= await GetRootFoldersFromApiAsync(user);
     }
-    private async Task<List<RootFolder>> GetRootFoldersFromApiAsync(User user = null)
+    private async Task<List<RootFolder>> GetRootFoldersFromApiAsync(User? user = null)
     {
         try
         {

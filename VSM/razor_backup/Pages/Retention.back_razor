@@ -1,0 +1,120 @@
+﻿@page "/retention"
+/*
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using VSM.Client.Datamodel
+
+<h3>Retention settings</h3>
+<div class="master-detail">
+    <div class="master">
+        <hr />
+        <div class="grid">
+            @*<QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="TreeNode" Style="height: 480px; width: 100%;"*@
+            <QuickGrid Items="@VisibleRows.AsQueryable()" TGridItem="TreeNode" Virtualize="true">
+                <TemplateColumn TGridItem="TreeNode" Title="TreeNodes">
+                    <ChildContent Context="item">
+                        <div style="padding-left:@(item.Level * 15)px;">
+                            @if (item is InnerNode innerNode && innerNode.Children.Count() > 0)
+                            {
+                                <button class="e-flat" @onclick="() => ToggleExpand(item)">
+                                    @(item.IsExpanded ? "▾" : "▸")
+                                </button>
+                            }
+                            @item.Name
+                        </div>
+                    </ChildContent>
+                </TemplateColumn>
+
+                @foreach (var key in RetentionHeaders)
+                {
+                    <TemplateColumn TGridItem="TreeNode" Title="@key">
+                        <ChildContent Context="item">
+                            @if (item.AttributDict.TryGetValue(key, out var val))
+                            {
+                                <button class="e-flat" @onclick="() => OnCellClick(item, key)">
+                                    @val
+                                </button>
+                            }
+                        </ChildContent>
+                    </TemplateColumn>
+                }
+
+            </QuickGrid>
+        </div>
+    </div>
+    <div class="detail">
+        <div class="property-panel-content" Style="height: 280px; width: 100%;">
+            <hr />
+            <table id="property" class="property-panel-table">
+                <h2> Detail panel for settings retentions</h2>
+            </table>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    List<string> RetentionHeaders = new List<string>();
+    private List<FolderNode> TreeRoots = new();
+    private List<FolderNode> VisibleRows = new();
+    //private RootFolder? rootFolder;
+
+    //private TreeNode? current_cell;
+    public string selected_TreeNode_name = "No TreeNode selected";
+    public string selected_retention = "No retention selected";
+    private void button_click(TreeNode cell)
+    {
+    }
+    protected override void OnInitialized()
+    {/*
+
+        //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
+        if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
+        {
+            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
+            if( rootFolder != null ){
+                if( rootFolder.FolderTree == null ){
+                    TreeRoots.Clear();
+                } else if( rootFolder.FolderTree is InnerNode innerNode ) {
+                    TreeRoots = innerNode.Children;
+                }
+    
+                if( rootFolder.FolderTree != null )
+                    await rootFolder.FolderTree.UpdateAggregation();
+            }
+        }*/
+        RefreshVisibleRows();
+    }
+
+
+    private void ToggleExpand(TreeNode node)
+    {
+        node.IsExpanded = !node.IsExpanded;
+        RefreshVisibleRows();
+    }
+
+    private void RefreshVisibleRows()
+    {
+        VisibleRows = FlattenVisible(TreeRoots);
+    }
+
+    private List<TreeNode> FlattenVisible(IEnumerable<TreeNode> nodes)
+    {
+        var result = new List<TreeNode>();
+        foreach (var node in nodes)
+        {
+            result.Add(node);
+            if (node.IsExpanded && node is InnerNode innerNode)
+            {
+                result.AddRange(FlattenVisible(innerNode.Children));
+            }
+        }
+
+        return result;
+    }
+
+    string[] RetentionHeaders_max = ["Review", "Path", "LongTerm", "_2025_Q4", "_2026_Q1", "_2026_Q2"];
+    private void OnCellClick(TreeNode node, string column)
+    {
+        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {column}");
+    }
+}

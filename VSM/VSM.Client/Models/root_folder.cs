@@ -1,5 +1,5 @@
 namespace VSM.Client.Datamodel
-{
+{/*
     public class RootFolder
     {
         private InnerNode? _folderTree;
@@ -18,5 +18,5 @@ namespace VSM.Client.Datamodel
         }
 
         public List<User> Users { get; set; } = [];
-    }
+    }*/
 }

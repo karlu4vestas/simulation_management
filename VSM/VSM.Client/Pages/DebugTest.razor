@@ -1,0 +1,25 @@
+@page "/debug-test"
+@rendermode InteractiveAuto
+
+<h3>Debug Test Page</h3>
+
+<button class="btn btn-primary" @onclick="TestBreakpoint">Test Breakpoint</button>
+
+<p>@message</p>
+
+@code {
+    private string message = "Click the button to test breakpoint";
+
+    private void TestBreakpoint()
+    {
+        // Set a breakpoint on this line
+        message = "If you see this, the breakpoint was not hit";
+        
+        // More code for testing breakpoints
+        int x = 10;
+        int y = 20;
+        int z = x + y;
+        
+        message = $"Calculation result: {z}";
+    }
+}
