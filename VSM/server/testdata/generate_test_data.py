@@ -86,12 +86,12 @@ def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path,
             owner=owner,
             approvers=approvers,
             active_cleanup=active_cleanup,
-            path=path,
-            #folder_id=folder_id
+            path=path
         )
         session.add(root_folder)
-        session.commit()
 
+        #commit in order to initialize the root_folder in the db and get a valid id
+        session.commit()
         root_folder_id:int = root_folder.id if root_folder.id else 0
         root_folder_name:str = root_folder.path
         root_folder.folder_id=generate_folder_tree(engine, root_folder_id, root_folder_name, levels)
@@ -170,7 +170,7 @@ def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str
     random_node_type: RandomNodeType = RandomNodeType(0)
     
 
-    print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level} engine:{not engine is None}")
+    #print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level} engine:{not engine is None}")
 
     with Session(engine) as session:
         #generate the root

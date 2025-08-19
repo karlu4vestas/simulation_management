@@ -36,6 +36,34 @@
         "ASPNETCORE_URLS": "http://0.0.0.0:5000"
       }
     },
+        {
+      "name": "🌐 Debug Blazor Client - Development (Port 5000)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5000",
+      "webRoot": "${workspaceFolder}/VSM.Client"
+    },
+
+    {
+      "name": "Test FastAPI endpoints",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/api/test_endpoints.py",
+        "-v",
+        "--tb=short"
+      ],
+      "python": "${workspaceFolder}/server/.venv/bin/python",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/server/.venv",
+        "PATH": "${workspaceFolder}/server/.venv/bin:${env:PATH}"
+      }
+    },
     {
       "name": "🚀 VSM Server - Development (Port 5000) [Run]",
       "type": "coreclr",
@@ -59,7 +87,7 @@
       }
     },
     {
-      "name": "🔄 VSM Server - Staging/Test (Port 5002)", 
+      "name": "🔄 VSM Server - Staging/Test (Port 5002)",
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
@@ -79,7 +107,7 @@
     },
     {
       "name": "⚙️ VSM Server - Debug/Custom (Port 5003)",
-      "type": "coreclr", 
+      "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
       "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
@@ -132,7 +160,7 @@
     {
       "name": "🔄 Debug Blazor Client - Staging/Test (Port 5002)",
       "type": "chrome",
-      "request": "launch", 
+      "request": "launch",
       "url": "http://localhost:5002",
       "webRoot": "${workspaceFolder}/VSM.Client"
     },
@@ -140,7 +168,7 @@
       "name": "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:5003", 
+      "url": "http://localhost:5003",
       "webRoot": "${workspaceFolder}/VSM.Client"
     }
   ],
@@ -154,7 +182,7 @@
       "stopAll": true
     },
     {
-      "name": "🚀 Full Stack Debug - Staging/Test Environment", 
+      "name": "🚀 Full Stack Debug - Staging/Test Environment",
       "configurations": [
         "🔄 VSM Server - Staging/Test (Port 5002)",
         "🔄 Debug Blazor Client - Staging/Test (Port 5002)"
@@ -164,7 +192,7 @@
     {
       "name": "🚀 Full Stack Debug - Custom Environment",
       "configurations": [
-        "⚙️ VSM Server - Debug/Custom (Port 5003)", 
+        "⚙️ VSM Server - Debug/Custom (Port 5003)",
         "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)"
       ],
       "stopAll": true

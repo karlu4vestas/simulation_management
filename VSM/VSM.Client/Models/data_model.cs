@@ -204,14 +204,11 @@ public async Task UpdateAggregation()
     {
         if (User is null)
         {
-            return new List<RootFolder>();
+            _the_users_rootFolders = new List<RootFolder>();
         }
         else
         {
-            var allRootFolders = await GetRootFoldersAsync(User);
-            _the_users_rootFolders = allRootFolders.Where(rf =>
-                rf.Owner == User.Initials ||
-                rf.Approvers.Contains(User.Initials)).ToList();
+            _the_users_rootFolders = await GetRootFoldersAsync(User);
         }
         return _the_users_rootFolders;
     }

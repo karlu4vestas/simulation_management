@@ -76,7 +76,7 @@ class TestConfigEndpoint:
 class TestRetentionAPI:
     # Test API endpoints for Retention operations
 
-    def test_get_retention_options_endpoint_structure(self, client):
+    def test_get_retention(self, client):
         # Test GET /retentiontypes/ endpoint returns proper structure
         response = client.get("/retentiontypes/")
             
@@ -102,7 +102,7 @@ class TestRetentionAPI:
 class TestRootFolderAPI:
     # Test API endpoints for RootFolder operations
 
-    def test_get_root_folders_endpoint(self):
+    def test_get_root_folders(self):
         # Test GET /root-folders endpoint
         client = TestClient(app)
         response = client.get("/rootfolders")
@@ -112,7 +112,7 @@ class TestRootFolderAPI:
         assert response.headers["content-type"] == "application/json"
 
 
-    def test_query_root_folders_endpoint(self):
+    def test_query_root_folders(self):
         # Test GET /root-folders endpoint with initials query
         client = TestClient(app)
         initials = "jajac"
@@ -126,7 +126,7 @@ class TestRootFolderAPI:
 class TestFolderNodeAPI:
     # Test API endpoints for FolderNode operations
 
-    def test_get_folder_nodes_endpoint(self):
+    def test_get_folder_nodes(self):
         # Test GET /folder-nodes endpoint
         client = TestClient(app)
         response = client.get("/folders/?rootfolder_id=1")  
@@ -138,7 +138,7 @@ class TestFolderNodeAPI:
 class TestRootfolder_vs_FoldersNodeAPI:
     # Test API endpoints for FolderNode operations
     
-    def test_get_the_rootfolders_folder_nodes(self, client):
+    def test_query_folder_nodes_by_rootfolder(self, client):
         # First retrieve root folders
         root_folders_response = client.get("/rootfolders")
         assert root_folders_response.status_code == 200
