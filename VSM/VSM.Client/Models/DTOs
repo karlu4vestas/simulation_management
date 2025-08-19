@@ -1,13 +1,5 @@
 namespace VSM.Client.Datamodel.DTO
 {
-    /*public class UserDTO
-    {
-        public string Initials { get; set; }
-    }*/
-
-
-
-
 
     public class FolderNodeDTO
     {
@@ -39,21 +31,6 @@ namespace VSM.Client.Datamodel.DTO
         public string Name { get; set; } = "InnerNode";
     }
 
-    // so far we know teh following value for Name:
-    // Cleaned, is IsSystemManaged=true
-    // CleanupIssue,    
-    // MarkedForCleanup, 
-    // New,
-    // +1 round 
-    // +3 rounds 
-    // +6 rounds 
-    // +12 rounds 
-    // +24 rounds 
-    // +36 rounds 
-    // longterm,
-    // path protected,
-    // -----------------
-    // a round would normally be 30 days but we can go down to 1 week and 1 day for testing purposes
     public class RetentionDTO
     {
         public byte Id { get; set; }

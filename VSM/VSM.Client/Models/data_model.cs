@@ -78,15 +78,6 @@ namespace VSM.Client.Datamodel
             return _folderTree;
         }
 
-        /*// Async method to get folder tree
-        public async Task<List<FolderNode>?> GetFolderTreeAsync()
-        {
-            if (_folderTree == null)
-                _folderTreeTask = DataModel.Instance.GetFolderTreeFromApiAsync();
-
-            return await _folderTreeTask;
-        }*/
-
         // Check if tree generation is in progress
         public bool IsLoadingFolderTree => _folderTreeTask != null && !_folderTreeTask.IsCompleted;
 
