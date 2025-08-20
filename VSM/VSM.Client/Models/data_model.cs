@@ -124,7 +124,7 @@ namespace VSM.Client.Datamodel
                 response.EnsureSuccessStatusCode();
 
                 string jsonContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Raw JSON response: {jsonContent}");
+                // Console.WriteLine($"Raw JSON response: {jsonContent}");
 
                 // Then attempt to deserialize
                 List<FolderNodeDTO> base_folders = JsonSerializer.Deserialize<List<FolderNodeDTO>>(jsonContent, new JsonSerializerOptions
@@ -157,8 +157,6 @@ namespace VSM.Client.Datamodel
                 nodeLookup[node.Id] = node;
             }
 
-            // Create a root node
-
             // Build the tree structure
             foreach (var dto in folderNodeDTOs)
             {
@@ -174,7 +172,18 @@ namespace VSM.Client.Datamodel
             }
 
             FolderNode root = nodeLookup[rootFolder.Folder_Id];
+            print_folder_tree_levels(root, 0);
             return root;
+        }
+
+        void print_folder_tree_levels(FolderNode folderNode, int level)
+        {
+            if (folderNode.IsLeaf)
+                Console.WriteLine($"leaf_level:{level}- {folderNode.Name} (ID: {folderNode.Id})");
+            foreach (var child in folderNode.Children)
+            {
+                print_folder_tree_levels(child, level + 1);
+            }
         }
 
         //@todo create a fastAPI endpoint to register that the user wants to run cleanup for this folder 
