@@ -31,7 +31,7 @@
 
                     <TemplateColumn Title="Owners">
                         <ChildContent Context="folder">
-                            @string.Join(", ", folder.Users.Select(u => u.Initials))
+                            @string.Join(", ", folder.AllInitials)
                         </ChildContent>
                     </TemplateColumn>
 
@@ -63,7 +63,7 @@
             <hr />
             @if (selected_root_folder != null)
             {
-                string ownerstring = string.Join(", ", selected_root_folder.Users.Select(u => u.Initials));
+                string ownerstring = string.Join(", ", selected_root_folder.AllInitials);
                 <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span>
                     @selected_root_folder.Root_path </div>
                 <p></p>
@@ -91,7 +91,7 @@
     string? initials;
     string? user
     {
-        get { return DataModel.Instance.User != null ? DataModel.Instance.User.Initials : initials; }
+        get { return DataModel.Instance.User != null ? DataModel.Instance.User : initials; }
         set { initials = value; }
     }
 
@@ -105,7 +105,7 @@
     {
         if (initials != null && initials.Length > 0)
         {
-            DataModel.Instance.User = new User(initials);
+            DataModel.Instance.User = initials;
             await LoadDataAsync();
             await Task.Delay(2000);
         }

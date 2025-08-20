@@ -1,5 +1,4 @@
 {
-
     // Port forwarding configuration for VSM frontend
     "remote.portsAttributes": {
         "5000": {
@@ -8,21 +7,19 @@
             "protocol": "http"
         },
         "5001": {
-            "label": "VSM HTTPS Server", 
+            "label": "VSM HTTPS Server",
             "onAutoForward": "notify",
             "protocol": "https"
         },
-        "5002": {
-            "label": "VSM Staging/Test Server",
-            "onAutoForward": "notify", 
-            "protocol": "http"
-        },
-        "5003": {
-            "label": "VSM Debug/Custom Server",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        }
     },
     "remote.autoForwardPorts": true,
-    "remote.autoForwardPortsSource": "hybrid"
+    "remote.autoForwardPortsSource": "hybrid",
+    "dotnet.defaultSolution": "VSM.slnx",
+    "omnisharp.enableRoslynAnalyzers": true,
+    "omnisharp.enableEditorConfigSupport": true,
+    "csharp.format.enable": true,
+    "editor.formatOnSave": true,
+    "[csharp]": {
+        "editor.defaultFormatter": "ms-dotnettools.csharp"
+    }
 }

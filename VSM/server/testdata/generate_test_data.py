@@ -80,7 +80,7 @@ class RandomNodeType:
         return self.inner_node_type
 
 def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path, levels):
-    folder_id = generate_folder_tree(engine, path, levels)
+
     with Session(engine) as session:
         root_folder = RootFolderDTO(
             owner=owner,
@@ -153,7 +153,8 @@ def generate_node( session: Session,
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
             name=f"Inner_{child_level}_{sibling_counter + 1}",
-            type_id=node_type.id
+            type_id=node_type.id,
+            retention_id=0
         )
     else:
         raise Exception("unknown nodetype")
@@ -175,22 +176,21 @@ def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str
     with Session(engine) as session:
         #generate the root
         id_counter:int = 1
-        root:Optional[FolderNodeDTO] = generate_node(   session=session, 
-                                                        root_folder_id=root_folder_id,
-                                                        parent_id=0, 
-                                                        node_type=random_node_type.get_inner_node_type(), 
-                                                        child_level=1, 
-                                                        sibling_counter=0,
-                                                        retention_generator=retention_generator)
-        if root is None: 
-            root = FolderNodeDTO(id=None, rootfolder_id=root_folder_id, parent_id=0, name=root_folder_name)
-            session.add(root)
-            session.flush()
-        else:
+        node_type = random_node_type.get_inner_node_type()
+        child_level:int = 0
+        current_parent_id:int = 0
+        root:Optional[FolderNodeDTO] = generate_node(  session=session, 
+                                                       root_folder_id=root_folder_id,
+                                                       parent_id=current_parent_id, 
+                                                       node_type=node_type, 
+                                                       child_level=child_level, 
+                                                       sibling_counter=0,
+                                                       retention_generator=retention_generator)
+        
+        if not root is None:
             # generate a folder tree under the rootfolder
             current_level_nodes = [root]
             nodes_generated = 1
-            YIELD_EVERY_N_NODES = 100
             for level in range(max_level):
                 next_level_nodes = []
                 for current_parent in current_level_nodes:

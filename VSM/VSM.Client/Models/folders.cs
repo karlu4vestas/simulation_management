@@ -1,26 +1,18 @@
 namespace VSM.Client.Datamodel
 {
 
-    public class FolderBaseNode{
-        public int Id { get; set; }
-        public int ParentId { get; set; } = 0;   //Default to 0, indicating no parent
-        public string Name { get; set; } = "";
-        public int Type_Id { get; set; } = 0;
-        public int Retention_Id { get; set; } = 0;
-
-    }
     public class FolderNode
     {
-        protected FolderBaseNode dto;
+        protected FolderNodeDTO dto;
 
-        public FolderNode(FolderBaseNode dto)
+        public FolderNode(FolderNodeDTO dto)
         {
             this.dto = dto;
         }
         
         //mapped to server fields
         public int Id { get => dto.Id; set => dto.Id = value; }
-        public int ParentId { get => dto.ParentId; set => dto.ParentId = value; }
+        public int ParentId { get => dto.Parent_Id; set => dto.Parent_Id = value; }
         public string Name { get => dto.Name; set => dto.Name = value; }
         public int Type_Id { get => dto.Type_Id; set => dto.Type_Id = value; }
         public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }

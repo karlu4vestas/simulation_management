@@ -34,16 +34,14 @@
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "http://0.0.0.0:5000"
+      },
+      "justMyCode": false,
+      "enableStepFiltering": false,
+      "suppressJITOptimizations": true,
+      "logging": {
+        "moduleLoad": false
       }
     },
-        {
-      "name": "🌐 Debug Blazor Client - Development (Port 5000)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:5000",
-      "webRoot": "${workspaceFolder}/VSM.Client"
-    },
-
     {
       "name": "Test FastAPI endpoints",
       "type": "debugpy",
@@ -65,85 +63,6 @@
       }
     },
     {
-      "name": "🚀 VSM Server - Development (Port 5000) [Run]",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "justMyCode": false,
-      "enableStepFiltering": false,
-      "suppressJITOptimizations": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)",
-        "uriFormat": "%s"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5000"
-      }
-    },
-    {
-      "name": "🔄 VSM Server - Staging/Test (Port 5002)",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)",
-        "uriFormat": "%s"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5002"
-      }
-    },
-    {
-      "name": "⚙️ VSM Server - Debug/Custom (Port 5003)",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)",
-        "uriFormat": "%s"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5003"
-      }
-    },
-    {
-      "name": "🔒 VSM Server - Secure/HTTPS (Port 5001)",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)",
-        "uriFormat": "%s"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "https://0.0.0.0:5001;http://0.0.0.0:5000"
-      }
-    },
-    {
       "name": "🔌 Attach to Running VSM Server",
       "type": "coreclr",
       "request": "attach",
@@ -158,18 +77,22 @@
       "webRoot": "${workspaceFolder}/VSM.Client"
     },
     {
-      "name": "🔄 Debug Blazor Client - Staging/Test (Port 5002)",
-      "type": "chrome",
+      "name": "Launch Client",
+      "type": "coreclr",
       "request": "launch",
-      "url": "http://localhost:5002",
-      "webRoot": "${workspaceFolder}/VSM.Client"
-    },
-    {
-      "name": "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:5003",
-      "webRoot": "${workspaceFolder}/VSM.Client"
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/VSM.Client/bin/Debug/net8.0/VSM.Client.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/VSM.Client",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
     }
   ],
   "compounds": [
@@ -182,45 +105,11 @@
       "stopAll": true
     },
     {
-      "name": "🚀 Full Stack Debug - Staging/Test Environment",
-      "configurations": [
-        "🔄 VSM Server - Staging/Test (Port 5002)",
-        "🔄 Debug Blazor Client - Staging/Test (Port 5002)"
-      ],
-      "stopAll": true
-    },
-    {
-      "name": "🚀 Full Stack Debug - Custom Environment",
-      "configurations": [
-        "⚙️ VSM Server - Debug/Custom (Port 5003)",
-        "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)"
-      ],
-      "stopAll": true
-    },
-    {
       "name": "🐍🌐 FastAPI + VSM - Development Environment",
       "configurations": [
         "🐍 Start FastAPI Server (Port 5173)",
         "🌐 VSM Server - Development (Port 5000) [Debug]",
         "🌐 Debug Blazor Client - Development (Port 5000)"
-      ],
-      "stopAll": true
-    },
-    {
-      "name": "🐍🔄 FastAPI + VSM - Staging/Test Environment",
-      "configurations": [
-        "🐍 Start FastAPI Server (Port 5173)",
-        "🔄 VSM Server - Staging/Test (Port 5002)",
-        "🔄 Debug Blazor Client - Staging/Test (Port 5002)"
-      ],
-      "stopAll": true
-    },
-    {
-      "name": "🐍⚙️ FastAPI + VSM - Custom Environment",
-      "configurations": [
-        "🐍 Start FastAPI Server (Port 5173)",
-        "⚙️ VSM Server - Debug/Custom (Port 5003)",
-        "⚙️ Debug Blazor Client - Debug/Custom (Port 5003)"
       ],
       "stopAll": true
     }

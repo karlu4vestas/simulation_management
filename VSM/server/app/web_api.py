@@ -91,7 +91,7 @@ def read_root_folders(initials: Optional[str] = Query(default=None)):
         return retention_types        
 
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
-@app.get("/folders/", response_model=list[FolderNodePublic])
+@app.get("/folders/", response_model=list[FolderNodeDTO])
 def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()

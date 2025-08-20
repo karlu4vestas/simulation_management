@@ -26,9 +26,9 @@ class FolderNodeBase(SQLModel):
     parent_id: int       = Field(default=0)  # 0 means no parent
     name: str            = Field(default="")
     type_id: int | None  = Field(default=None, foreign_key="foldertypedto.id")
-    modified: str | None = None
-    retention_date: str | None = None
     retention_id: int | None = Field(default=None, foreign_key="retentiontypedto.id")
+    retention_date: str | None = None
+    modified: str | None = None
 
 class FolderNodeDTO(FolderNodeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
