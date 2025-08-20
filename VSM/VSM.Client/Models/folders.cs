@@ -9,10 +9,10 @@ namespace VSM.Client.Datamodel
         {
             this.dto = dto;
         }
-        
+
         //mapped to server fields
         public int Id { get => dto.Id; set => dto.Id = value; }
-        public int ParentId { get => dto.Parent_Id; set => dto.Parent_Id = value; }
+        public int Parent_Id { get => dto.Parent_Id; set => dto.Parent_Id = value; }
         public string Name { get => dto.Name; set => dto.Name = value; }
         public int Type_Id { get => dto.Type_Id; set => dto.Type_Id = value; }
         public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
@@ -37,7 +37,8 @@ namespace VSM.Client.Datamodel
             {
                 var currentNode = stack.Pop();
 
-                if (currentNode.IsLeaf) {
+                if (currentNode.IsLeaf)
+                {
                     if (currentNode.Retention_Id == from.Id)
                     {
                         // Found a leaf node - update its retention
@@ -87,7 +88,7 @@ namespace VSM.Client.Datamodel
                         if (currentNode.IsLeaf)
                         {
                             // Leaf node: count its retention value
-                            if (currentNode!=null)
+                            if (currentNode != null)
                             {
                                 currentNode.AttributDict[currentNode.Retention_Id] = 1;
                             }
@@ -105,7 +106,7 @@ namespace VSM.Client.Datamodel
                             }
                             // InnerNode doesn't have its own retention value to add
                         }
-                        if( currentNode!=null ) //get rid of the warning
+                        if (currentNode != null) //get rid of the warning
                             processedFolders.Add(currentNode.Id);
                     }
                 }

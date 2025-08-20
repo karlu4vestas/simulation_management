@@ -1,3 +1,4 @@
+@using System.Diagnostics
 @page "/debug-test"
 @rendermode InteractiveAuto
 
@@ -14,12 +15,12 @@
     {
         // Set a breakpoint on this line
         message = "If you see this, the breakpoint was not hit";
-        
+
         // More code for testing breakpoints
         int x = 10;
         int y = 20;
         int z = x + y;
-        
-        message = $"Calculation result: {z}";
+
+        message = $"Calculation result: {z} Debugger.IsAttached:{Debugger.IsAttached}";
     }
 }

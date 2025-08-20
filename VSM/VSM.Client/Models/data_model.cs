@@ -114,12 +114,12 @@ namespace VSM.Client.Datamodel
             }
         }*/
 
-        public async Task<List<FolderNode>> GetFoldersByRootFolderIdAsync(int rootFolderId)
+        public async Task<FolderNode> GetFoldersByRootFolderIdAsync(RootFolder rootFolder)
         {
             try
             {
                 // Get the raw JSON response first
-                string requestUrl = $"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolderId}";
+                string requestUrl = $"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolder.Id}";
                 HttpResponseMessage response = await httpClient.GetAsync(requestUrl);
                 response.EnsureSuccessStatusCode();
 
@@ -132,8 +132,9 @@ namespace VSM.Client.Datamodel
                     PropertyNameCaseInsensitive = true
                 }) ?? new List<FolderNodeDTO>();
 
-                List<FolderNode> folder_nodes = base_folders.Select(dto => new FolderNode(dto)).ToList();
-                return folder_nodes;
+
+                FolderNode root = ConstructFolderTreeFromNodes(rootFolder, base_folders);
+                return root;
             }
             catch (Exception ex)
             {
@@ -142,9 +143,40 @@ namespace VSM.Client.Datamodel
                 {
                     Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
                 }
-                return new List<FolderNode>();
+                return new FolderNode(new FolderNodeDTO());
             }
         }
+
+        FolderNode ConstructFolderTreeFromNodes(RootFolder rootFolder, List<FolderNodeDTO> folderNodeDTOs)
+        {
+            // create a map for fast lookup of all FolderNodes
+            Dictionary<int, FolderNode> nodeLookup = new Dictionary<int, FolderNode>();
+            foreach (var dto in folderNodeDTOs)
+            {
+                FolderNode node = new FolderNode(dto);
+                nodeLookup[node.Id] = node;
+            }
+
+            // Create a root node
+
+            // Build the tree structure
+            foreach (var dto in folderNodeDTOs)
+            {
+                if (dto.Parent_Id == 0)
+                {
+                    // This is the root node
+                    continue;
+                }
+                else if (nodeLookup.TryGetValue(dto.Parent_Id, out var parentNode))
+                {
+                    parentNode.Children.Add(nodeLookup[dto.Id]);
+                }
+            }
+
+            FolderNode root = nodeLookup[rootFolder.Folder_Id];
+            return root;
+        }
+
         //@todo create a fastAPI endpoint to register that the user wants to run cleanup for this folder 
         public bool RegisterRootFolderForCleanUp(RootFolder rootFolder)
         {

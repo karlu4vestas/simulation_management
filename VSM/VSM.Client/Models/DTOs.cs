@@ -55,7 +55,7 @@ namespace VSM.Client.Datamodel
         //mapped
         public int Id { get; set; } //ID of this DTO
         public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
-        public uint Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
+        public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
         public bool Active_Cleanup { get; set; } // indicates if the folder is actively being cleaned up
@@ -75,11 +75,14 @@ namespace VSM.Client.Datamodel
             this.dto = dto;
         }
 
-        private int Id => dto.Id;
-        public bool Is_registeredfor_cleanup { 
+        public int Id => dto.Id;
+        public int Folder_Id => dto.Folder_Id;
+
+        public bool Is_registeredfor_cleanup
+        {
             get => dto.Active_Cleanup;
             set => dto.Active_Cleanup = value;
-        }        
+        }
         public string Root_path => dto.Path;
         public string Owner => dto.Owner;
         public string Approvers => dto.Approvers;
@@ -90,14 +93,12 @@ namespace VSM.Client.Datamodel
 
         public async Task<FolderNode?> GetFolderTreeAsync()
         {
-            if (_folderTree == null )
+            if (_folderTree == null)
             {
-                List<FolderNode> result = await DataModel.Instance.GetFoldersByRootFolderIdAsync(Id);
-                if (result != null)
+                _folderTree = await DataModel.Instance.GetFoldersByRootFolderIdAsync(this);
+                if (_folderTree == null)
                 {
-                    FolderNode rootFolderNode = new FolderNode(new FolderNodeDTO());
-                    //rootFolderNode.Children = result;
-                    _folderTree = rootFolderNode;
+                    Console.WriteLine($"Error: No folder tree found for root folder with ID {Id}");
                 }
             }
             return _folderTree;

@@ -26,21 +26,24 @@
       "args": [],
       "cwd": "${workspaceFolder}/VSM",
       "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "Now listening on: (https?://\\S+)",
-        "uriFormat": "%s"
-      },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ASPNETCORE_URLS": "http://0.0.0.0:5000"
       },
       "justMyCode": false,
       "enableStepFiltering": false,
+      "requireExactSource": true,
+      "symbolOptions": {
+        "searchMicrosoftSymbolServer": true,
+        "searchNuGetSymbolServer": true
+      },
+      "internalConsoleOptions": "openOnSessionStart",
       "suppressJITOptimizations": true,
       "logging": {
         "moduleLoad": false
       }
+      // Optional: Uncomment if you want to disable Hot Reload
+      // "hotReloadEnabled": false
     },
     {
       "name": "Test FastAPI endpoints",
@@ -81,7 +84,7 @@
       "type": "coreclr",
       "request": "launch",
       "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM.Client/bin/Debug/net8.0/VSM.Client.dll",
+      "program": "${workspaceFolder}/VSM.Client/bin/Debug/net9.0/VSM.Client.dll",
       "args": [],
       "cwd": "${workspaceFolder}/VSM.Client",
       "stopAtEntry": false,
@@ -100,6 +103,15 @@
       "name": "🚀 Full Stack Debug - Development Environment",
       "configurations": [
         "🌐 VSM Server - Development (Port 5000) [Debug]",
+        "🌐 Debug Blazor Client - Development (Port 5000)"
+      ],
+      "stopAll": true
+    },
+    {
+      "name": "Blazor Client-Server Full Stack Debug",
+      "configurations": [
+        "🌐 VSM Server - Development (Port 5000) [Debug]",
+        "Launch Client",
         "🌐 Debug Blazor Client - Development (Port 5000)"
       ],
       "stopAll": true

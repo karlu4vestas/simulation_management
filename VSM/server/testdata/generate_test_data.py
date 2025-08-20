@@ -132,6 +132,7 @@ from typing import Optional
 def generate_node( session: Session, 
                    root_folder_id:int, 
                    parent_id:int, 
+                   parent_name:str,
                    node_type:FolderTypeDTO, 
                    child_level:int, 
                    sibling_counter:int, 
@@ -144,7 +145,7 @@ def generate_node( session: Session,
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
-            name=f"VTS_{child_level}_{sibling_counter + 1}",
+            name=f"VTS_{parent_name}_{sibling_counter + 1}",
             type_id=node_type.id,  
             retention_id=retention_generator.next().id
         )
@@ -152,7 +153,7 @@ def generate_node( session: Session,
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
-            name=f"Inner_{child_level}_{sibling_counter + 1}",
+            name=f"{parent_name}_{sibling_counter + 1}",
             type_id=node_type.id,
             retention_id=0
         )
@@ -179,8 +180,10 @@ def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str
         node_type = random_node_type.get_inner_node_type()
         child_level:int = 0
         current_parent_id:int = 0
+        current_parent_name:str = root_folder_name
         root:Optional[FolderNodeDTO] = generate_node(  session=session, 
                                                        root_folder_id=root_folder_id,
+                                                       parent_name=current_parent_name,
                                                        parent_id=current_parent_id, 
                                                        node_type=node_type, 
                                                        child_level=child_level, 
@@ -195,6 +198,8 @@ def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str
                 next_level_nodes = []
                 for current_parent in current_level_nodes:
                     number_of_children = rand.randint(4, 6)
+                    current_parent_name:str = current_parent.name
+
                     if current_parent is None : 
                         print(f"Skipping. current_parent is None")
                         continue  # Skip to next iteration of the loop
@@ -219,6 +224,7 @@ def generate_folder_tree(engine:Engine, root_folder_id:int, root_folder_name:str
                             child:Optional[FolderNodeDTO] = generate_node(  session=session, 
                                                                             root_folder_id=root_folder_id,
                                                                             parent_id=current_parent_id, 
+                                                                            parent_name=current_parent_name,
                                                                             node_type=node_type, 
                                                                             child_level=child_level, 
                                                                             sibling_counter=i_sibling,
