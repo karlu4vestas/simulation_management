@@ -3,17 +3,17 @@
   "configurations": [
     {
       "name": "🐍 Start FastAPI Server (Port 5173)",
-      "type": "debugpy",
+      "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/server/main.py",
-      "python": "${workspaceFolder}/server/.venv/bin/python",
+      "pythonPath": "${workspaceFolder}/.venv/bin/python",
       "cwd": "${workspaceFolder}/server",
       "console": "integratedTerminal",
       "justMyCode": false,
       "env": {
         "PYTHONPATH": "${workspaceFolder}/server",
-        "VIRTUAL_ENV": "${workspaceFolder}/server/.venv",
-        "PATH": "${workspaceFolder}/server/.venv/bin:${env:PATH}"
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       },
       "args": []
     },

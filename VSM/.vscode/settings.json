@@ -21,5 +21,48 @@
     "editor.formatOnSave": true,
     "[csharp]": {
         "editor.defaultFormatter": "ms-dotnettools.csharp"
-    }
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "terminal.integrated.env.linux": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+    },
+    "terminal.integrated.env.osx": {
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+    },
+    "terminal.integrated.env.windows": {
+        "VIRTUAL_ENV": "${workspaceFolder}\\.venv",
+        "PATH": "${workspaceFolder}\\server\\Scripts;${env:PATH}"
+    },
+    "terminal.integrated.profiles.linux": {
+        "bash (venv)": {
+            "path": "/bin/bash",
+            "args": [
+                "--rcfile",
+                "${workspaceFolder}/.venv/bin/activate"
+            ]
+        }
+    },
+    "terminal.integrated.profiles.osx": {
+        "bash (venv)": {
+            "path": "/bin/bash",
+            "args": [
+                "--rcfile",
+                "${workspaceFolder}/.venv/bin/activate"
+            ]
+        }
+    },
+    "terminal.integrated.profiles.windows": {
+        "Command Prompt (venv)": {
+            "path": "cmd.exe",
+            "args": [
+                "/k",
+                "${workspaceFolder}\\.venv\\Scripts\\activate.bat"
+            ]
+        }
+    },
+    "terminal.integrated.defaultProfile.linux": "bash (venv)",
+    "terminal.integrated.defaultProfile.osx": "bash (venv)",
+    "terminal.integrated.defaultProfile.windows": "Command Prompt (venv)"
 }
