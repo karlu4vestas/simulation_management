@@ -2,20 +2,25 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🐍 Start FastAPI Server (Port 5173)",
-      "type": "python",
+      "name": "Launch Blazor Server",
+      "type": "coreclr",
       "request": "launch",
-      "program": "${workspaceFolder}/server/main.py",
-      "pythonPath": "${workspaceFolder}/.venv/bin/python",
-      "cwd": "${workspaceFolder}/server",
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/server",
-        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
-        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/VSM",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://0\\.0\\.0\\.0:\\d+)"
       },
-      "args": []
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://0.0.0.0:5500"
+      },
+      "logging": {
+        "trace": true
+      }
     },
     {
       "name": "🌐 VSM Server - Development (Port 5000) [Debug]",
@@ -42,8 +47,22 @@
       "logging": {
         "moduleLoad": false
       }
-      // Optional: Uncomment if you want to disable Hot Reload
-      // "hotReloadEnabled": false
+    },
+    {
+      "name": "🐍 Start FastAPI Server (Port 5173)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/main.py",
+      "pythonPath": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "args": []
     },
     {
       "name": "Test FastAPI endpoints",

@@ -2,16 +2,6 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "kill-port-5000",
-      "type": "shell",
-      "command": "lsof -ti:5000 | xargs -r kill -9",
-      "presentation": {
-        "reveal": "silent",
-        "panel": "shared"
-      },
-      "problemMatcher": []
-    },
-    {
       "label": "build",
       "command": "dotnet",
       "type": "process",
@@ -21,10 +11,7 @@
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
-      "problemMatcher": "$msCompile",
-      "dependsOn": [
-        "kill-port-5000"
-      ]
+      "problemMatcher": "$msCompile"
     },
     {
       "label": "publish",
@@ -32,7 +19,7 @@
       "type": "process",
       "args": [
         "publish",
-        "${workspaceFolder}/VSM.sln",
+        "${workspaceFolder}/VSM.slnx",
         "/property:GenerateFullPaths=true",
         "/consoleloggerparameters:NoSummary"
       ],
@@ -46,7 +33,7 @@
         "watch",
         "run",
         "--project",
-        "${workspaceFolder}/VSM.sln"
+        "${workspaceFolder}/VSM.slnx"
       ],
       "problemMatcher": "$msCompile"
     }

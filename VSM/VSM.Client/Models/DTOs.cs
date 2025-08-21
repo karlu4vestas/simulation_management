@@ -66,7 +66,6 @@ namespace VSM.Client.Datamodel
     // Define RetentionType for backwards compatibility until all code is updated
     public class RetentionType : RetentionDTO { }
     public class FolderType : FolderTypeDTO { }
-
     public class RootFolder
     {
         RootFolderDTO dto;

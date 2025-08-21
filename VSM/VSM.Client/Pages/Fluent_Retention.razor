@@ -20,19 +20,23 @@
                 </div>
             } else {
 
-                <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="FolderNode" Virtualize="true" ItemSize ="25" 
+                <FluentDataGrid @ref="grid" Items="@VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize ="25" 
                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
 
-                        <TemplateColumn TGridItem="FolderNode" Title="TreeNodes" Width="350px">
+                        <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="350px">
                             <ChildContent Context="item">
                                 <div style="padding-left:@(item.Level * 15)px;">
-                                    @if (!item.IsLeaf && item.Children.Count() > 0)
+                                    @if (!item.IsLeaf)
                                     {
                                         <button class="e-flat" @onclick="() => ToggleExpand(item)">
                                             @(item.IsExpanded ? "▾" : "▸")
                                         </button>
+                                        @item.Name
+                                    } else {
+                                        <span class="e-flat" style="display: inline-block; width: 4.5em; text-align: center;">
+                                            @item.Name
+                                        </span>
                                     }
-                                    @item.Name
                             </div>
                             </ChildContent>
                         </TemplateColumn>                                
@@ -40,16 +44,16 @@
                         @if( rootFolder!=null ){
                             @foreach (var key in retentionOptions)
                             {
-                                <TemplateColumn TGridItem="FolderNode" Title="@key.Name">
+                                <TemplateColumn TGridItem="ViewNode" Title="@key.Name">
                                     <ChildContent Context="item">
-                                        @if( item.AttributDict.TryGetValue(key.Id, out var val) ){
-                                            RetentionCell cell = new RetentionCell(item,key);    
+                                        @if( item.Data.AttributDict.TryGetValue(key.Id, out var val) ){
+                                            RetentionCell cell = new RetentionCell(item.Data,key, retentionOptions);    
                                             //var cellId = $"{item.Id}_{key}";
 
                                             var isSelected  = selected_cell==null ? false : selected_cell == cell ;
                                             var buttonClass = isSelected ? "e-flat selected" : "e-flat";
 
-                                            <button class="@buttonClass" @onclick="() => OnCellClick(item, key)">
+                                            <button class="@buttonClass" @onclick="() => OnCellClick(cell)">
                                                 @val
                                             </button>
                                         }
@@ -68,20 +72,20 @@
         @if( selected_cell != null ){
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span>TreeNode: </span>
-                <span>@selected_cell.TreeNode.Name</span>
+                <span>@selected_cell.Node.Name</span>
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
                 <span>Current retention: </span>
                 <span>@selected_cell.retention_key.Name</span>
             </div>            
             <div style="display: flex; align-items: center; gap: 10px;">
-                
                 <FluentCombobox Placeholder="Make a selection..." 
                                 Label="New retention" 
                                 Autofocus="true"
-                                Multiple=false
-                                Items="@retentionOptions.Select(r => r.Name).ToList()"
-                                @bind-Value="@selected_cell.new_retention_key.Name"
+                                Items="@retentionOptions"
+                                OptionValue="@(i => i.Id.ToString())"
+                                OptionText="@(i => $"{i.Name}")"                                
+                                @bind-Value="@selected_cell.new_retention_key_string"
                                 @bind-Value:after="OnRetentionChangedAsync" 
                                 Height="200px"
                                 Position="SelectPosition.Above" 
@@ -97,209 +101,3 @@
         }
     </FluentStack>
 </FluentStack>
-
-@code {
-    FluentDataGrid<FolderNode>? grid;
-    private List<FolderNode> TreeRoots = new();
-    private List<FolderNode> VisibleRows = new();
-    public  RootFolder? rootFolder { get; set; }
-    private List<RetentionType> retentionOptions = new();
-    private bool isLoading = true;
-    private bool hasRendered = false;
-    
-    protected override void OnInitialized()
-    {
-        // Just set up initial state, don't block with async operations
-        if( rootFolder != DataModel.Instance.SelectedRootFolder ) 
-        {
-            rootFolder = DataModel.Instance.SelectedRootFolder; 
-            // Don't await here - let the UI render first
-        }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender && !hasRendered)
-        {
-            hasRendered = true;
-            // Load both data and retention options
-            await LoadDataAsync();
-        }
-    }
-
-    private async Task LoadRetentionOptionsAsync()
-    {
-        try
-        {
-            retentionOptions = await DataModel.Instance.GetRetentionOptionsAsync();
-            await InvokeAsync(StateHasChanged);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading retention options: {ex.Message}");
-            retentionOptions = new List<RetentionType>();
-        }
-    }
-
-
-    private async Task LoadRootFolderTreeAsync( RootFolder rootFolder)
-    {
-        try
-        {
-            if( rootFolder != null ){
-                var folderTree = await rootFolder.GetFolderTreeAsync();
-                if( folderTree == null ){
-                    TreeRoots.Clear();
-                } else if( !folderTree.IsLeaf ) {
-                    TreeRoots = folderTree.Children;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error loading RootFolderTree: {ex.Message}");
-        }
-    }
-
-    private async Task LoadDataAsync()
-    {
-        try
-        {
-            // Ensure UI shows loading state
-            await InvokeAsync(StateHasChanged);
-
-            // first load retention options because we need them to generate testdata and folder structure
-            await LoadRetentionOptionsAsync();
-
-            
-            if( rootFolder!=null){
-                await LoadRootFolderTreeAsync(rootFolder);
-                await rootFolder.UpdateAggregation();
-            }            
-        }
-        finally
-        {
-            RefreshVisibleRows();
-            isLoading = false;
-            await InvokeAsync(StateHasChanged);
-        }
-    }
-    
-    private void ToggleExpand(FolderNode node)
-    {
-        node.IsExpanded = !node.IsExpanded;
-        RefreshVisibleRows();
-    }
-
-    private void RefreshVisibleRows()
-    {
-        VisibleRows = FlattenVisible(TreeRoots);
-    }
-
-    private List<FolderNode> FlattenVisible(IEnumerable<FolderNode> nodes)
-    {
-        var result = new List<FolderNode>();
-        foreach (var node in nodes)
-        {
-            result.Add(node);
-            if (node.IsExpanded && !node.IsLeaf)
-            {
-                result.AddRange(FlattenVisible(node.Children));
-            }
-        }
-
-        return result;
-    }
-
-    public class RetentionCell : IEquatable<RetentionCell>
-    {
-        public FolderNode TreeNode { get; set; }
-        public RetentionType retention_key { get; set; }
-        public RetentionType new_retention_key { get; set; }
-        public RetentionCell(FolderNode TreeNode, RetentionType retention_key)
-        {
-            this.TreeNode = TreeNode;
-            this.retention_key = retention_key;
-            this.new_retention_key = this.retention_key; 
-        }
-        public bool Equals(RetentionCell? other)
-        {
-            if (other is null) return false;
-            if (ReferenceEquals(this, other)) return true;
-
-            return TreeNode?.Id == other.TreeNode?.Id && retention_key.Id == other.retention_key.Id;
-        }
-        public override bool Equals(object? obj)
-        {
-            return obj is RetentionCell other && Equals(other);
-        }
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(TreeNode?.Id, retention_key.Id);
-        }
-
-        public static bool operator ==(RetentionCell? left, RetentionCell? right)
-        {
-            if (left is null) return right is null;
-            return left.Equals(right);
-        }
-
-        public static bool operator !=(RetentionCell? left, RetentionCell? right)
-        {
-            return !(left == right);
-        }
-
-        public async Task SyncRetentions()
-        {
-            if( new_retention_key.Id != retention_key.Id ){
-                Console.WriteLine($"sync the TreeNode tree' retentions {TreeNode.Name} retention {retention_key.Name} new_retention {new_retention_key.Name}");
-
-                TreeNode.ChangeRetentions(retention_key, new_retention_key);                
-                retention_key = new_retention_key;
-
-                //finde the root folder by iteration untill the parent is null
-                var currentFolder = TreeNode;
-                while (currentFolder.Parent !=  null)
-                {
-                    currentFolder = currentFolder.Parent;
-                }
-                if( !currentFolder.IsLeaf )
-                    await currentFolder.UpdateAggregation();
-            }
-        }
-    }
-    RetentionCell? selected_cell = null;
-    private bool isProcessing = false;
-
-    
-    private void OnCellClick(FolderNode node, RetentionType key)
-    {
-        //selected_cell = (node,key);
-        selected_cell = new RetentionCell(node,key);
-        Console.WriteLine($"Cell focused, clickCount: {node.Name}, {key.Name}");
-    }
-
-    private async Task OnRetentionChangedAsync()
-    {
-        if (selected_cell != null)
-        {
-            isProcessing = true;
-            StateHasChanged(); // Update UI to show progress
-            
-            try
-            {
-                await selected_cell.SyncRetentions();
-                await InvokeAsync(StateHasChanged);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error syncing retentions: {ex.Message}");
-            }
-            finally
-            {
-                isProcessing = false;
-                StateHasChanged(); // Hide progress indicator
-            }
-        }
-    }
-}

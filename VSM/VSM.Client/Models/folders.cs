@@ -26,7 +26,7 @@ namespace VSM.Client.Datamodel
 
         public List<FolderNode> Children { get; set; } = new();
 
-        public void ChangeRetentions(RetentionType from, RetentionType to)
+        public async Task ChangeRetentions(RetentionType from, RetentionType to)
         {
             //@todo
             //change retention for all leaf nodes in this inner node without recursion
@@ -53,6 +53,12 @@ namespace VSM.Client.Datamodel
                         stack.Push(child);
                     }
                 }
+                // Yield control periodically for large trees to prevent UI blocking
+                if (stack.Count % 100 == 0)
+                {
+                    await Task.Yield();
+                }
+
             }
         }
 

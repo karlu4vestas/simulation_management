@@ -59,6 +59,13 @@ kill -9 <PID>
 lsof -ti:5000 | xargs kill
 ```
 
+### Method 6: Using `fuser` to kill all processes on a port (Alternative One-liner)
+
+```bash
+# Kill all processes on port 5000 using fuser
+fuser -k 5000/tcp
+```
+
 ## Common Scenarios
 
 ### ASP.NET Core Applications

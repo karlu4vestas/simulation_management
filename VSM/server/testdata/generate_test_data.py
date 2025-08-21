@@ -20,8 +20,8 @@ def insert_folder_metadata_in_db(engine):
         session.add(RetentionTypeDTO(name="+1Y",              display_rank=9,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="+2Y",              display_rank=10, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="+3Y",              display_rank=11, is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="longterm",         display_rank=12, is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="path",             display_rank=13, is_system_managed=False ))
+        #session.add(RetentionTypeDTO(name="longterm",         display_rank=12, is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="Path",             display_rank=13, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="Clean",            display_rank=14,  is_system_managed=True  ))
 
         session.commit()
@@ -145,7 +145,7 @@ def generate_node( session: Session,
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
-            name=f"VTS_{parent_name}_{sibling_counter + 1}",
+            name=f"VTS_{parent_name}_{sibling_counter + 1}" if parent_id > 0 else f"VTS_{parent_name}",
             type_id=node_type.id,  
             retention_id=retention_generator.next().id
         )
@@ -153,7 +153,7 @@ def generate_node( session: Session,
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
-            name=f"{parent_name}_{sibling_counter + 1}",
+            name=f"{parent_name}_{sibling_counter + 1}" if parent_id > 0 else f"{parent_name}",
             type_id=node_type.id,
             retention_id=0
         )
