@@ -22,9 +22,8 @@ namespace VSM.Client.Datamodel
         private static readonly HttpClient httpClient = new HttpClient();
         private List<RetentionType>? _retentionOptions;
         private List<FolderType>? _foldertypes;
-        private List<RootFolder>? _the_users_rootFolders;
         public RootFolder? SelectedRootFolder { get; set; }
-        public string? User { get; set; }
+        public string User { get; set; } = "";
         public async Task<List<RetentionType>> GetRetentionOptionsAsync()
         {
             return _retentionOptions ??= await GetRetentionTypesFromApiAsync();
@@ -63,58 +62,55 @@ namespace VSM.Client.Datamodel
                 return new List<FolderType>();
             }
         }
-        public async Task<List<RootFolder>> GetTheUsersRootFolders()
+        public List<RootFolder> TheUsersRootFolders { get; set; } = new List<RootFolder>();
+        public async Task LoadTheUsersRootFolders()
         {
-            if (User is null)
+            if (User == null || User.Length == 0)
             {
-                _the_users_rootFolders = new List<RootFolder>();
+                TheUsersRootFolders = [];
             }
             else
             {
-                _the_users_rootFolders = await GetRootFoldersFromApiAsync(User);
-            }
-            return _the_users_rootFolders;
-        }
-        private async Task<List<RootFolder>> GetRootFoldersFromApiAsync(string? user = null)
-        {
-            try
-            {
-                string endpoint = user != null ? $"http://127.0.0.1:5173/rootfolders/?initials={user}" : "http://127.0.0.1:5173/rootfolders/";
-                List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(endpoint, new JsonSerializerOptions
+                try
                 {
-                    PropertyNameCaseInsensitive = true
-                }) ?? new List<RootFolderDTO>();
+                    string endpoint = $"http://127.0.0.1:5173/rootfolders/?initials={User}";
+                    List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(endpoint, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    }) ?? new List<RootFolderDTO>();
 
-                List<RootFolder> rootFolders = rootFolderDTOs.Select(dto => new RootFolder(dto)).ToList();
-                return rootFolders;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching root folders: {ex.Message}");
-                return new List<RootFolder>();
+                    List<RootFolder> rootFolders = rootFolderDTOs.Select(dto => new RootFolder(dto)).ToList();
+                    TheUsersRootFolders = rootFolders;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error fetching root folders: {ex.Message}");
+                    TheUsersRootFolders = [];
+                }
             }
         }
-
-        /*public async Task<List<FolderNode>> GetFoldersByRootFolderIdAsync(int rootFolderId)
+        public async Task<FolderNode> GetFoldersByRootFolderIdAsync(RootFolder rootFolder)
         {
             try
             {
-                List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>($"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolderId}", new JsonSerializerOptions
+                string requestUrl = $"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolder.Id}";
+                List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>(requestUrl, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 }) ?? new List<FolderNodeDTO>();
 
                 List<FolderNode> folder_nodes = base_folders.Select(dto => new FolderNode(dto)).ToList();
-                return folder_nodes;
+                FolderNode root = ConstructFolderTreeFromNodes(rootFolder, base_folders);
+                return root;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching root folders: {ex.Message}");
-                return new List<FolderNode>();
+                return new FolderNode(new FolderNodeDTO());
             }
-        }*/
+        }
 
-        public async Task<FolderNode> GetFoldersByRootFolderIdAsync(RootFolder rootFolder)
+        /*public async Task<FolderNode> GetFoldersByRootFolderIdAsync(RootFolder rootFolder)
         {
             try
             {
@@ -145,7 +141,7 @@ namespace VSM.Client.Datamodel
                 }
                 return new FolderNode(new FolderNodeDTO());
             }
-        }
+        }*/
 
         FolderNode ConstructFolderTreeFromNodes(RootFolder rootFolder, List<FolderNodeDTO> folderNodeDTOs)
         {

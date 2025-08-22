@@ -37,6 +37,10 @@
     border: none;
 }
 
-.selected {
+.e-flat-selected {
     background-color: lightblue !important;
+}
+
+.e-flat-target {
+    background-color: lightgreen !important;
 }
