@@ -36,7 +36,7 @@
                                     <div style="padding-left:@(item.Level * 15)px;">
                                         @if (!item.IsLeaf)
                                         {
-                                            <button class="e-flat" @onclick="() => ToggleExpand(VisibleRows, VisibleRootNode, item)">
+                                            <button class="e-flat" @onclick="() => ToggleExpand(VisibleRootNode, item)">
                                                 @(item.IsExpanded ? "▾" : "▸")
                                             </button>
                                             @item.Name

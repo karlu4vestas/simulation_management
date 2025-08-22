@@ -32,7 +32,6 @@ namespace VSM.Client.Pages
                 // Don't await here - let the UI render first
             }
         }
-
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender && !hasRendered)
@@ -42,7 +41,6 @@ namespace VSM.Client.Pages
                 await LoadDataAsync();
             }
         }
-
         private async Task LoadRetentionOptionsAsync()
         {
             try
@@ -56,8 +54,6 @@ namespace VSM.Client.Pages
                 retentionOptions = new List<RetentionType>();
             }
         }
-
-
         private async Task LoadRootFolderTreeAsync(RootFolder rootFolder)
         {
             try
@@ -80,7 +76,6 @@ namespace VSM.Client.Pages
                 Console.WriteLine($"Error loading RootFolderTree: {ex.Message}");
             }
         }
-
         private async Task LoadDataAsync()
         {
             try
@@ -102,16 +97,16 @@ namespace VSM.Client.Pages
                 VisibleRootNode = new ViewNode(TreeData.First());
                 VisibleRootNode.IsExpanded = false; // Expand the root node by default
                 VisibleRootNode.Level = 0; // Set the root level to 0
-                ViewNode.ToggleExpand(VisibleRows, VisibleRootNode, VisibleRootNode); // Expand the root node to show its children
+                VisibleRows = ViewNode.ToggleExpand(VisibleRootNode, VisibleRootNode); // Expand the root node to show its children
 
                 //RefreshVisibleRows();
                 isLoading = false;
                 await InvokeAsync(StateHasChanged);
             }
         }
-        private void ToggleExpand(List<ViewNode> VisibleRows, ViewNode VisibleRootNode, ViewNode node)
+        private void ToggleExpand(ViewNode VisibleRootNode, ViewNode node)
         {
-            ViewNode.ToggleExpand(VisibleRows, VisibleRootNode, node);
+            VisibleRows = ViewNode.ToggleExpand(VisibleRootNode, node);
         }
         private void OnCellClick(RetentionCell cell)
         {
@@ -139,7 +134,7 @@ namespace VSM.Client.Pages
                         await rootFolder.UpdateAggregation();
 
                     if (VisibleRows != null && VisibleRootNode != null)
-                        ViewNode.RefreshVisibleRows(VisibleRows, VisibleRootNode);
+                        VisibleRows = ViewNode.RefreshVisibleRows(VisibleRootNode);
 
                     await InvokeAsync(StateHasChanged);
                     target_retention_cell = selected_cell;
@@ -157,6 +152,7 @@ namespace VSM.Client.Pages
             }
         }
     }
+
     class RetentionKey
     {
         public byte Id = 0;
@@ -172,6 +168,7 @@ namespace VSM.Client.Pages
             }
         }
     }
+
     //client node with fields to manage display and navigation
     public class ViewNode
     {
@@ -186,8 +183,7 @@ namespace VSM.Client.Pages
         public bool IsExpanded { get; set; } = false;
         public string Name => data.Name;
         public List<ViewNode> Children = [];
-
-        public static void ToggleExpand(List<ViewNode> VisibleRows, ViewNode VisibleRootNode, ViewNode node)
+        public static List<ViewNode> ToggleExpand(ViewNode VisibleRootNode, ViewNode node)
         {
             node.IsExpanded = !node.IsExpanded;
             if (!node.IsExpanded)
@@ -208,12 +204,11 @@ namespace VSM.Client.Pages
                     node.Children.Add(childNode);
                 }
             }
-            RefreshVisibleRows(VisibleRows, VisibleRootNode);
+            return RefreshVisibleRows(VisibleRootNode);
         }
-
-        public static void RefreshVisibleRows(List<ViewNode> VisibleRows, ViewNode VisibleRootNode)
+        public static List<ViewNode> RefreshVisibleRows(ViewNode VisibleRootNode)
         {
-            VisibleRows.Clear();
+            List<ViewNode> VisibleRows = [];
 
             if (VisibleRootNode != null)
             {
@@ -233,6 +228,7 @@ namespace VSM.Client.Pages
                     }
                 }
             }
+            return VisibleRows;
         }
     }
 
