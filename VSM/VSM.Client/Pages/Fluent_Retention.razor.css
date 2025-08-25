@@ -41,6 +41,10 @@
     background-color: lightblue !important;
 }
 
+.e-flat-selected-grey {
+    background-color: lightgray !important;
+}
+
 .e-flat-target {
     background-color: lightgreen !important;
 }

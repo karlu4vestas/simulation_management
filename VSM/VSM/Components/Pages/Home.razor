@@ -9,21 +9,3 @@
   <p>Use the "Library" page to login and select the root folder to manage or add a new root folder to the clean-up
     process</p>
 </FluentCard>
-
-
-<FluentCard>
-  <h3>Check debugger attachement</h3>
-
-  <button class="btn btn-primary" @onclick="TestDebugger">Test attachement</button>
-
-  <p>@message</p>
-</FluentCard>
-
-@code {
-  private string message = "Click the button to test breakpoint";
-
-  private void TestDebugger()
-  {
-    message = $"Is Debugger Attached: {Debugger.IsAttached}";
-  }
-}

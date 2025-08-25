@@ -1,4 +1,6 @@
+using System;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using Microsoft.AspNetCore.Components;
 using Microsoft.FluentUI.AspNetCore.Components;
 using VSM.Client.Datamodel;
@@ -15,12 +17,12 @@ namespace VSM.Client.Pages
         RetentionCell? selected_cell = null;
         RetentionCell? target_retention_cell = null;
         private bool isProcessing = false;
-        RetentionKey new_retention_key = new RetentionKey();
+        RetentionKey new_retention_key = new();
 
         //data from the DataModel
         private List<FolderNode> TreeData = new();
         public RootFolder? rootFolder { get; set; }
-        private List<RetentionType> retentionOptions = new();
+        private RetentionConfiguration retention_config = new RetentionConfiguration(new RetentionConfigurationDTO());
 
         protected override void OnInitialized()
         {
@@ -45,13 +47,12 @@ namespace VSM.Client.Pages
         {
             try
             {
-                retentionOptions = await DataModel.Instance.GetRetentionOptionsAsync();
-                await InvokeAsync(StateHasChanged);
+                retention_config = await DataModel.Instance.GetRetentionOptionsAsync();
+
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error loading retention options: {ex.Message}");
-                retentionOptions = [];
+                Console.WriteLine($"Error loading retention configuration: {ex.Message}");
             }
         }
         private async Task LoadRootFolderTreeAsync(RootFolder rootFolder)
@@ -111,7 +112,10 @@ namespace VSM.Client.Pages
             //selected_cell = (node,key);
             selected_cell = cell;
             target_retention_cell = null;
-            new_retention_key.Id = cell.retention_key.Id;
+            if (new_retention_key == null)
+                new_retention_key = new RetentionKey { Id = cell.retention_key.Id };
+            else
+                new_retention_key.Id = cell.retention_key.Id;
             Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
         }
         private async Task OnRetentionChangedAsync()
@@ -119,12 +123,16 @@ namespace VSM.Client.Pages
             if (selected_cell != null)
             {
                 isProcessing = true;
-                Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {new_retention_key.Id}");
+                Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
                 StateHasChanged(); // Update UI to show progress
                 try
                 {
-                    await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
-                    selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
+                    if (new_retention_key == null)
+                        throw new InvalidOperationException("No new retention key selected");
+
+                    byte newId = new_retention_key.Id;
+                    await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, newId);
+                    selected_cell.retention_key.Id = newId; // Update the selected cell's retention key
 
                     // Update the aggregation from the root folder. 
                     // This could be optimsed by only updating the modifed branch and the parente

@@ -98,7 +98,6 @@
 
                 // first load retention options because we need them to generate testdata and folder structure
                 await DataModel.Instance.LoadTheUsersRootFolders();
-                await Task.Delay(2000);
                 has_loaded_rootFolders = true;
             }
             finally

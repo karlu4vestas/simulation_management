@@ -1,13 +1,62 @@
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.FluentUI.AspNetCore.Components.DesignTokens;
+
 
 // Add reference to the DTOs file to make RootFolderDTO accessible
 using VSM.Client.Datamodel; // This ensures all types in this namespace are accessible
 
 namespace VSM.Client.Datamodel
 {
+    public class RetentionConfigurationDTO
+    {
+        public RetentionConfigurationDTO(List<RetentionType>? all_retentions = null)
+        {
+            if (all_retentions != null)
+            {
+                this.All_retentions = all_retentions;
+                this.Path_retention = all_retentions
+                        .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("path", StringComparison.OrdinalIgnoreCase));
 
+                if (Path_retention == null)
+                    throw new InvalidOperationException("No suitable path retention option found");
+
+                this.Cleaned_retention = all_retentions
+                    .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("cleaned", StringComparison.OrdinalIgnoreCase));
+                if (this.Cleaned_retention == null)
+                    throw new InvalidOperationException("No suitable cleaned retention option found");
+
+                this.Issue_retention = all_retentions
+                    .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase));
+                if (Issue_retention == null)
+                    throw new InvalidOperationException("No suitable issue retention option found");
+
+                //the list of dropdown retentions is equal to retentionOptions except for the cleaned retention value
+                this.Target_retentions = all_retentions
+                                        .Where(r => r.Id != this.Cleaned_retention.Id && !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)).ToList();
+            }
+        }
+        public List<RetentionType> All_retentions = new();
+        public List<RetentionType> Target_retentions = new();
+        public RetentionType Path_retention = new();
+        public RetentionType Cleaned_retention = new();
+        public RetentionType Issue_retention = new();
+    }
+
+    public class RetentionConfiguration
+    {
+        RetentionConfigurationDTO dto;
+        public RetentionConfiguration(RetentionConfigurationDTO dto)
+        {
+            this.dto = dto;
+        }
+        public List<RetentionType> All_retentions => dto.All_retentions;
+        public List<RetentionType> Target_retentions => dto.Target_retentions;
+        public RetentionType Path_retention => dto.Path_retention;
+        public RetentionType Cleaned_retention => dto.Cleaned_retention;
+        public RetentionType Issue_retention => dto.Issue_retention;
+    }
     public class DataModel
     {
         // Private static variable that holds the single instance
@@ -20,14 +69,25 @@ namespace VSM.Client.Datamodel
         public static DataModel Instance => _instance.Value;
 
         private static readonly HttpClient httpClient = new HttpClient();
-        private List<RetentionType>? _retentionOptions;
         private List<FolderType>? _foldertypes;
         public RootFolder? SelectedRootFolder { get; set; }
         public string User { get; set; } = "";
-        public async Task<List<RetentionType>> GetRetentionOptionsAsync()
+        private RetentionConfiguration retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO());
+        public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
         {
-            return _retentionOptions ??= await GetRetentionTypesFromApiAsync();
+            List<RetentionType> all_retentions = await DataModel.Instance.GetRetentionTypesFromApiAsync();
+            if (all_retentions != null)
+            {
+                retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO(all_retentions));
+            }
+            else
+            {
+                throw new InvalidOperationException("failed to retrieve retention");
+
+            }
+            return retentionConfiguration;
         }
+
         private async Task<List<RetentionType>> GetRetentionTypesFromApiAsync()
         {
             try

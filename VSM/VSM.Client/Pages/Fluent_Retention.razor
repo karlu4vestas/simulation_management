@@ -9,14 +9,15 @@
 <FluentStack Orientation="Orientation.Vertical">
     @if (isLoading)
     {
-        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; text-align: center;">
+        <div
+            style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 400px; text-align: center;">
             <FluentProgressRing Width="128px"></FluentProgressRing>
             <div style="margin-top: 16px; font-size: 16px;">
                 Loading folders...
             </div>
         </div>
     }
-    else if(VisibleRows==null || VisibleRows.Count == 0)
+    else if (VisibleRows == null || VisibleRows.Count == 0)
     {
         <div style="display:flex">
             <p>To work with retention you must first select a rootfolder on the Library page!</p>
@@ -25,85 +26,110 @@
     else
     {
         <FluentBodyContent>
-            <hr/>
+            <hr />
             <div class="grid">
-                    <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize ="25" 
-                                    ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
+                <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize="25"
+                    ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
 
-                            <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="350px">
-                                <ChildContent Context="item">
-                                    <div style="padding-left:@(item.Level * 18)px; display:flex; align-items:center;">
-                                        @if (!item.IsLeaf)
-                                        {
-                                            <button class="e-flat" @onclick="() => ToggleExpand(VisibleRootNode, item)" style="width:1.5em; height:1.5em; padding:0; display:inline-flex; align-items:center; justify-content:center;">
-                                                @(item.IsExpanded ? "▾" : "▸")
-                                            </button>
-                                            <span style="margin-left:8px;">@item.Name</span>
-                                        }
-                                        else
-                                        {
-                                            @* placeholder so leaf rows align with nodes that have a toggle button *@
-                                            <span style="display:inline-block; width:1.5em;"></span>
-                                            <span style="margin-left:8px;">@item.Name</span>
-                                        }
-                                    </div>
-                                </ChildContent>
-                            </TemplateColumn>                                
-
-                            @if( rootFolder!=null ){
-                                @foreach (var key in retentionOptions)
+                    <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="350px">
+                        <ChildContent Context="item">
+                            <div style="padding-left:@(item.Level * 18)px; display:flex; align-items:center;">
+                                @if (!item.IsLeaf && VisibleRootNode != null)
                                 {
-                                    <TemplateColumn TGridItem="ViewNode" Title="@key.Name">
-                                        <ChildContent Context="item">
-                                            @if( item.Data.AttributDict.TryGetValue(key.Id, out var val) ){
-                                                RetentionCell cell = new RetentionCell(item.Data,key);    
-                                                //var cellId = $"{item.Id}_{key}";
-
-                                                var isSelected  = selected_cell==null ? false : selected_cell == cell ;
-                                                var buttonClass = isSelected ? "e-flat-selected" : target_retention_cell==cell ? "e-flat-target" : "e-flat" ;
-                                                <button class="@buttonClass" @onclick="() => OnCellClick(cell)">
-                                                    @val
-                                                </button>
-                                            }
-                                        </ChildContent>
-                                    </TemplateColumn>
+                                    <button class="e-flat" @onclick="() => ToggleExpand(VisibleRootNode, item)"
+                                        style="width:1.5em; height:1.5em; padding:0; display:inline-flex; align-items:center; justify-content:center;">
+                                        @(item.IsExpanded ? "▾" : "▸")
+                                    </button>
+                                    <span style="margin-left:8px;">@item.Name</span>
                                 }
-                            }
+                                else
+                                {
+                                    @* placeholder so leaf rows align with nodes that have a toggle button *@
+                                    <span style="display:inline-block; width:1.5em;"></span>
+                                    <span style="margin-left:8px;">@item.Name</span>
+                                }
+                            </div>
+                        </ChildContent>
+                    </TemplateColumn>
 
-                    </FluentDataGrid>
+                    @if (rootFolder != null)
+                    {
+                        @foreach (var key in retention_config.All_retentions)
+                        {
+                            <TemplateColumn TGridItem="ViewNode" Title="@key.Name">
+                                <ChildContent Context="item">
+                                    @if (item.Data.AttributDict.TryGetValue(key.Id, out var val))
+                                    {
+                                        RetentionCell cell = new RetentionCell(item.Data, key);
+
+                                        @*if is_cleaned_column then show the slection as grey to indicate that i cannot be changed *@
+                                        var is_cleaned_column = key.Id == retention_config.Cleaned_retention?.Id;
+                                        var isSelected = selected_cell == null ? false : selected_cell == cell;
+                                        var buttonClass = isSelected ? (is_cleaned_column ? "e-flat-selected-grey" : "e-flat-selected")
+                                        : (target_retention_cell == cell ? "e-flat-target" : "e-flat");
+                                        <button class="@buttonClass" @onclick="() => OnCellClick(cell)">
+                                            @val
+                                        </button>
+                                    }
+                                </ChildContent>
+                            </TemplateColumn>
+                        }
+                    }
+
+                </FluentDataGrid>
             </div>
         </FluentBodyContent>
         <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 20px;">
             <hr />
             <h2> Review and change retention</h2>
-            @if( selected_cell != null ){
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span>Folder: </span>
-                    <span>@selected_cell.Node.FullPath</span>
-                </div>            
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span>Current retention: </span>
-                    <span>@selected_cell.retention_key.Name</span>
-                </div>            
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <FluentCombobox Placeholder="Make a selection..." 
-                                    Label="New retention" 
-                                    Autofocus="true"
-                                    Items="@retentionOptions"
-                                    OptionValue="@(i => i.Id.ToString())"
-                                    OptionText="@(i => $"{i.Name}")"                                
-                                    @bind-Value="@new_retention_key.Id_AsString"
-                                    @bind-Value:after="OnRetentionChangedAsync" 
-                                    Height="200px"
-                                    Position="SelectPosition.Above" 
-                                    Immediate ImmediateDelay="100"
-                                    Disabled="@isProcessing" />
-                </div>
-                @if (isProcessing)
+            @{
+                var cell = target_retention_cell ?? selected_cell;
+                @if (cell != null)
                 {
-                    <div style="margin-top: 10px;">
-                        <FluentProgress Text="Updating retention settings..." />
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span>Folder: </span>
+                        <span>@cell.Node.FullPath</span>
                     </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        @if (cell.retention_key.Id == retention_config.Cleaned_retention?.Id ||
+                                    cell.retention_key.Id == retention_config.Issue_retention?.Id)
+                        {
+                            <span>Status: </span>
+                            <span>@cell.retention_key.Name</span>
+                        }
+                        else
+                        {
+                            <span>Current retention: </span>
+                            <span>@cell.retention_key.Name</span>
+                        }
+                    </div>
+
+                    @if (selected_cell != null &&
+                            selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&
+                            selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id)
+                    {
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <FluentCombobox Placeholder="Make a selection..." Label="New retention" Autofocus="true"
+                                Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
+                                OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
+                                @bind-Value:after="OnRetentionChangedAsync" Height="200px" Position="SelectPosition.Above" Immediate
+                                ImmediateDelay="100" Disabled="@isProcessing" />
+                        </div>
+                    }
+                    else if (cell.retention_key.Id == retention_config.Path_retention?.Id)
+                    {
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span>List of Path retentions: </span>
+                        </div>
+                    }
+
+
+                    @if (isProcessing)
+                    {
+                        <div style="margin-top: 10px;">
+                            <FluentProgress Text="Updating retention settings..." />
+                        </div>
+                    }
                 }
             }
         </FluentStack>
