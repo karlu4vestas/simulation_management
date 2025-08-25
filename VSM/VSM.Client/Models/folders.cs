@@ -17,18 +17,28 @@ namespace VSM.Client.Datamodel
         public int Type_Id { get => dto.Type_Id; set => dto.Type_Id = value; }
         public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
 
-        //@todo client side help fields for display and navigation
+        //@todo client side help fields
+        public string FullPath
+        {
+            get
+            {
+                if (Parent is null)
+                {
+                    return Name; // Root node or no parent
+                }
+                else
+                {
+                    return $"{Parent.FullPath}/{Name}";
+                }
+            }
+        }
         public bool IsLeaf { get { return !Children.Any(); } }
         public Dictionary<int, int> AttributDict { get; set; } = new();
-        public int Level { get; set; } = 0;
-        public bool IsExpanded { get; set; } = false;
         public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
-
         public List<FolderNode> Children { get; set; } = new();
 
-        public void ChangeRetentions(RetentionType from, RetentionType to)
+        public async Task ChangeRetentions(byte from_retention_Id, byte to_retention_Id)
         {
-            //@todo
             //change retention for all leaf nodes in this inner node without recursion
             var stack = new Stack<FolderNode>();
             stack.Push(this);
@@ -39,10 +49,10 @@ namespace VSM.Client.Datamodel
 
                 if (currentNode.IsLeaf)
                 {
-                    if (currentNode.Retention_Id == from.Id)
+                    if (currentNode.Retention_Id == from_retention_Id)
                     {
                         // Found a leaf node - update its retention
-                        currentNode.Retention_Id = to.Id;
+                        currentNode.Retention_Id = to_retention_Id;
                     }
                 }
                 else
@@ -52,6 +62,11 @@ namespace VSM.Client.Datamodel
                     {
                         stack.Push(child);
                     }
+                }
+                // Yield control periodically for large trees to prevent UI blocking
+                if (stack.Count % 100 == 0)
+                {
+                    await Task.Yield();
                 }
             }
         }

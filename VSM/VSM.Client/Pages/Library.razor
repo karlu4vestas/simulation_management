@@ -7,23 +7,27 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (!is_logged_in  )
+    @if (DataModel.Instance.TheUsersRootFolders.Count==0)
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
-            <FluentTextField @bind-Value="@user" Placeholder="your initials"></FluentTextField>
-
+            <FluentTextField @bind-Value="@DataModel.Instance.User" Placeholder="your initials"></FluentTextField>
             <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
         </div>
+
+        if(has_loaded_rootFolders){
+            <div style="display:flex">
+                <p>Load of root folders has failed or you are not owner or approver of any root folder! </p>            
+            </div>
+        }
     }
-    else if(rootFolders!=null)
+    else
     {
         <FluentBodyContent>
-            <p>Logged in as: @initials</p>
-            <p>User:         @user</p>
+            <p>User: @DataModel.Instance.User</p>
             <hr />
             <div class="grid">
-                <FluentDataGrid @ref="grid" Items="@rootFolders.AsQueryable()" TGridItem="RootFolder"
+                <FluentDataGrid Items="@DataModel.Instance.TheUsersRootFolders.AsQueryable()" TGridItem="RootFolder"
                     OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
                     GenerateHeader="@GenerateHeaderOption.Sticky">
 
@@ -34,7 +38,6 @@
                             @string.Join(", ", folder.AllInitials)
                         </ChildContent>
                     </TemplateColumn>
-
 
                     <TemplateColumn Title="Active cleanup">
                         <ChildContent Context="folder">
@@ -61,93 +64,64 @@
         </FluentBodyContent>
         <FluentBodyContent>
             <hr />
-            @if (selected_root_folder != null)
+            @if (DataModel.Instance.SelectedRootFolder != null)
             {
-                string ownerstring = string.Join(", ", selected_root_folder.AllInitials);
+                string ownerstring = string.Join(", ", DataModel.Instance.SelectedRootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span>
-                    @selected_root_folder.Root_path </div>
+                    @DataModel.Instance.SelectedRootFolder.Root_path </div>
                 <p></p>
                 <div style="display:flex"><span style="width: 80px; display: inline-block;">Owners:</span> @ownerstring
                     AriaLabel</div>
                 <p></p>
-                string toggle_subscription = selected_root_folder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" :
+                string toggle_subscription = DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" :
                 "Subscribe to cleanup";
                 <div style="display:flex">Change the subscription to the cleanup process:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => ToggleCleanupProcess(selected_root_folder))">
+                    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => ToggleCleanupProcess())">
                         @toggle_subscription</FluentButton>
                 </div>
-
             }
         </FluentBodyContent>
-
-    } else{
-        <p>???? Bug bug bug ????</p>
     }
-
 </FluentStack>
 @code {
-    FluentDataGrid<RootFolder>? grid;
-    RootFolder? selected_root_folder;
-    string? initials;
-    string? user
-    {
-        get { return DataModel.Instance.User != null ? DataModel.Instance.User : initials; }
-        set { initials = value; }
-    }
-
-    //bool is_logged_in { get { return DataModel.Instance.User != null && DataModel.Instance.User.Initials.Length > 0; } }
-    bool is_logged_in { get { return rootFolders!=null && rootFolders.Count > 0; } }
-
-    List<RootFolder>? rootFolders;
-
+    bool has_loaded_rootFolders = false;    
 
     async Task OnLoginClicked()
     {
-        if (initials != null && initials.Length > 0)
+        if (DataModel.Instance.User.Length > 0)
         {
-            DataModel.Instance.User = initials;
-            await LoadDataAsync();
-            await Task.Delay(2000);
+            try
+            {
+                has_loaded_rootFolders = false;
+                // Ensure UI shows loading state. well later if we implement it
+                await InvokeAsync(StateHasChanged);
+
+                // first load retention options because we need them to generate testdata and folder structure
+                await DataModel.Instance.LoadTheUsersRootFolders();
+                await Task.Delay(2000);
+                has_loaded_rootFolders = true;
+            }
+            finally
+            {
+                await InvokeAsync(StateHasChanged);
+            }
         }
     }
-
     //selecte the folder for the details panel
     private void OnSelectRootFolder(FluentDataGridRow<RootFolder> row)
     {
-        if (row.Item != null)
-        {
-            selected_root_folder = row.Item;
-        }
+        DataModel.Instance.SelectedRootFolder = row.Item;
     }
-    private void ToggleCleanupProcess(RootFolder root_folder)
+    private void ToggleCleanupProcess()
     {
-        if (root_folder != null)
+        if (DataModel.Instance.SelectedRootFolder != null)
         {
-            root_folder.Is_registeredfor_cleanup = !root_folder.Is_registeredfor_cleanup;
+            DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup = !DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup;
         }
     }
     private void Go2retention(RootFolder root_folder)
     {
-        if (root_folder != null)
-        {
-            DataModel.Instance.SelectedRootFolder = root_folder;
-            Navigation.NavigateTo("retention");                
-        }
+        DataModel.Instance.SelectedRootFolder = root_folder;
+        Navigation.NavigateTo("retention");
     }
-
-    private async Task LoadDataAsync()
-    {
-        try
-        {
-            // Ensure UI shows loading state
-            await InvokeAsync(StateHasChanged);
-
-            // first load retention options because we need them to generate testdata and folder structure
-            rootFolders = await DataModel.Instance.GetTheUsersRootFolders();
-        }
-        finally
-        {
-            await InvokeAsync(StateHasChanged);
-        }
-    }    
 }

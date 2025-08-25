@@ -1,0 +1,8 @@
+sqlmodel
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+fastapi
+uvicorn
+zstandard

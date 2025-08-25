@@ -1,3 +1,6 @@
+# virtual python environment
+.venv/
+
 # Ignore SQLite database files
 *.db
 *.db3
