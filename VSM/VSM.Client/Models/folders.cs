@@ -147,5 +147,28 @@ namespace VSM.Client.Datamodel
                 }
             }
         }
+        public async Task SetParentFolderAsync()
+        {
+            // Set the Parent property to the immediate parent for each node in the hierarchy (iterative, no recursion)
+            var stack = new Stack<(FolderNode node, FolderNode? parent)>();
+            stack.Push((this, null)); // root_folder's parent is null
+
+            while (stack.Count > 0)
+            {
+                var (currentNode, parentNode) = stack.Pop();
+                currentNode.Parent = parentNode;
+
+                foreach (var child in currentNode.Children)
+                {
+                    stack.Push((child, currentNode));
+                }
+
+                // Yield control periodically for large trees to prevent UI blocking
+                if (stack.Count % 100 == 0)
+                {
+                    await Task.Yield();
+                }
+            }
+        }
     }
 }

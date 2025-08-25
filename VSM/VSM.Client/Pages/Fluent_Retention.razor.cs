@@ -12,7 +12,6 @@ namespace VSM.Client.Pages
         private ViewNode? VisibleRootNode = null;
         private List<ViewNode> VisibleRows = new();
         private bool isLoading = true;
-        private bool hasRendered = false;
         RetentionCell? selected_cell = null;
         RetentionCell? target_retention_cell = null;
         private bool isProcessing = false;
@@ -25,6 +24,7 @@ namespace VSM.Client.Pages
 
         protected override void OnInitialized()
         {
+            isLoading = true;
             // Just set up initial state, don't block with async operations
             if (rootFolder != DataModel.Instance.SelectedRootFolder)
             {
@@ -34,12 +34,12 @@ namespace VSM.Client.Pages
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (firstRender && !hasRendered)
+            if (firstRender && isLoading)
             {
-                hasRendered = true;
                 // Load both data and retention options
                 await LoadDataAsync();
             }
+            isLoading = false;
         }
         private async Task LoadRetentionOptionsAsync()
         {
@@ -51,7 +51,7 @@ namespace VSM.Client.Pages
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading retention options: {ex.Message}");
-                retentionOptions = new List<RetentionType>();
+                retentionOptions = [];
             }
         }
         private async Task LoadRootFolderTreeAsync(RootFolder rootFolder)
@@ -99,8 +99,6 @@ namespace VSM.Client.Pages
                 VisibleRootNode.Level = 0; // Set the root level to 0
                 VisibleRows = ViewNode.ToggleExpand(VisibleRootNode, VisibleRootNode); // Expand the root node to show its children
 
-                //RefreshVisibleRows();
-                isLoading = false;
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -208,7 +206,7 @@ namespace VSM.Client.Pages
         }
         public static List<ViewNode> RefreshVisibleRows(ViewNode VisibleRootNode)
         {
-            List<ViewNode> VisibleRows = [];
+            List<ViewNode> VisibleRows = new List<ViewNode>();
 
             if (VisibleRootNode != null)
             {

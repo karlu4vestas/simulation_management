@@ -100,7 +100,7 @@ namespace VSM.Client.Datamodel
                 }) ?? new List<FolderNodeDTO>();
 
                 List<FolderNode> folder_nodes = base_folders.Select(dto => new FolderNode(dto)).ToList();
-                FolderNode root = ConstructFolderTreeFromNodes(rootFolder, base_folders);
+                FolderNode root = await ConstructFolderTreeFromNodes(rootFolder, base_folders);
                 return root;
             }
             catch (Exception ex)
@@ -109,41 +109,7 @@ namespace VSM.Client.Datamodel
                 return new FolderNode(new FolderNodeDTO());
             }
         }
-
-        /*public async Task<FolderNode> GetFoldersByRootFolderIdAsync(RootFolder rootFolder)
-        {
-            try
-            {
-                // Get the raw JSON response first
-                string requestUrl = $"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolder.Id}";
-                HttpResponseMessage response = await httpClient.GetAsync(requestUrl);
-                response.EnsureSuccessStatusCode();
-
-                string jsonContent = await response.Content.ReadAsStringAsync();
-                // Console.WriteLine($"Raw JSON response: {jsonContent}");
-
-                // Then attempt to deserialize
-                List<FolderNodeDTO> base_folders = JsonSerializer.Deserialize<List<FolderNodeDTO>>(jsonContent, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                }) ?? new List<FolderNodeDTO>();
-
-
-                FolderNode root = ConstructFolderTreeFromNodes(rootFolder, base_folders);
-                return root;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching root folders: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
-                return new FolderNode(new FolderNodeDTO());
-            }
-        }*/
-
-        FolderNode ConstructFolderTreeFromNodes(RootFolder rootFolder, List<FolderNodeDTO> folderNodeDTOs)
+        async Task<FolderNode> ConstructFolderTreeFromNodes(RootFolder rootFolder, List<FolderNodeDTO> folderNodeDTOs)
         {
             // create a map for fast lookup of all FolderNodes
             Dictionary<int, FolderNode> nodeLookup = new Dictionary<int, FolderNode>();
@@ -168,24 +134,24 @@ namespace VSM.Client.Datamodel
             }
 
             FolderNode root = nodeLookup[rootFolder.Folder_Id];
-            print_folder_tree_levels(root, 0);
+            await root.SetParentFolderAsync();
+            //print_folder_leaf_levels(root, 0);
             return root;
         }
-
-        void print_folder_tree_levels(FolderNode folderNode, int level)
+        void print_folder_leaf_levels(FolderNode folderNode, int level)
         {
+            // used for debugging only
             if (folderNode.IsLeaf)
                 Console.WriteLine($"leaf_level:{level}- {folderNode.Name} (ID: {folderNode.Id})");
             foreach (var child in folderNode.Children)
             {
-                print_folder_tree_levels(child, level + 1);
+                print_folder_leaf_levels(child, level + 1);
             }
         }
-
         //@todo create a fastAPI endpoint to register that the user wants to run cleanup for this folder 
         public bool RegisterRootFolderForCleanUp(RootFolder rootFolder)
         {
-            if (User is null)
+            if (User is null || User.Length == 0)
             {
                 return false;
             }
