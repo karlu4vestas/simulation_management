@@ -11,15 +11,15 @@ def insert_test_data_in_db(engine):
 def insert_folder_metadata_in_db(engine):
     with Session(engine) as session:
         session.add(RetentionTypeDTO(name="Marked",           display_rank=1,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="Issue",            display_rank=2,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+Next",            display_rank=3,  is_system_managed=False ))  
-        session.add(RetentionTypeDTO(name="+Q1",              display_rank=4,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+Q3",              display_rank=5,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+Q6",              display_rank=6,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+1Y",              display_rank=7,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+2Y",              display_rank=8,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="+3Y",              display_rank=9,  is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="Path",             display_rank=10, is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+Next",            display_rank=2,  is_system_managed=False ))  
+        session.add(RetentionTypeDTO(name="+Q1",              display_rank=3,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+Q3",              display_rank=4,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+Q6",              display_rank=5,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+1Y",              display_rank=6,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+2Y",              display_rank=7,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="+3Y",              display_rank=8,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="Path",             display_rank=9,  is_system_managed=False ))
+        session.add(RetentionTypeDTO(name="Issue",            display_rank=10, is_system_managed=False ))
         session.add(RetentionTypeDTO(name="Cleaned",          display_rank=11, is_system_managed=True  ))
 
         session.commit()
@@ -41,13 +41,13 @@ def insert_folder_metadata_in_db(engine):
             print(f" - {folder.name} (ID: {folder.id})")
 
 #-------------------------------------
-# helper to generate random testdata
+# helper to generate random retenttype except for the "Path" retention. 
 class RandomRetention:
     def __init__(self, seed):
         self.rand_int_generator = random.Random(seed)
 
         with Session(Database.get_engine()) as session:
-            self.retention_types = session.exec(select(RetentionTypeDTO)).all()
+            self.retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.name != "Path")).all()
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]

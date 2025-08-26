@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, FolderNodePublic
+from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO
 from datamodel.db import Database
 from sqlalchemy import create_engine, text, or_, func
 from app.config import AppConfig
@@ -199,3 +199,10 @@ def read_folders_csv_zstd():
             "Content-Encoding": "zstd"
         }
     )
+
+#develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
+@app.get("/pathprotections/", response_model=list[PathProtectionDTO])
+def read_pathprotections( rootfolder_id: int ):
+    with Session(Database.get_engine()) as session:
+        paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
+        return paths

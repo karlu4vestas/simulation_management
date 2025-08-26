@@ -90,3 +90,19 @@ class RetentionTypeBaseCreate(RetentionTypeBase):
 #Use for read-only
 class RetentionTypePublic(RetentionTypeBase):
     id: int
+
+
+# path protection for a specific path in a rootfolder
+# the question is whether we need a foreigne key to the folder id 
+class PathProtectionBase(SQLModel):
+    rootfolder_id: int   = Field(default=None, foreign_key="rootfolderdto.id")
+    path: str            = Field(default="")
+
+class PathProtectionDTO(PathProtectionBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+class PathProtectionPublic(PathProtectionBase):
+    id: int | None = Field(default=None, primary_key=True)
+
+class PathProtectionCreate(PathProtectionBase):
+    pass

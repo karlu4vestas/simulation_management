@@ -9,54 +9,6 @@ using VSM.Client.Datamodel; // This ensures all types in this namespace are acce
 
 namespace VSM.Client.Datamodel
 {
-    public class RetentionConfigurationDTO
-    {
-        public RetentionConfigurationDTO(List<RetentionType>? all_retentions = null)
-        {
-            if (all_retentions != null)
-            {
-                this.All_retentions = all_retentions;
-                this.Path_retention = all_retentions
-                        .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("path", StringComparison.OrdinalIgnoreCase));
-
-                if (Path_retention == null)
-                    throw new InvalidOperationException("No suitable path retention option found");
-
-                this.Cleaned_retention = all_retentions
-                    .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("cleaned", StringComparison.OrdinalIgnoreCase));
-                if (this.Cleaned_retention == null)
-                    throw new InvalidOperationException("No suitable cleaned retention option found");
-
-                this.Issue_retention = all_retentions
-                    .FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase));
-                if (Issue_retention == null)
-                    throw new InvalidOperationException("No suitable issue retention option found");
-
-                //the list of dropdown retentions is equal to retentionOptions except for the cleaned retention value
-                this.Target_retentions = all_retentions
-                                        .Where(r => r.Id != this.Cleaned_retention.Id && !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)).ToList();
-            }
-        }
-        public List<RetentionType> All_retentions = new();
-        public List<RetentionType> Target_retentions = new();
-        public RetentionType Path_retention = new();
-        public RetentionType Cleaned_retention = new();
-        public RetentionType Issue_retention = new();
-    }
-
-    public class RetentionConfiguration
-    {
-        RetentionConfigurationDTO dto;
-        public RetentionConfiguration(RetentionConfigurationDTO dto)
-        {
-            this.dto = dto;
-        }
-        public List<RetentionType> All_retentions => dto.All_retentions;
-        public List<RetentionType> Target_retentions => dto.Target_retentions;
-        public RetentionType Path_retention => dto.Path_retention;
-        public RetentionType Cleaned_retention => dto.Cleaned_retention;
-        public RetentionType Issue_retention => dto.Issue_retention;
-    }
     public class DataModel
     {
         // Private static variable that holds the single instance
@@ -73,35 +25,51 @@ namespace VSM.Client.Datamodel
         public RootFolder? SelectedRootFolder { get; set; }
         public string User { get; set; } = "";
         private RetentionConfiguration retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO());
-        public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
+        //                List<PathProtectionDTO> pathProtectionDTOs = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>("http://127.0.0.1:5173/pathprotections/?rootfolder_id={rootFolder.Id}", new JsonSerializerOptions
+        public async Task<RetentionConfiguration> UpdatePathProtection(FolderNode node)
         {
-            List<RetentionType> all_retentions = await DataModel.Instance.GetRetentionTypesFromApiAsync();
-            if (all_retentions != null)
+            retentionConfiguration.Path_protections.Add(new PathProtectionDTO
             {
-                retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO(all_retentions));
-            }
-            else
-            {
-                throw new InvalidOperationException("failed to retrieve retention");
-
-            }
+                //Id = pathProtection.Id, // Id will be set by the server
+                Rootfolder_Id = node.Rootfolder_Id,
+                Folder_Id = node.Id,
+                Path = node.FullPath
+            });
+            //@todo add to changeset 
+            await Task.Delay(2000); // Simulate async work
             return retentionConfiguration;
         }
-
-        private async Task<List<RetentionType>> GetRetentionTypesFromApiAsync()
+        public async Task<RetentionConfiguration> RemovePathProtection(string path)
+        {
+            retentionConfiguration.Path_protections.RemoveAll(p => p.Path == path);
+            //@todo update the server
+            await Task.Delay(2000); // Simulate async work
+            return retentionConfiguration;
+        }
+        public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
         {
             try
             {
-                return await httpClient.GetFromJsonAsync<List<RetentionType>>("http://127.0.0.1:5173/retentiontypes/", new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                }) ?? new List<RetentionType>();
+                var config = await DataModel.Instance.GetRetentionTypesFromApiAsync();
+
+                retentionConfiguration = config == null ? retentionConfiguration : config;
+
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error fetching retention types: {ex.Message}");
-                return new List<RetentionType>();
             }
+            return retentionConfiguration;
+        }
+
+        private async Task<RetentionConfiguration> GetRetentionTypesFromApiAsync()
+        {
+            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>("http://127.0.0.1:5173/retentiontypes/", new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new List<RetentionTypeDTO>();
+
+            return new RetentionConfiguration(new RetentionConfigurationDTO(all_retentions));
         }
         public async Task<List<FolderType>> GetFolderTypesAsync()
         {
