@@ -82,25 +82,25 @@
             </div>
         </FluentBodyContent>
         <FluentBodyContent>
-                    <hr />
-                    <h3> Review and change retention</h3>
-                    @{
-                        var cell = target_retention_cell ?? selected_cell;
-                        @if (cell != null)
-                        {
-                            <div style="display: flex; align-items: center; gap: 10px;">
-                                <span>Folder: </span>
-                                <span>@cell.Node.FullPath</span>
-                            </div>
-                        }
-                            @if (isProcessing)
-                            {
-                                <div style="margin-top: 10px;">
-                                    <FluentProgress Text="Updating retention settings..." />
-                                </div>
-                            }
-                    }
-            <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 20px; border: 1px dotted var(--accent-fill-rest)">
+            <hr />
+            <h3> Review and change retention</h3>
+            @{
+                var cell = target_retention_cell ?? selected_cell;
+                @if (cell != null)
+                {
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <span>Folder: </span>
+                        <span>@cell.Node.FullPath</span>
+                    </div>
+                }
+                @if (isProcessing)
+                {
+                    <div style="margin-top: 20px;">
+                        <FluentProgress Text="Updating retention settings..." />
+                    </div>
+                }
+            }
+            <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 20px)">
                 <FluentStack Orientation="Orientation.Vertical" Width="400px" >
                     @{
                         var cell = target_retention_cell ?? selected_cell;
@@ -124,7 +124,7 @@
                                     selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&
                                     selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id   )
                             {
-                                <div style="display: flex; align-items: center; gap: 10px; border: 1px dotted var(--accent-fill-rest)">
+                                <div style="display: flex; align-items: center; gap: 10px;">
                                     <FluentCombobox Label="Change retention:" Autofocus="true"
                                         Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
                                         OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
@@ -141,32 +141,29 @@
                             <div class="grid">
                             @{
                                 var cell = target_retention_cell ?? selected_cell;
-                                    @if (cell!=null && cell.retention_key.Id == retention_config.Path_retention?.Id)
-                                    {
-                                        <span>List of Path retentions: </span>
-                                        <div style="display: flex; align-items: center; gap: 10px; border: 1px dotted var(--accent-fill-rest)">
-                                            <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
-                                                ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
-                                                 MultiLine="true">
-                                                <TemplateColumn Title="Protection" Width="160px">
-                                                    <ChildContent Context="pathprotection">
-                                                        <FluentButton Appearance="Appearance.Accent"
-                                                            @onclick="@(() => RemovePathRetention(pathprotection))">Remove
-                                                        </FluentButton>
-                                                    </ChildContent>
-                                                </TemplateColumn>
+                                @if (cell!=null && cell.retention_key.Id == retention_config.Path_retention?.Id)
+                                {
+                                    <span>List of Path retentions: </span>
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
+                                            ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
+                                             MultiLine="true">
+                                            <TemplateColumn Title="Protection" Width="160px">
+                                                <ChildContent Context="pathprotection">
+                                                    <FluentButton Appearance="Appearance.Accent"
+                                                        @onclick="@(() => RemovePathRetention(pathprotection))">Remove
+                                                    </FluentButton>
+                                                </ChildContent>
+                                            </TemplateColumn>
+                                            <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />
 
-                                                <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />
-
-                                            </FluentDataGrid>
-                                        </div>
-                                    }
+                                        </FluentDataGrid>
+                                    </div>
+                                }
                             }
                             </div>
                         </FluentStack>
-
             </FluentStack>
         </FluentBodyContent>
-
     }
 </FluentStack>

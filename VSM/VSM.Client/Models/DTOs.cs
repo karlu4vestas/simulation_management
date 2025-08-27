@@ -117,7 +117,12 @@ namespace VSM.Client.Datamodel
         public byte Id { get; set; }
         public int Rootfolder_Id { get; set; }
         public int Folder_Id { get; set; }
-        public string Path { get; set; } = "";
+        public string Path
+        {
+            get;
+            set;
+        } = "";
+        public int Levels { get; set; } = 0;
     }
     public class PathProtection
     {
@@ -126,7 +131,6 @@ namespace VSM.Client.Datamodel
         {
             this.dto = dto;
         }
-        public string Path => dto.Path;
     }
 
     public class RetentionConfigurationDTO

@@ -28,6 +28,7 @@ namespace VSM.Client.Datamodel
         //                List<PathProtectionDTO> pathProtectionDTOs = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>("http://127.0.0.1:5173/pathprotections/?rootfolder_id={rootFolder.Id}", new JsonSerializerOptions
         public async Task<RetentionConfiguration> UpdatePathProtection(FolderNode node)
         {
+            f
             retentionConfiguration.Path_protections.Add(new PathProtectionDTO
             {
                 //Id = pathProtection.Id, // Id will be set by the server

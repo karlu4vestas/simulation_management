@@ -29,6 +29,7 @@ namespace VSM.Client.Pages
         {
             isLoading = true;
             // Just set up initial state, don't block with async operations
+            StateHasChanged();
             if (rootFolder != DataModel.Instance.SelectedRootFolder)
             {
                 rootFolder = DataModel.Instance.SelectedRootFolder;
@@ -39,8 +40,10 @@ namespace VSM.Client.Pages
         {
             if (firstRender && isLoading)
             {
+                StateHasChanged();
                 // Load both data and retention options
                 await LoadDataAsync();
+                //Thread.Sleep(10000);
             }
             isLoading = false;
         }
@@ -182,7 +185,9 @@ namespace VSM.Client.Pages
         }
         private async Task RemovePathRetention(PathProtectionDTO pathprotection)
         {
+            //retention for the simulation that were but are no longer covered by the path protection is set to "+Next"
             retention_config = await DataModel.Instance.RemovePathProtection(pathprotection.Path);
+            //await OnRetentionChangedAsync();
         }
     }
 
