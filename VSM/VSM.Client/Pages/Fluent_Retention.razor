@@ -79,59 +79,92 @@
                 </FluentDataGrid>
             </div>
         </FluentBodyContent>
-        <FluentStack Orientation="Orientation.Vertical" Style="margin-top: 20px;">
-            <hr />
-            <h2> Review and change retention</h2>
-            @{
-                var cell = target_retention_cell ?? selected_cell;
-                @if (cell != null)
-                {
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span>Folder: </span>
-                        <span>@cell.Node.FullPath</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        @if (cell.retention_key.Id == retention_config.Cleaned_retention?.Id ||
-                                    cell.retention_key.Id == retention_config.Issue_retention?.Id)
+        <FluentBodyContent>
+                    <hr />
+                    <h3> Review and change retention</h3>
+                    @{
+                        var cell = target_retention_cell ?? selected_cell;
+                        @if (cell != null)
                         {
-                            <span>Status: </span>
-                            <span>@cell.retention_key.Name</span>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span>Folder: </span>
+                                <span>@cell.Node.FullPath</span>
+                            </div>
                         }
-                        else
+                            @if (isProcessing)
+                            {
+                                <div style="margin-top: 10px;">
+                                    <FluentProgress Text="Updating retention settings..." />
+                                </div>
+                            }
+                    }
+            <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 20px;">
+                <FluentStack Orientation="Orientation.Vertical" Width="400px" >
+                    @{
+                        var cell = target_retention_cell ?? selected_cell;
+                        @if (cell != null)
                         {
-                            <span>Current retention: </span>
-                            <span>@cell.retention_key.Name</span>
+
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                @if (cell == target_retention_cell)
+                                {
+                                    <span>New retention: </span>
+                                    <span>@cell.retention_key.Name</span>
+                                }
+                                else
+                                {
+                                    <span>Current retention: </span>
+                                    <span>@cell.retention_key.Name</span>
+                                }
+                            </div>
+
+                            @if (selected_cell != null &&
+                                    selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&
+                                    selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id)
+                            {
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <FluentCombobox Placeholder="Make a selection..." Label="New retention" Autofocus="true"
+                                        Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
+                                        OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
+                                        @bind-Value:after="OnRetentionChangedAsync" Height="200px" Position="SelectPosition.Below" Immediate
+                                        ImmediateDelay="100" Disabled="@isProcessing" />
+                                </div>
+                            }
+
+
                         }
-                    </div>
-
-                    @if (selected_cell != null &&
-                            selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&
-                            selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id)
-                    {
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <FluentCombobox Placeholder="Make a selection..." Label="New retention" Autofocus="true"
-                                Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
-                                OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
-                                @bind-Value:after="OnRetentionChangedAsync" Height="200px" Position="SelectPosition.Above" Immediate
-                                ImmediateDelay="100" Disabled="@isProcessing" />
-                        </div>
                     }
-                    else if (cell.retention_key.Id == retention_config.Path_retention?.Id)
-                    {
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <span>List of Path retentions: </span>
-                        </div>
-                    }
+                </FluentStack>
+                        <FluentStack Orientation="Orientation.Vertical">
+                            <div class="grid">
+                            @{
+                                var cell = target_retention_cell ?? selected_cell;
+                                    @if (cell!=null && cell.retention_key.Id == retention_config.Path_retention?.Id)
+                                    {
+                                        <span>List of Path retentions: </span>
+                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                            <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
+                                                ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
+                                                 MultiLine="true">
+                                                <TemplateColumn Title="Protection" Width="100px">
+                                                    <ChildContent Context="pathprotection">
+                                                        <FluentButton Appearance="Appearance.Accent"
+                                                            @onclick="@(() => RemovePathRetention(pathprotection))">Remove
+                                                        </FluentButton>
+                                                    </ChildContent>
+                                                </TemplateColumn>
 
+                                                <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="800px" />
 
-                    @if (isProcessing)
-                    {
-                        <div style="margin-top: 10px;">
-                            <FluentProgress Text="Updating retention settings..." />
-                        </div>
-                    }
-                }
-            }
-        </FluentStack>
+                                            </FluentDataGrid>
+                                        </div>
+                                    }
+                            }
+                            </div>
+                        </FluentStack>
+
+            </FluentStack>
+        </FluentBodyContent>
+
     }
 </FluentStack>

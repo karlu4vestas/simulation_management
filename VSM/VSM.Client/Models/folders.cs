@@ -11,12 +11,14 @@ namespace VSM.Client.Datamodel
         }
 
         //mapped to server fields
-        public int Id { get => dto.Id; set => dto.Id = value; }
-        public int Parent_Id { get => dto.Parent_Id; set => dto.Parent_Id = value; }
-        public string Name { get => dto.Name; set => dto.Name = value; }
-        public int Type_Id { get => dto.Type_Id; set => dto.Type_Id = value; }
-        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
+        public int Id => dto.Id;
+        public int Parent_Id => dto.Parent_Id;
+        public int Rootfolder_Id => dto.Rootfolder_Id;
 
+        public string Name => dto.Name;
+        public int Type_Id => dto.Type_Id;
+        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
+        public int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
         //@todo client side help fields
         public string FullPath
         {

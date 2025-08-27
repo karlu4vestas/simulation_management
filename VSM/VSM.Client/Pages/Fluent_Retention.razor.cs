@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.FluentUI.AspNetCore.Components;
 using VSM.Client.Datamodel;
@@ -55,6 +56,7 @@ namespace VSM.Client.Pages
                 Console.WriteLine($"Error loading retention configuration: {ex.Message}");
             }
         }
+
         private async Task LoadRootFolderTreeAsync(RootFolder rootFolder)
         {
             try
@@ -120,20 +122,41 @@ namespace VSM.Client.Pages
         }
         private async Task OnRetentionChangedAsync()
         {
-            if (selected_cell != null)
+            if (selected_cell != null && new_retention_key != null && rootFolder != null && retention_config != null)
             {
-                isProcessing = true;
-                Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
-                StateHasChanged(); // Update UI to show progress
                 try
                 {
-                    if (new_retention_key == null)
-                        throw new InvalidOperationException("No new retention key selected");
+                    StateHasChanged(); // Update UI to show progress
+                    isProcessing = true;
 
-                    byte newId = new_retention_key.Id;
-                    await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, newId);
-                    selected_cell.retention_key.Id = newId; // Update the selected cell's retention key
+                    if (new_retention_key.Id == retention_config.Path_retention.Id)
+                    {
+                        //add a path protection if it doesn't already exist
+                        if (retention_config.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
+                        {
+                            Console.WriteLine($"Path protection already exists for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
+                            return;
+                        }
 
+                        // Create and persist the new path protection in order to get an ID assigned
+                        retention_config = await DataModel.Instance.UpdatePathProtection(selected_cell.Node);
+                        var path_protection = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == selected_cell.Node.Id);
+                        if (path_protection == null)//|| path_protection.Id == 0)
+                        {
+                            Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
+                            return;
+                        }
+                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {path_protection.Path}");
+                    }
+                    else
+                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
+
+                    if (new_retention_key != null)
+                    {
+                        await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
+                        selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
+                        selected_cell.retention_key.Name = retention_config.All_retentions.FirstOrDefault(r => r.Id == new_retention_key.Id)?.Name ?? selected_cell.retention_key.Name;
+                    }
                     // Update the aggregation from the root folder. 
                     // This could be optimsed by only updating the modifed branch and the parente
                     if (rootFolder != null)
@@ -156,6 +179,10 @@ namespace VSM.Client.Pages
                     StateHasChanged(); // Hide progress indicator
                 }
             }
+        }
+        private async Task RemovePathRetention(PathProtectionDTO pathprotection)
+        {
+            retention_config = await DataModel.Instance.RemovePathProtection(pathprotection.Path);
         }
     }
 
@@ -241,11 +268,11 @@ namespace VSM.Client.Pages
     public class RetentionCell : IEquatable<RetentionCell>
     {
         public FolderNode Node { get; set; }
-        public RetentionType retention_key { get; set; }
-        public RetentionCell(FolderNode Node, RetentionType retention_key)
+        public RetentionTypeDTO retention_key { get; set; }
+        public RetentionCell(FolderNode node, RetentionTypeDTO retention_key)
         {
-            this.Node = Node;
-            this.retention_key = new RetentionType
+            this.Node = node;
+            this.retention_key = new RetentionTypeDTO
             {
                 Id = retention_key.Id,
                 Name = retention_key.Name,

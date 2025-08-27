@@ -2,6 +2,22 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "🐍 Start FastAPI Server (Port 5173)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/main.py",
+      "pythonPath": "${workspaceFolder}/.venv/bin/python",
+      "cwd": "${workspaceFolder}/server",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      },
+      "args": []
+    },
+    {
       "name": "Launch Blazor Server",
       "type": "coreclr",
       "request": "launch",
@@ -16,7 +32,7 @@
       },
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5500"
+        "ASPNETCORE_URLS": "http://0.0.0.0:5700"
       },
       "logging": {
         "trace": true
@@ -47,22 +63,6 @@
       "logging": {
         "moduleLoad": false
       }
-    },
-    {
-      "name": "🐍 Start FastAPI Server (Port 5173)",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/server/main.py",
-      "pythonPath": "${workspaceFolder}/.venv/bin/python",
-      "cwd": "${workspaceFolder}/server",
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/server",
-        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
-        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
-      },
-      "args": []
     },
     {
       "name": "Test FastAPI endpoints",
