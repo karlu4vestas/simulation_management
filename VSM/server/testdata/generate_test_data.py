@@ -20,7 +20,7 @@ def insert_folder_metadata_in_db(engine):
         session.add(RetentionTypeDTO(name="+3Y",              display_rank=8,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="Path",             display_rank=9,  is_system_managed=False ))
         session.add(RetentionTypeDTO(name="Issue",            display_rank=10, is_system_managed=False ))
-        session.add(RetentionTypeDTO(name="Cleaned",          display_rank=11, is_system_managed=True  ))
+        session.add(RetentionTypeDTO(name="Clean",            display_rank=11, is_system_managed=True  ))
 
         session.commit()
 

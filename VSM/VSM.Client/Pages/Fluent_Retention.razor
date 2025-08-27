@@ -28,10 +28,11 @@
         <FluentBodyContent>
             <hr />
             <div class="grid">
+                <div  style="display: table; table-layout: fixed; width: 100%;">
                 <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize="25"
-                    ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky">
+                    ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky" Style="min-width: max-content;">
 
-                    <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="350px">
+                    <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="400px">
                         <ChildContent Context="item">
                             <div style="padding-left:@(item.Level * 18)px; display:flex; align-items:center;">
                                 @if (!item.IsLeaf && VisibleRootNode != null)
@@ -56,7 +57,7 @@
                     {
                         @foreach (var key in retention_config.All_retentions)
                         {
-                            <TemplateColumn TGridItem="ViewNode" Title="@key.Name">
+                            <TemplateColumn TGridItem="ViewNode" Title="@key.Name" Width="100px">
                                 <ChildContent Context="item">
                                     @if (item.Data.AttributDict.TryGetValue(key.Id, out var val))
                                     {
@@ -77,6 +78,7 @@
                     }
 
                 </FluentDataGrid>
+                </div>
             </div>
         </FluentBodyContent>
         <FluentBodyContent>
@@ -98,35 +100,35 @@
                                 </div>
                             }
                     }
-            <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 20px;">
+            <FluentStack Orientation="Orientation.Horizontal" Style="margin-top: 20px; border: 1px dotted var(--accent-fill-rest)">
                 <FluentStack Orientation="Orientation.Vertical" Width="400px" >
                     @{
                         var cell = target_retention_cell ?? selected_cell;
                         @if (cell != null)
                         {
 
-                            <div style="display: flex; align-items: center; gap: 10px;">
+                            <div>
                                 @if (cell == target_retention_cell)
                                 {
-                                    <span>New retention: </span>
+                                    <span>New retention:</span>
                                     <span>@cell.retention_key.Name</span>
                                 }
                                 else
                                 {
-                                    <span>Current retention: </span>
+                                    <span>Retention:</span>
                                     <span>@cell.retention_key.Name</span>
                                 }
                             </div>
 
-                            @if (selected_cell != null &&
+                            @if (   selected_cell != null &&
                                     selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&
-                                    selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id)
+                                    selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id   )
                             {
-                                <div style="display: flex; align-items: center; gap: 10px;">
-                                    <FluentCombobox Placeholder="Make a selection..." Label="New retention" Autofocus="true"
+                                <div style="display: flex; align-items: center; gap: 10px; border: 1px dotted var(--accent-fill-rest)">
+                                    <FluentCombobox Label="Change retention:" Autofocus="true"
                                         Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
                                         OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
-                                        @bind-Value:after="OnRetentionChangedAsync" Height="200px" Position="SelectPosition.Below" Immediate
+                                        @bind-Value:after="OnRetentionChangedAsync" Height="300px" Position="SelectPosition.Below" Immediate
                                         ImmediateDelay="100" Disabled="@isProcessing" />
                                 </div>
                             }
@@ -142,11 +144,11 @@
                                     @if (cell!=null && cell.retention_key.Id == retention_config.Path_retention?.Id)
                                     {
                                         <span>List of Path retentions: </span>
-                                        <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div style="display: flex; align-items: center; gap: 10px; border: 1px dotted var(--accent-fill-rest)">
                                             <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
                                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
                                                  MultiLine="true">
-                                                <TemplateColumn Title="Protection" Width="100px">
+                                                <TemplateColumn Title="Protection" Width="160px">
                                                     <ChildContent Context="pathprotection">
                                                         <FluentButton Appearance="Appearance.Accent"
                                                             @onclick="@(() => RemovePathRetention(pathprotection))">Remove
@@ -154,7 +156,7 @@
                                                     </ChildContent>
                                                 </TemplateColumn>
 
-                                                <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="800px" />
+                                                <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />
 
                                             </FluentDataGrid>
                                         </div>
