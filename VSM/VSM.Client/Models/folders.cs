@@ -38,7 +38,35 @@ namespace VSM.Client.Datamodel
         public Dictionary<int, int> AttributDict { get; set; } = new();
         public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
         public List<FolderNode> Children { get; set; } = new();
+        public async Task<FolderNode> find_by_folder_id(int folder_id)
+        {
+            // Iterative DFS to find folder by ID
+            var stack = new Stack<FolderNode>();
+            stack.Push(this);
 
+            while (stack.Count > 0)
+            {
+                var currentNode = stack.Pop();
+                if (currentNode.Id == folder_id)
+                {
+                    return currentNode; // Found the folder
+                }
+
+                // Add children to stack for further exploration
+                foreach (var child in currentNode.Children)
+                {
+                    stack.Push(child);
+                }
+
+                // Yield control periodically for large trees to prevent UI blocking
+                if (stack.Count % 100 == 0)
+                {
+                    await Task.Yield();
+                }
+            }
+
+            throw new Exception($"Folder with ID {folder_id} not found.");
+        }
         public async Task ChangeRetentions(byte from_retention_Id, byte to_retention_Id)
         {
             //change retention for all leaf nodes in this inner node without recursion

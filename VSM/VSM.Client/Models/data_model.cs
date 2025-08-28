@@ -26,27 +26,6 @@ namespace VSM.Client.Datamodel
         public string User { get; set; } = "";
         private RetentionConfiguration retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO());
         //                List<PathProtectionDTO> pathProtectionDTOs = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>("http://127.0.0.1:5173/pathprotections/?rootfolder_id={rootFolder.Id}", new JsonSerializerOptions
-        public async Task<RetentionConfiguration> UpdatePathProtection(FolderNode node)
-        {
-
-            retentionConfiguration.Path_protections.Add(new PathProtectionDTO
-            {
-                //Id = pathProtection.Id, // Id will be set by the server
-                Rootfolder_Id = node.Rootfolder_Id,
-                Folder_Id = node.Id,
-                Path = node.FullPath
-            });
-            //@todo add to changeset 
-            await Task.Delay(2000); // Simulate async work
-            return retentionConfiguration;
-        }
-        public async Task<RetentionConfiguration> RemovePathProtection(string path)
-        {
-            retentionConfiguration.Path_protections.RemoveAll(p => p.Path == path);
-            //@todo update the server
-            await Task.Delay(2000); // Simulate async work
-            return retentionConfiguration;
-        }
         public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
         {
             try
