@@ -123,6 +123,10 @@ namespace VSM.Client.Pages
                 new_retention_key.Id = cell.retention_key.Id;
             Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
         }
+
+        // the following update the retention for one cell and all its children
+        // Concerning path protection. One pathprotection can be added and only one path protection can be removed
+        // The dealing with hierachies of path protection must be done on the userinterface so that it is explicit for the user what will happen
         private async Task OnRetentionChangedAsync()
         {
             if (selected_cell != null && new_retention_key != null && rootFolder != null && retention_config != null)
@@ -142,14 +146,22 @@ namespace VSM.Client.Pages
                         }
 
                         // Create and persist the new path protection in order to get an ID assigned
-                        retention_config = await DataModel.Instance.UpdatePathProtection(selected_cell.Node);
-                        var path_protection = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == selected_cell.Node.Id);
+                        var path_protection = await retention_config.AddPathProtection(selected_cell.Node);
                         if (path_protection == null)//|| path_protection.Id == 0)
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
                             return;
                         }
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {path_protection.Path}");
+                    }
+                    else if (selected_cell.retention_key.Id == retention_config.Path_retention.Id)
+                    {
+                        //remove existing path protection.
+                        int remove_count = await retention_config.RemovePathProtection(selected_cell.Node);
+                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
+                        //no removal happened so abandon the update
+                        if (remove_count == 0)
+                            return;
                     }
                     else
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
@@ -158,8 +170,9 @@ namespace VSM.Client.Pages
                     {
                         await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
                         selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
-                        selected_cell.retention_key.Name = retention_config.All_retentions.FirstOrDefault(r => r.Id == new_retention_key.Id)?.Name ?? selected_cell.retention_key.Name;
+                        selected_cell.retention_key.Name = retention_config.Find_by_Id(new_retention_key.Id)?.Name ?? "unknown";
                     }
+
                     // Update the aggregation from the root folder. 
                     // This could be optimsed by only updating the modifed branch and the parente
                     if (rootFolder != null)
@@ -185,9 +198,28 @@ namespace VSM.Client.Pages
         }
         private async Task RemovePathRetention(PathProtectionDTO pathprotection)
         {
-            //retention for the simulation that were but are no longer covered by the path protection is set to "+Next"
-            retention_config = await DataModel.Instance.RemovePathProtection(pathprotection.Path);
-            //await OnRetentionChangedAsync();
+            try
+            {
+                FolderNode? root = rootFolder != null ? await rootFolder.GetFolderTreeAsync() : null;
+                FolderNode? folder = null;
+
+                if (root != null) folder = await root.find_by_folder_id(pathprotection.Folder_Id);
+                new_retention_key.Id = retention_config.Find_by_Name("+Next")?.Id ?? 0;
+
+                if (folder != null && new_retention_key.Id > 0)
+                {
+                    selected_cell = new RetentionCell(folder, retention_config.Path_retention);
+                    await OnRetentionChangedAsync();
+                }
+                else
+                {
+                    Console.WriteLine($"failed to remove retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
+                }
+            }
+            catch
+            {
+                Console.WriteLine($"failed to remove retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
+            }
         }
     }
 
