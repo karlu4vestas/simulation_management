@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics.Contracts;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.FluentUI.AspNetCore.Components;
@@ -8,12 +9,10 @@ using VSM.Client.Datamodel;
 
 namespace VSM.Client.Pages
 {
-
     public partial class Fluent_Retention : ComponentBase
     {
         //Data for visualization
-        private ViewNode? VisibleRootNode = null;
-        private List<ViewNode> VisibleRows = new();
+        VisibleTable visibleTable = new();
         private bool isLoading = true;
         RetentionCell? selected_cell = null;
         RetentionCell? target_retention_cell = null;
@@ -21,7 +20,6 @@ namespace VSM.Client.Pages
         RetentionKey new_retention_key = new();
 
         //data from the DataModel
-        private List<FolderNode> TreeData = new();
         public RootFolder? rootFolder { get; set; }
         private RetentionConfiguration retention_config = new RetentionConfiguration(new RetentionConfigurationDTO());
 
@@ -33,7 +31,6 @@ namespace VSM.Client.Pages
             if (rootFolder != DataModel.Instance.SelectedRootFolder)
             {
                 rootFolder = DataModel.Instance.SelectedRootFolder;
-                // Don't await here - let the UI render first
             }
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -60,28 +57,6 @@ namespace VSM.Client.Pages
             }
         }
 
-        private async Task LoadRootFolderTreeAsync(RootFolder rootFolder)
-        {
-            try
-            {
-                if (rootFolder != null)
-                {
-                    var folderTree = await rootFolder.GetFolderTreeAsync();
-                    if (folderTree == null)
-                    {
-                        TreeData.Clear();
-                    }
-                    else if (!folderTree.IsLeaf)
-                    {
-                        TreeData = folderTree.Children;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading RootFolderTree: {ex.Message}");
-            }
-        }
         private async Task LoadDataAsync()
         {
             try
@@ -94,23 +69,22 @@ namespace VSM.Client.Pages
 
                 if (rootFolder != null)
                 {
-                    await LoadRootFolderTreeAsync(rootFolder);
+                    var folderTree = await rootFolder.GetFolderTreeAsync();
+                    if (folderTree != null)
+                    {
+                        visibleTable.SetVisibleRoot(folderTree);
+                    }
                     await rootFolder.UpdateAggregation();
                 }
             }
             finally
             {
-                VisibleRootNode = new ViewNode(TreeData.First());
-                VisibleRootNode.IsExpanded = false; // Expand the root node by default
-                VisibleRootNode.Level = 0; // Set the root level to 0
-                VisibleRows = ViewNode.ToggleExpand(VisibleRootNode, VisibleRootNode); // Expand the root node to show its children
-
                 await InvokeAsync(StateHasChanged);
             }
         }
         private void ToggleExpand(ViewNode VisibleRootNode, ViewNode node)
         {
-            VisibleRows = ViewNode.ToggleExpand(VisibleRootNode, node);
+            visibleTable.ToggleExpand(node);
         }
         private void OnCellClick(RetentionCell cell)
         {
@@ -123,7 +97,6 @@ namespace VSM.Client.Pages
                 new_retention_key.Id = cell.retention_key.Id;
             Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
         }
-
         // the following update the retention for one cell and all its children
         // Concerning path protection. One pathprotection can be added and only one path protection can be removed
         // The dealing with hierachies of path protection must be done on the userinterface so that it is explicit for the user what will happen
@@ -178,8 +151,8 @@ namespace VSM.Client.Pages
                     if (rootFolder != null)
                         await rootFolder.UpdateAggregation();
 
-                    if (VisibleRows != null && VisibleRootNode != null)
-                        VisibleRows = ViewNode.RefreshVisibleRows(VisibleRootNode);
+                    if (visibleTable.VisibleRows != null && visibleTable.VisibleRootNode != null)
+                        visibleTable.RefreshVisibleRows();
 
                     await InvokeAsync(StateHasChanged);
                     target_retention_cell = selected_cell;
@@ -196,29 +169,24 @@ namespace VSM.Client.Pages
                 }
             }
         }
-        private async Task RemovePathRetention(PathProtectionDTO pathprotection)
+        private async Task SelectPathRetention(PathProtectionDTO pathprotection)
         {
-            try
+            FolderNode? root = rootFolder == null ? null : await rootFolder.GetFolderTreeAsync();
+            FolderNode? folder = root == null ? null : await root.find_by_folder_id(pathprotection.Folder_Id);
+
+            if (folder != null && visibleTable.VisibleRootNode != null)
             {
-                FolderNode? root = rootFolder != null ? await rootFolder.GetFolderTreeAsync() : null;
-                FolderNode? folder = null;
+                Console.WriteLine($"Found the folder node for pathprotection {folder.FullPath}");
 
-                if (root != null) folder = await root.find_by_folder_id(pathprotection.Folder_Id);
-                new_retention_key.Id = retention_config.Find_by_Name("+Next")?.Id ?? 0;
-
-                if (folder != null && new_retention_key.Id > 0)
-                {
-                    selected_cell = new RetentionCell(folder, retention_config.Path_retention);
-                    await OnRetentionChangedAsync();
-                }
-                else
-                {
-                    Console.WriteLine($"failed to remove retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
-                }
+                //unfolder the VisibleRows to show folder and select the node where the pathprotection is defined
+                visibleTable.ExpandToNode(folder);
+                selected_cell = new RetentionCell(folder, retention_config.Path_retention);
+                target_retention_cell = null;
+                new_retention_key.Id = retention_config.Path_retention.Id;
             }
-            catch
+            else
             {
-                Console.WriteLine($"failed to remove retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
+                Console.WriteLine($"failed to select retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
             }
         }
     }
@@ -253,7 +221,24 @@ namespace VSM.Client.Pages
         public bool IsExpanded { get; set; } = false;
         public string Name => data.Name;
         public List<ViewNode> Children = [];
-        public static List<ViewNode> ToggleExpand(ViewNode VisibleRootNode, ViewNode node)
+
+    }
+    public class VisibleTable
+    {
+        public ViewNode? VisibleRootNode = null;
+        public List<ViewNode> VisibleRows = new();
+
+        public void SetVisibleRoot(FolderNode root)
+        {
+
+            VisibleRootNode = new ViewNode(root);
+            VisibleRootNode.IsExpanded = false; // Expand the root node by default
+            VisibleRootNode.Level = 0; // Set the root level to 0
+
+            VisibleRows.Clear();
+            ToggleExpand(VisibleRootNode); // Expand the root node to show its children
+        }
+        public void AddVisibleNode(ViewNode node)
         {
             node.IsExpanded = !node.IsExpanded;
             if (!node.IsExpanded)
@@ -264,7 +249,7 @@ namespace VSM.Client.Pages
                 node.Children.Count == 0 && node.Data.Children.Count > 0)
             {
                 // If the node is expanded and has children, flatten its children
-                //add the children as new ViewNodes 
+                // add the children as new ViewNodes 
                 foreach (var child in node.Data.Children)
                 {
                     // Create a new ViewNode for each child
@@ -274,11 +259,49 @@ namespace VSM.Client.Pages
                     node.Children.Add(childNode);
                 }
             }
-            return RefreshVisibleRows(VisibleRootNode);
         }
-        public static List<ViewNode> RefreshVisibleRows(ViewNode VisibleRootNode)
+        public void CollapseNoRefresh(ViewNode node)
         {
-            List<ViewNode> VisibleRows = new List<ViewNode>();
+            if (node.IsExpanded)
+            {
+                node.IsExpanded = false;
+                node.Children.Clear();
+            }
+        }
+        public void ExpandNoRefresh(ViewNode node)
+        {
+            if ((!node.IsExpanded && !node.IsLeaf) || node.Children.Count != node.Data.Children.Count)
+            {
+                node.Children.Clear();
+
+                // If the node is expanded and has children then add the children as new ViewNodes 
+                foreach (var child in node.Data.Children)
+                {
+                    // Create a new ViewNode for each child
+                    var childNode = new ViewNode(child);
+                    childNode.IsExpanded = false; // Keep the child node expanded
+                    childNode.Level = node.Level + 1; // Increment level for children
+                    node.Children.Add(childNode);
+                }
+                node.IsExpanded = true;
+            }
+        }
+        public void ToggleExpand(ViewNode node)
+        {
+            if (node.IsExpanded)
+                CollapseNoRefresh(node);
+            else
+                ExpandNoRefresh(node);
+
+            RefreshVisibleRows();
+        }
+        /// <summary>
+        ///  The refresh is required in order to show the updated folder structure in order.
+        /// without the refresh expanding a node would result in the expanded children being shown at the end of the list
+        /// </summary>
+        public void RefreshVisibleRows()
+        {
+            VisibleRows.Clear();
 
             if (VisibleRootNode != null)
             {
@@ -298,10 +321,40 @@ namespace VSM.Client.Pages
                     }
                 }
             }
-            return VisibleRows;
+        }
+
+        public void ExpandToNode(FolderNode node)
+        {
+            //create a hashlist for fast lookup which folder are already expanded. Basically a look of all id ViewNode.Data.Id list for 
+            HashSet<int> visiblefolder_Ids = VisibleRows.Select(r => r.Data.Id).ToHashSet();
+            // print the visible folder ids to the console for debugging
+            Console.WriteLine($"Visible folder IDs ({visiblefolder_Ids.Count}): {string.Join(", ", visiblefolder_Ids)}");
+
+            //add all nodes (node and its parents) that are not expanded (that not in the expandedFolders) to a list closed nodes. 
+            //stop at the first node found in expandedFolders
+            var closedNodes = new Stack<FolderNode>();
+            FolderNode? current = node;
+            while (current != null && !visiblefolder_Ids.Contains(current.Id))
+            {
+                closedNodes.Push(current);
+                current = current.Parent;
+                if (current != null) Console.WriteLine($"current: ID:{current.Id}, Name: {current.Name}, IsVisible:{visiblefolder_Ids.Contains(current.Id)}");
+            }
+
+            // Find the viewnode for current which is the highest ViewNode with one of node's parent FolderNodes
+            ViewNode? currentViewNode = current == null ? null : VisibleRows.FirstOrDefault(v => v.Data.Id == current.Id);
+            // Continue while we can find children to expand
+            FolderNode? child = closedNodes.Count > 0 ? closedNodes.Pop() : null;
+            while (currentViewNode != null && child != null)
+            {
+                ExpandNoRefresh(currentViewNode);
+
+                currentViewNode = currentViewNode.Children.FirstOrDefault(v => v.Data.Id == child.Id);
+                child = closedNodes.Count > 0 ? closedNodes.Pop() : null;
+            }
+            RefreshVisibleRows();
         }
     }
-
     public class RetentionCell : IEquatable<RetentionCell>
     {
         public FolderNode Node { get; set; }
@@ -344,5 +397,4 @@ namespace VSM.Client.Pages
             return !(left == right);
         }
     }
-
 }

@@ -17,7 +17,7 @@
             </div>
         </div>
     }
-    else if (VisibleRows == null || VisibleRows.Count == 0)
+    else if (visibleTable.VisibleRows == null || visibleTable.VisibleRows.Count == 0)
     {
         <div style="display:flex">
             <p>To work with retention you must first select a rootfolder on the Library page!</p>
@@ -30,15 +30,15 @@
             <hr />
             <div class="grid">
                 <div  style="display: table; table-layout: fixed; width: 100%;">
-                <FluentDataGrid Items="@VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize="25"
+                <FluentDataGrid Items="@visibleTable.VisibleRows.AsQueryable()" TGridItem="ViewNode" Virtualize="true" ItemSize="25"
                     ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky" Style="min-width: max-content;">
 
                     <TemplateColumn TGridItem="ViewNode" Title="Folders" Width="400px">
                         <ChildContent Context="item">
                             <div style="padding-left:@(item.Level * 18)px; display:flex; align-items:center;">
-                                @if (!item.IsLeaf && VisibleRootNode != null)
+                                @if (!item.IsLeaf && visibleTable.VisibleRootNode != null)
                                 {
-                                    <button class="e-flat" @onclick="() => ToggleExpand(VisibleRootNode, item)"
+                                    <button class="e-flat" @onclick="() => ToggleExpand(visibleTable.VisibleRootNode, item)"
                                         style="width:1.5em; height:1.5em; padding:0; display:inline-flex; align-items:center; justify-content:center;">
                                         @(item.IsExpanded ? "▾" : "▸")
                                     </button>
@@ -148,14 +148,25 @@
                                     <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
                                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
                                                 MultiLine="true">
-                                        <TemplateColumn Title="Protection" Width="160px">
+                                        @*<TemplateColumn Title="Protection" Width="160px">
                                             <ChildContent Context="pathprotection">
                                                 <FluentButton Appearance="Appearance.Accent"
                                                     @onclick="@(() => RemovePathRetention(pathprotection))">Remove
                                                 </FluentButton>
                                             </ChildContent>
+                                        </TemplateColumn>*@
+                                        @*<PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />*@
+                                        <TemplateColumn Title="Protected path" Width="1800px">
+                                            <ChildContent Context="pathprotection">
+                                                @{
+                                                    var isSelected = selected_cell == null ? false : selected_cell.Node.Id == pathprotection.Folder_Id;
+                                                    var buttonClass = isSelected ? "e-flat-selected" : "e-flat";
+                                                }
+                                                <button class="@buttonClass" @onclick="() => SelectPathRetention(pathprotection)">
+                                                        @pathprotection.Path
+                                                </button>
+                                            </ChildContent>
                                         </TemplateColumn>
-                                        <PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />
                                     </FluentDataGrid>
                                 </div>
                             }
