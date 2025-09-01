@@ -102,13 +102,14 @@ namespace VSM.Client.Pages
         // The dealing with hierachies of path protection must be done on the userinterface so that it is explicit for the user what will happen
         private async Task OnRetentionChangedAsync()
         {
-            if (selected_cell != null && new_retention_key != null && rootFolder != null && retention_config != null)
+            try
             {
-                try
+                if (selected_cell != null && new_retention_key != null && rootFolder != null && retention_config != null)
                 {
                     StateHasChanged(); // Update UI to show progress
                     isProcessing = true;
 
+                    //start by verifying if we need to change the list of pathprotections
                     if (new_retention_key.Id == retention_config.Path_retention.Id)
                     {
                         //add a path protection if it doesn't already exist
@@ -119,7 +120,7 @@ namespace VSM.Client.Pages
                         }
 
                         // Create and persist the new path protection in order to get an ID assigned
-                        var path_protection = await retention_config.AddPathProtection(selected_cell.Node);
+                        var path_protection = await selected_cell.Node.AddPathProtection(retention_config);
                         if (path_protection == null)//|| path_protection.Id == 0)
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
@@ -130,45 +131,47 @@ namespace VSM.Client.Pages
                     else if (selected_cell.retention_key.Id == retention_config.Path_retention.Id)
                     {
                         //remove existing path protection.
-                        int remove_count = await retention_config.RemovePathProtection(selected_cell.Node);
+                        int remove_count = await selected_cell.Node.RemovePathProtection(retention_config, new_retention_key.Id);
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
                         //no removal happened so abandon the update
                         if (remove_count == 0)
                             return;
                     }
-                    else
+                    else if (new_retention_key != null)
+                    {
+                        // case for change of retention that does not involved pathRetention
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
 
+                        await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
+                    }
+
+                    // All done for the selected_cell. 
+                    // Now show where the change has gone to by assigning target_retention_cell
                     if (new_retention_key != null)
                     {
-                        await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
                         selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
                         selected_cell.retention_key.Name = retention_config.Find_by_Id(new_retention_key.Id)?.Name ?? "unknown";
+                        target_retention_cell = selected_cell;
+                        selected_cell = null;
                     }
 
                     // Update the aggregation from the root folder. 
-                    // This could be optimsed by only updating the modifed branch and the parente
-                    if (rootFolder != null)
-                        await rootFolder.UpdateAggregation();
-
-                    if (visibleTable.VisibleRows != null && visibleTable.VisibleRootNode != null)
-                        visibleTable.RefreshVisibleRows();
-
-                    await InvokeAsync(StateHasChanged);
-                    target_retention_cell = selected_cell;
-                    selected_cell = null;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error syncing retentions: {ex.Message}");
-                }
-                finally
-                {
-                    isProcessing = false;
-                    StateHasChanged(); // Hide progress indicator
+                    // This could be optimsed by only updating the modifed branch and its ancestors
+                    await rootFolder.UpdateAggregation();
                 }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error syncing retentions: {ex.Message}");
+            }
+            finally
+            {
+                //ensure that the user can see the changes
+                isProcessing = false;
+                await InvokeAsync(StateHasChanged);
+            }
         }
+
         private async Task SelectPathRetention(PathProtectionDTO pathprotection)
         {
             FolderNode? root = rootFolder == null ? null : await rootFolder.GetFolderTreeAsync();

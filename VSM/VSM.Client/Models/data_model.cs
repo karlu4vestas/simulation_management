@@ -26,6 +26,11 @@ namespace VSM.Client.Datamodel
         public string User { get; set; } = "";
         private RetentionConfiguration retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO());
         //                List<PathProtectionDTO> pathProtectionDTOs = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>("http://127.0.0.1:5173/pathprotections/?rootfolder_id={rootFolder.Id}", new JsonSerializerOptions
+        private static byte _current_id = 0;
+        public byte NewID
+        {
+            get => _current_id++;
+        }
         public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
         {
             try
@@ -146,16 +151,6 @@ namespace VSM.Client.Datamodel
             //print_folder_leaf_levels(root, 0);
             return root;
         }
-        void print_folder_leaf_levels(FolderNode folderNode, int level)
-        {
-            // used for debugging only
-            if (folderNode.IsLeaf)
-                Console.WriteLine($"leaf_level:{level}- {folderNode.Name} (ID: {folderNode.Id})");
-            foreach (var child in folderNode.Children)
-            {
-                print_folder_leaf_levels(child, level + 1);
-            }
-        }
         //@todo create a fastAPI endpoint to register that the user wants to run cleanup for this folder 
         public bool RegisterRootFolderForCleanUp(RootFolder rootFolder)
         {
@@ -168,5 +163,17 @@ namespace VSM.Client.Datamodel
             return true;
         }
         //@todo create a fastAPI endpoint to register change in retentions for the simulations
+
+        void print_folder_leaf_levels(FolderNode folderNode, int level)
+        {
+            // used for debugging only
+            if (folderNode.IsLeaf)
+                Console.WriteLine($"leaf_level:{level}- {folderNode.Name} (ID: {folderNode.Id})");
+            foreach (var child in folderNode.Children)
+            {
+                print_folder_leaf_levels(child, level + 1);
+            }
+        }
+
     }
 }

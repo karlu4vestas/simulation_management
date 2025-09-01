@@ -126,7 +126,7 @@ namespace VSM.Client.Datamodel
     }
     public class PathProtection
     {
-        PathProtectionDTO dto;
+        public PathProtectionDTO dto;
         public PathProtection(PathProtectionDTO dto)
         {
             this.dto = dto;
@@ -183,94 +183,5 @@ namespace VSM.Client.Datamodel
         {
             return this.Path_protections.FirstOrDefault(r => r.Folder_Id == folder_id);
         }
-        public List<FolderNode> FindClosestPathProtectionsForFolder(FolderNode node)
-        {
-            // find the closest and most specific path protection for the given folder node. 
-            // start by looking for Closest ancestor. Of not match the look for the closest protected children 
-            List<FolderNode> closest_list = FindClosestPathProtectedParent(node);
-            if (closest_list.Count == 0)
-                closest_list = FindClosestPathProtectedDescendants(node);
-            return closest_list;
-        }
-        private List<FolderNode> FindClosestPathProtectedParent(FolderNode node)
-        {
-            // return the closest ancestor
-            List<FolderNode> closest_list = new List<FolderNode>();
-            FolderNode current = node;
-            while (current.Parent != null && closest_list.Count == 0)
-            {
-                if (Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id) != null)
-                    closest_list.Add(current);
-                else { current = current.Parent; }
-            }
-            return closest_list;
-        }
-
-        /// <summary>
-        /// Finds the closest descendants of the given node whose Ids are in the pathProtections list.
-        /// If multiple matches exist at the same depth, all are returned.
-        /// Once matches are found at a given depth, deeper levels are not searched.
-        /// </summary>
-        private List<FolderNode> FindClosestPathProtectedDescendants(FolderNode root)
-        {
-            HashSet<int> hash_of_pathProtections = new HashSet<int>(Path_protections.Select(pp => pp.Folder_Id));
-            if (root == null || hash_of_pathProtections == null || hash_of_pathProtections.Count == 0)
-                return new List<FolderNode>();
-
-            var currentLevel = new Queue<FolderNode>(root.Children);
-
-            var matches = new List<FolderNode>();
-            while (currentLevel.Count > 0 && matches.Count == 0)
-            {
-                var nextLevel = new Queue<FolderNode>();
-
-                // Process all nodes in the current level
-                while (currentLevel.Count > 0)
-                {
-                    var node = currentLevel.Dequeue();
-
-                    if (hash_of_pathProtections.Contains(node.Id))
-                    {
-                        matches.Add(node);
-                    }
-                    else
-                    {
-                        foreach (var child in node.Children)
-                            nextLevel.Enqueue(child);
-                    }
-                }
-
-                // Otherwise, continue deeper
-                currentLevel = nextLevel;
-            }
-
-            // No matches in the entire subtree
-            return matches;
-        }
-
-        public async Task<PathProtectionDTO> AddPathProtection(FolderNode node)
-        {
-            PathProtectionDTO new_protection = new PathProtectionDTO
-            {
-                //Id = pathProtection.Id, // Id will be set by the server
-                Rootfolder_Id = node.Rootfolder_Id,
-                Folder_Id = node.Id,
-                Path = node.FullPath
-            };
-            Path_protections.Add(new_protection);
-            //@todo add to changeset 
-            await Task.Delay(2000); // Simulate async work
-            return new_protection;
-        }
-        public async Task<int> RemovePathProtection(FolderNode node)
-        {
-            // step 1: find the path protection entry in the list of path protections
-            // step 2: remove it from the list if found
-            int remove_count = Path_protections.RemoveAll(p => p.Folder_Id == node.Id);
-            //@todo update the server
-            await Task.Delay(2000); // Simulate async work
-            return remove_count;
-        }
-
     }
 }
