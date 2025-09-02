@@ -61,7 +61,7 @@
                                     @{
                                         RetentionCell cell = new RetentionCell(item.Data, key);
                                         @*if is_cleaned_column then show the slection as grey to indicate that i cannot be changed *@
-                                        var is_cleaned_column = key.Id == retention_config.Cleaned_retention?.Id;
+                                        var is_cleaned_column = key.Id == retention_config.Cleaned_retentiontype?.Id;
                                         var isSelected = selected_cell == null ? false : selected_cell == cell;
                                         var buttonClass = isSelected ? (is_cleaned_column ? "e-flat-selected-grey" : "e-flat-selected")
                                         : (target_retention_cell == cell ? "e-flat-target" : "e-flat");
@@ -124,7 +124,7 @@
 
                         @if (   selected_cell != null &&
                                 @*selected_cell?.retention_key.Id != retention_config.Path_retention?.Id &&*@
-                                selected_cell?.retention_key.Id != retention_config.Cleaned_retention?.Id   )
+                                selected_cell?.retention_key.Id != retention_config.Cleaned_retentiontype?.Id   )
                         {
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <FluentCombobox Label="Change retention:" Autofocus="true"
@@ -141,21 +141,13 @@
                     <div class="grid">
                         @{
                             var cell = target_retention_cell ?? selected_cell;
-                            @if (cell!=null && cell.retention_key.Id == retention_config.Path_retention?.Id)
+                            @if (cell!=null && cell.retention_key.Id == retention_config.Path_retentiontype?.Id)
                             {
                                 <span>List of Path retentions: </span>
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
                                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
                                                 MultiLine="true">
-                                        @*<TemplateColumn Title="Protection" Width="160px">
-                                            <ChildContent Context="pathprotection">
-                                                <FluentButton Appearance="Appearance.Accent"
-                                                    @onclick="@(() => RemovePathRetention(pathprotection))">Remove
-                                                </FluentButton>
-                                            </ChildContent>
-                                        </TemplateColumn>*@
-                                        @*<PropertyColumn Property="@(p => p.Path)" Title="Path" Width="1200px" />*@
                                         <TemplateColumn Title="Protected path" Width="1800px">
                                             <ChildContent Context="pathprotection">
                                                 @{
@@ -169,6 +161,8 @@
                                         </TemplateColumn>
                                     </FluentDataGrid>
                                 </div>
+                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => OnRetentionChangedAsync())">Add path retention
+                                </FluentButton>
                             }
                         }
                     </div>

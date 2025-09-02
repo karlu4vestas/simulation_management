@@ -110,7 +110,7 @@ namespace VSM.Client.Pages
                     isProcessing = true;
 
                     //start by verifying if we need to change the list of pathprotections
-                    if (new_retention_key.Id == retention_config.Path_retention.Id)
+                    if (new_retention_key.Id == retention_config.Path_retentiontype.Id)
                     {
                         //add a path protection if it doesn't already exist
                         if (retention_config.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
@@ -128,7 +128,7 @@ namespace VSM.Client.Pages
                         }
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {path_protection.Path}");
                     }
-                    else if (selected_cell.retention_key.Id == retention_config.Path_retention.Id)
+                    else if (selected_cell.retention_key.Id == retention_config.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
                         int remove_count = await selected_cell.Node.RemovePathProtection(retention_config, new_retention_key.Id);
@@ -183,9 +183,9 @@ namespace VSM.Client.Pages
 
                 //unfolder the VisibleRows to show folder and select the node where the pathprotection is defined
                 visibleTable.ExpandToNode(folder);
-                selected_cell = new RetentionCell(folder, retention_config.Path_retention);
+                selected_cell = new RetentionCell(folder, retention_config.Path_retentiontype);
                 target_retention_cell = null;
-                new_retention_key.Id = retention_config.Path_retention.Id;
+                new_retention_key.Id = retention_config.Path_retentiontype.Id;
             }
             else
             {

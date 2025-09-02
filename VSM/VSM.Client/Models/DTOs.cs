@@ -167,9 +167,9 @@ namespace VSM.Client.Datamodel
         }
         public List<RetentionTypeDTO> All_retentions => dto.All_retentions;
         public List<RetentionTypeDTO> Target_retentions => dto.Target_retentions;
-        public RetentionTypeDTO Path_retention => dto.Path_retention;
-        public RetentionTypeDTO Cleaned_retention => dto.Cleaned_retention;
-        public RetentionTypeDTO Issue_retention => dto.Issue_retention;
+        public RetentionTypeDTO Path_retentiontype => dto.Path_retention;
+        public RetentionTypeDTO Cleaned_retentiontype => dto.Cleaned_retention;
+        public RetentionTypeDTO Issue_retentiontype => dto.Issue_retention;
         public List<PathProtectionDTO> Path_protections => dto.Path_protections;
         public RetentionTypeDTO? Find_by_Name(string name)
         {
