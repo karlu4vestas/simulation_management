@@ -6,7 +6,7 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/main.py",
-      "pythonPath": "${workspaceFolder}/.venv/bin/python",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "cwd": "${workspaceFolder}/server",
       "console": "integratedTerminal",
       "justMyCode": false,
@@ -49,7 +49,7 @@
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5400"
+        "ASPNETCORE_URLS": "http://0.0.0.0:5000"
       },
       "justMyCode": false,
       "enableStepFiltering": false,
@@ -115,12 +115,6 @@
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
-    },
-    {
-      "name": "C#: VSM [Default Configuration]",
-      "type": "dotnet",
-      "request": "launch",
-      "projectPath": "${workspaceFolder}/VSM/VSM.csproj"
     }
   ],
   "compounds": [

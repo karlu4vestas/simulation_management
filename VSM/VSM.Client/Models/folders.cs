@@ -68,7 +68,11 @@ namespace VSM.Client.Datamodel
             throw new Exception($"Folder with ID {folder_id} not found.");
         }
 
-        //only used if from_retention_Id, and to_retention_Id are not Path retention
+        public async Task ChangeRetentions(byte from_retentiontype_Id, byte to_retentiontype_Id)
+        {
+            await ChangeRetentionsOfSubtree(from_retentiontype_Id, 0, to_retentiontype_Id, 0);
+        }
+        /*//only used if from_retention_Id, and to_retention_Id are not Path retention
         public async Task ChangeRetentions(byte from_retention_Id, byte to_retention_Id)
         {
             //change retention for all leaf nodes in this inner node without recursion
@@ -102,7 +106,7 @@ namespace VSM.Client.Datamodel
                     await Task.Yield();
                 }
             }
-        }
+        }*/
 
         public async Task<PathProtectionDTO> AddPathProtection(RetentionConfiguration retention_config)
         {
@@ -135,13 +139,14 @@ namespace VSM.Client.Datamodel
                 {
                     Console.WriteLine($"AddPathProtection do not change FullPath,Path_Protection_Id: {currentNode.FullPath} {currentNode.Path_Protection_Id}");
                 }
-
-                // Add all children to stack for processing
-                foreach (var child in currentNode.Children)
+                else
                 {
-                    stack.Push(child);
+                    // Add all children to stack for processing
+                    foreach (var child in currentNode.Children)
+                    {
+                        stack.Push(child);
+                    }
                 }
-
                 // Yield control periodically for large trees to prevent UI blocking
                 if (stack.Count % 100 == 0)
                 {
@@ -151,24 +156,32 @@ namespace VSM.Client.Datamodel
 
             return new_path_protection;
         }
+        private PathProtectionDTO? FindClosestPathProtectedParent(RetentionConfiguration retention_config)
+        {
+            PathProtectionDTO? closest_path_protection = null;
+            FolderNode current = this;
+            while (current.Parent != null && closest_path_protection == null)
+            {
+                closest_path_protection = retention_config.Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
+                current = current.Parent;
+            }
+            return closest_path_protection;
+        }
         public async Task<int> RemovePathProtection(RetentionConfiguration retention_config, int to_retention_Id)
         {
-            // step 1: find the path protection entry in the list of path protections
+            // step 1: find this node path protection entry 
             // step 2: remove it from the list if found
+            // step 3: Verify if this node has a parent PathProtection in the retention_config
+            //         If there is no parent path protection, 
+            //            -then set the retention of leaves under this nodes to (to_retention_Id, to_path_protection_id=0). 
+            //         else  
+            //            -then set the retention of leaves under this node to (path protection type,  from_path_protectection.Id).
+            //         In this way we do not touch path protection of other children.
             PathProtectionDTO? from_path_retention = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == this.Id);
             int remove_count = retention_config.Path_protections.RemoveAll(p => p.Folder_Id == this.Id);
 
-            // Verify if from_path_retention has a parent PathProtection in the retention_config
-            // If there is no parent, 
-            //    -then set the retention of leaf node with retentions equal to from_path_protectection with (to_retention_Id, to_path_protection_id=0). 
-            // If there is a parent path protection 
-            //    -then set the retention of leaf node with retentions equal to from_path_protectection with the parent_path_protection.
-            // In this way we do not touch other child path protections.
 
-            // in both cases we need a function that finds all from_path_protection containing (from_retention_Id and from_path_protection_id) and replaces them with a to_retention_Id and to_path_protection_id
-            // the search can be limited to the folder for from_path_retention
-
-            // tjek if any of the pathretentions from retention_config are a parent of from_path_retention_folder
+            // check if any of the pathretentions from retention_config are a parent of from_path_retention_folder
             PathProtectionDTO? parent_path_protection = this.FindClosestPathProtectedParent(retention_config);
             if (from_path_retention == null || remove_count == 0)
                 throw new ArgumentException("Invalid path protection folder specified.");
@@ -183,23 +196,12 @@ namespace VSM.Client.Datamodel
             }
             return remove_count;
         }
-        public PathProtectionDTO? FindClosestPathProtectedParent(RetentionConfiguration retention_config)
-        {
-            // return the closest ancestor
-            PathProtectionDTO? closest_path_protection = null;
-            FolderNode current = this;
-            while (current.Parent != null && closest_path_protection == null)
-            {
-                closest_path_protection = retention_config.Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
-                current = current.Parent;
-            }
-            return closest_path_protection;
-        }
-        public async Task ChangeRetentionsOfSubtree(int from_retention_ID, int from_path_protection_id, int to_retention_ID, int to_path_protection_id)
+        // in both cases we need a function that finds all from_path_protection containing (from_retention_Id and from_path_protection_id) and replaces them with a to_retention_Id and to_path_protection_id
+        public async Task ChangeRetentionsOfSubtree(int from_retentiontype_Id, int from_path_protection_id, int to_retentiontype_Id, int to_path_protection_id)
         {
             //select the subtree to folder incl folder that have retention equal to  (from_retention_ID, from_path_protection_id)
             // and change the retentions to (to_retention_ID, to_path_protection_id)
-            Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} from_retention_ID: {from_retention_ID}, from_path_protection_id: {from_path_protection_id} ");
+            Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} from_retention_ID: {from_retentiontype_Id}, from_path_protection_id: {from_path_protection_id} ");
             int number_of_change_leafs = 0;
             int number_of_unchanged_leafs = 0;
             var stack = new Stack<FolderNode>();
@@ -209,9 +211,9 @@ namespace VSM.Client.Datamodel
                 var currentNode = stack.Pop();
 
                 // Check if current node matches the criteria and update if so
-                if (currentNode.IsLeaf && currentNode.Retention_Id == from_retention_ID && currentNode.Path_Protection_Id == from_path_protection_id)
+                if (currentNode.IsLeaf && currentNode.Retention_Id == from_retentiontype_Id && currentNode.Path_Protection_Id == from_path_protection_id)
                 {
-                    currentNode.Retention_Id = to_retention_ID;
+                    currentNode.Retention_Id = to_retentiontype_Id;
                     currentNode.Path_Protection_Id = to_path_protection_id;
                     number_of_change_leafs++;
                 }
@@ -221,11 +223,13 @@ namespace VSM.Client.Datamodel
                     //Console.WriteLine($"ChangeRetentionsOfSubtree do not change FullPath, Retention_Id, Path_Protection_Id:" +
                     //                   $" {currentNode.FullPath} {currentNode.Retention_Id} {currentNode.Path_Protection_Id}");
                 }
-
-                // Add all children to stack for processing
-                foreach (var child in currentNode.Children)
+                else
                 {
-                    stack.Push(child);
+                    // Add all children to stack for processing
+                    foreach (var child in currentNode.Children)
+                    {
+                        stack.Push(child);
+                    }
                 }
 
                 // Yield control periodically for large trees to prevent UI blocking
