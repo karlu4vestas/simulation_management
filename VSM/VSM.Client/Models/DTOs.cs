@@ -41,7 +41,7 @@ namespace VSM.Client.Datamodel
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public bool Active_Cleanup { get; set; } // indicates if the folder is actively being cleaned up
+        public string Cleanup_frequency { get; set; } = ""; // indicates the folder's cleanup frequency
     }
 
     //-------------------- here come client side objects that contains a DTO like object ----------------
@@ -57,10 +57,10 @@ namespace VSM.Client.Datamodel
         public int Id => dto.Id;
         public int Folder_Id => dto.Folder_Id;
 
-        public bool Is_registeredfor_cleanup
+        public string Cleanup_frequency
         {
-            get => dto.Active_Cleanup;
-            set => dto.Active_Cleanup = value;
+            get => dto.Cleanup_frequency;
+            set => dto.Cleanup_frequency = value;
         }
         public string Root_path => dto.Path;
         public string Owner => dto.Owner;

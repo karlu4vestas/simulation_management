@@ -1,3 +1,4 @@
+import string
 from sqlmodel import Field, SQLModel
 from typing import Optional
 from datetime import date
@@ -7,8 +8,8 @@ from datetime import date
 class RootFolderBase(SQLModel):
     owner: str
     approvers: str | None = Field(default=None)  # comma separated approvers
-    active_cleanup: bool
-    path: str           #fullpath including the domain. Maybe only the domains because folder_id points to the foldername
+    cleanup_frequency: str | None = Field(default="inactive") 
+    path: str                                    #fullpath including the domain. Maybe only the domains because folder_id points to the foldername
     folder_id: int | None = Field(default=None, foreign_key="foldernodedto.id") 
 
 class RootFolderDTO(RootFolderBase, table=True):

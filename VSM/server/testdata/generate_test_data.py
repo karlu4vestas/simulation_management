@@ -77,13 +77,13 @@ class RandomNodeType:
         if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
 
-def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path, levels):
+def generate_root_folder(engine: Engine, owner, approvers, cleanup_frequency, path, levels):
 
     with Session(engine) as session:
         root_folder = RootFolderDTO(
             owner=owner,
             approvers=approvers,
-            active_cleanup=active_cleanup,
+            cleanup_frequency=cleanup_frequency,
             path=path
         )
         session.add(root_folder)
@@ -99,13 +99,13 @@ def generate_root_folder(engine: Engine, owner, approvers, active_cleanup, path,
 
 def insert_root_folders_metadata_in_db(engine):
 
-    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R1",2)
-    generate_root_folder(engine, "jajac", "stefw, misve", False, "R2",3)
-    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R3",4)
-    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R4",5)
-    generate_root_folder(engine, "misve", "stefw, arlem", True,  "R5",6)
-    generate_root_folder(engine, "karlu", "arlem, caemh", False, "R6",7)
-    generate_root_folder(engine, "jajac", "stefw, misve", True,  "R7",8)
+    generate_root_folder(engine, "jajac", "stefw, misve", "1 week",  "R1",2)
+    generate_root_folder(engine, "jajac", "stefw, misve", "inactive", "R2",3)
+    generate_root_folder(engine, "jajac", "stefw, misve", "2 weeks",  "R3",4)
+    generate_root_folder(engine, "jajac", "stefw, misve", "3 weeks",  "R4",5)
+    generate_root_folder(engine, "misve", "stefw, arlem", "4 weeks",  "R5",6)
+    generate_root_folder(engine, "karlu", "arlem, caemh", "inactive", "R6",7)
+    generate_root_folder(engine, "jajac", "stefw, misve", "6 weeks",  "R7",8)
     #generate_root_folder(engine, "caemh", "arlem, jajac", False, "R8",9)
     #generate_root_folder(engine, "caemh", "arlem, jajac", False, "R9",10)
 
@@ -113,7 +113,7 @@ def insert_root_folders_metadata_in_db(engine):
         root_folders = session.exec(select(RootFolderDTO)).all()
         print("Test data for root_folders inserted successfully:")
         for rf in root_folders:
-            print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, Active Cleanup: {rf.active_cleanup} Folder id: {rf.folder_id}")
+            print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanup_frequency} Folder id: {rf.folder_id}")
 
 
 #class FolderNodeDTO(SQLModel, table=True):

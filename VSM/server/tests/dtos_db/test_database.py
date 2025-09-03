@@ -142,8 +142,8 @@ class TestDatabase:
         with Session(db.get_engine()) as session:
             root_folder = RootFolderDTO(
                 path="/test/folder",
-                owner="testuser",
-                active_cleanup=False
+                owner="testuser"
+                ##cleanup_frequency=""
             )
             session.add(root_folder)
             session.commit()

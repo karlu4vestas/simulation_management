@@ -7,7 +7,7 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (DataModel.Instance.TheUsersRootFolders.Count==0)
+    @if (DataModel.Instance.TheUsersRootFolders.Count == 0)
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
@@ -15,42 +15,43 @@
             <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
         </div>
 
-        if(has_loaded_rootFolders){
+        if (has_loaded_rootFolders)
+        {
             <div style="display:flex">
-                <p>Load of root folders has failed or you are not owner or approver of any root folder! </p>            
+                <p>Load of root folders has failed or you are not owner or approver of any root folder! </p>
             </div>
         }
     }
     else
     {
-        <FluentBodyContent>
+        <FluentStack Orientation="Orientation.Vertical">
             <p>User: @DataModel.Instance.User</p>
             <hr />
             <div class="grid">
                 <FluentDataGrid Items="@DataModel.Instance.TheUsersRootFolders.AsQueryable()" TGridItem="RootFolder"
                     OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
-                    GenerateHeader="@GenerateHeaderOption.Sticky">
+                    GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
 
-                    <PropertyColumn Property="@(folder => folder.Root_path)" />
+                    <PropertyColumn Title="Secure folder" Property="@(folder => folder.Root_path)" Width="400px" />
 
-                    <TemplateColumn Title="Owners">
+                    <TemplateColumn Title="Owners" Width="300px">
                         <ChildContent Context="folder">
                             @string.Join(", ", folder.AllInitials)
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Active cleanup">
+                    <TemplateColumn Title="Cleanup frequency" Width="300px">
                         <ChildContent Context="folder">
-                            @(folder.Is_registeredfor_cleanup ? "X" : "")
+                            @(folder.Cleanup_frequency)
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Go to Retention">
+                    <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
-                            @if (folder.Is_registeredfor_cleanup)
+                            @if (folder.Cleanup_frequency != null && folder.Cleanup_frequency != "inactive")
                             {
-                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Retentions
-                                </FluentButton>
+                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to
+                                    retentions</FluentButton>
                             }
                             else
                             {
@@ -60,32 +61,28 @@
                     </TemplateColumn>
                 </FluentDataGrid>
             </div>
-
-        </FluentBodyContent>
-        <FluentBodyContent>
+        </FluentStack>
+        <FluentStack Orientation="Orientation.Vertical">
             <hr />
             @if (DataModel.Instance.SelectedRootFolder != null)
             {
-                string ownerstring = string.Join(", ", DataModel.Instance.SelectedRootFolder.AllInitials);
-                <div style="display:flex"><span style="width: 80px; display: inline-block;">Root-path:</span>
+                <div style="display:flex"><span style="width: 160px; display: inline-block;">Secure folder:</span>
                     @DataModel.Instance.SelectedRootFolder.Root_path </div>
-                <p></p>
-                <div style="display:flex"><span style="width: 80px; display: inline-block;">Owners:</span> @ownerstring
-                    AriaLabel</div>
-                <p></p>
-                string toggle_subscription = DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup ? "Unsubscribe from cleanup" :
-                "Subscribe to cleanup";
-                <div style="display:flex">Change the subscription to the cleanup process:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-                    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => ToggleCleanupProcess())">
-                        @toggle_subscription</FluentButton>
+                string ownerstring = string.Join(", ", DataModel.Instance.SelectedRootFolder.AllInitials);
+                <div style="display:flex"><span style="width: 160px; display: inline-block;">Owners:</span> @ownerstring</div>
+                <div style="display:flex"><span style="width: 160px; display: inline-block;">Change retention:</span>
+                    <FluentCombobox Autofocus="true" Items="@cleanup_frequencies"
+                        @bind-Value="@DataModel.Instance.SelectedRootFolder.Cleanup_frequency"
+                        @bind-Value:after="UpdateCleanUpFrequency" Height="300px" Position="SelectPosition.Above" Immediate
+                        ImmediateDelay="100" />
                 </div>
             }
-        </FluentBodyContent>
+        </FluentStack>
     }
 </FluentStack>
 @code {
-    bool has_loaded_rootFolders = false;    
-
+    bool has_loaded_rootFolders = false;
+    private List<string> cleanup_frequencies = ["inactive", "1 week", "2 weeks", "3 weeks", "4 weeks", "6 weeks"];
     async Task OnLoginClicked()
     {
         if (DataModel.Instance.User.Length > 0)
@@ -111,12 +108,9 @@
     {
         DataModel.Instance.SelectedRootFolder = row.Item;
     }
-    private void ToggleCleanupProcess()
+    private void UpdateCleanUpFrequency()
     {
-        if (DataModel.Instance.SelectedRootFolder != null)
-        {
-            DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup = !DataModel.Instance.SelectedRootFolder.Is_registeredfor_cleanup;
-        }
+        Console.WriteLine($"new cleanup_frequency:{DataModel.Instance.SelectedRootFolder?.Cleanup_frequency}");
     }
     private void Go2retention(RootFolder root_folder)
     {

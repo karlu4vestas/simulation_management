@@ -28,7 +28,7 @@ class TestRootFolderDTO:
         assert retrieved_folder.folder_id == original_folder.folder_id
         assert retrieved_folder.owner == original_folder.owner
         assert retrieved_folder.approvers == original_folder.approvers
-        assert retrieved_folder.active_cleanup == original_folder.active_cleanup
+        #assert retrieved_folder.active_cleanup == original_folder.active_cleanup
 
     def test_root_folder_update_and_retrieve(self, test_session, sample_root_folder_data):
         """Test updating and retrieving a RootFolderDTO"""
@@ -45,14 +45,14 @@ class TestRootFolderDTO:
             path="/updated/path",
             folder_id=sample_root_folder_data["folder_id"],  # Unchanged
             owner="UpdatedOwner",
-            approvers=sample_root_folder_data["approvers"],  # Unchanged
-            active_cleanup=True
+            approvers=sample_root_folder_data["approvers"]  # Unchanged
+            #active_cleanup=True
         )
         
         # Apply updates from expected object
         folder.path = expected_folder.path
         folder.owner = expected_folder.owner
-        folder.active_cleanup = expected_folder.active_cleanup
+        #folder.active_cleanup = expected_folder.active_cleanup
         test_session.commit()
         
         # Clear session and retrieve fresh
@@ -62,7 +62,7 @@ class TestRootFolderDTO:
         # Verify against expected values
         assert retrieved_folder.path == expected_folder.path
         assert retrieved_folder.owner == expected_folder.owner
-        assert retrieved_folder.active_cleanup == expected_folder.active_cleanup
+        #assert retrieved_folder.active_cleanup == expected_folder.active_cleanup
         assert retrieved_folder.folder_id == expected_folder.folder_id  # Unchanged
         assert retrieved_folder.approvers == expected_folder.approvers  # Unchanged
 
@@ -70,9 +70,9 @@ class TestRootFolderDTO:
         """Test querying RootFolderDTO by various attributes"""
         # Define expected test folders
         expected_folders = [
-            RootFolderDTO(path="/folder1", folder_id=1, owner="Owner1", approvers="A,B", active_cleanup=False),
-            RootFolderDTO(path="/folder2", folder_id=2, owner="Owner2", approvers="C,D", active_cleanup=True),
-            RootFolderDTO(path="/folder3", folder_id=3, owner="Owner1", approvers="E,F", active_cleanup=False)
+            RootFolderDTO(path="/folder1", folder_id=1, owner="Owner1", approvers="A,B"),
+            RootFolderDTO(path="/folder2", folder_id=2, owner="Owner2", approvers="C,D"),
+            RootFolderDTO(path="/folder3", folder_id=3, owner="Owner1", approvers="E,F")
         ]
         
         # Create folders from expected data
@@ -82,7 +82,7 @@ class TestRootFolderDTO:
                 folder_id=expected_folder.folder_id,
                 owner=expected_folder.owner,
                 approvers=expected_folder.approvers,
-                active_cleanup=expected_folder.active_cleanup
+                #active_cleanup=expected_folder.active_cleanup
             )
             test_session.add(folder)
         test_session.commit()
@@ -96,12 +96,12 @@ class TestRootFolderDTO:
         assert all(f.owner == "Owner1" for f in owner1_folders)
         
         # Query by active_cleanup
-        active_folders = test_session.exec(
-            select(RootFolderDTO).where(RootFolderDTO.active_cleanup == True)
-        ).all()
-        expected_active_paths = [f.path for f in expected_folders if f.active_cleanup]
-        assert len(active_folders) == len(expected_active_paths)
-        assert active_folders[0].path in expected_active_paths
+        #active_folders = test_session.exec(
+        #    select(RootFolderDTO).where(RootFolderDTO.active_cleanup == True)
+        #).all()
+        #expected_active_paths = [f.path for f in expected_folders if f.active_cleanup]
+        #assert len(active_folders) == len(expected_active_paths)
+        #assert active_folders[0].path in expected_active_paths
 
 
 class TestFolderNodeDTO:
@@ -457,7 +457,7 @@ class TestDTODatabaseIntegration:
         """Test that all DTOs can be created as database tables and accessed"""
         # Create one instance of each DTO type
         root_folder = RootFolderDTO(
-            path="/test", folder_id=1, owner="test", approvers="test", active_cleanup=False
+            path="/test", folder_id=1, owner="test", approvers="test"#, active_cleanup=False
         )
         folder_node = FolderNodeDTO(parent_id=0, name="test", type_id=0)
         folder_type = FolderTypeDTO(name="TestType")
@@ -499,7 +499,7 @@ class TestDTODatabaseIntegration:
             folder_id=999999,
             owner="Owner with spaces and åæø",
             approvers="A1,B2,C3,D4,E5",
-            active_cleanup=True
+            #active_cleanup=True
         )
         
         expected_folder_node = FolderNodeDTO(
@@ -522,7 +522,7 @@ class TestDTODatabaseIntegration:
             folder_id=expected_root_folder.folder_id,
             owner=expected_root_folder.owner,
             approvers=expected_root_folder.approvers,
-            active_cleanup=expected_root_folder.active_cleanup
+            #active_cleanup=expected_root_folder.active_cleanup
         )
         
         folder_node = FolderNodeDTO(
@@ -557,7 +557,7 @@ class TestDTODatabaseIntegration:
         assert retrieved_folder.folder_id == expected_root_folder.folder_id
         assert retrieved_folder.owner == expected_root_folder.owner
         assert retrieved_folder.approvers == expected_root_folder.approvers
-        assert retrieved_folder.active_cleanup == expected_root_folder.active_cleanup
+        #assert retrieved_folder.active_cleanup == expected_root_folder.active_cleanup
         
         assert retrieved_node.parent_id == expected_folder_node.parent_id
         assert retrieved_node.name == expected_folder_node.name

@@ -49,7 +49,7 @@
       "stopAtEntry": false,
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5200"
+        "ASPNETCORE_URLS": "http://0.0.0.0:5400"
       },
       "justMyCode": false,
       "enableStepFiltering": false,

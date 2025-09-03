@@ -137,12 +137,10 @@ namespace VSM.Client.Pages
                         if (remove_count == 0)
                             return;
                     }
-                    else if (new_retention_key != null)
+                    else if (new_retention_key != null) // case for change of retention that does not involved pathRetention
                     {
-                        // case for change of retention that does not involved pathRetention
-                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
-
                         await selected_cell.Node.ChangeRetentions(selected_cell.retention_key.Id, new_retention_key.Id);
+                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
                     }
 
                     // All done for the selected_cell. 

@@ -152,7 +152,7 @@ namespace VSM.Client.Datamodel
             return root;
         }
         //@todo create a fastAPI endpoint to register that the user wants to run cleanup for this folder 
-        public bool RegisterRootFolderForCleanUp(RootFolder rootFolder)
+        /*public bool RegisterRootFolderForCleanUp(RootFolder rootFolder)
         {
             if (User is null || User.Length == 0)
             {
@@ -161,7 +161,7 @@ namespace VSM.Client.Datamodel
             rootFolder.Is_registeredfor_cleanup = true;
 
             return true;
-        }
+        }*/
         //@todo create a fastAPI endpoint to register change in retentions for the simulations
 
         void print_folder_leaf_levels(FolderNode folderNode, int level)
