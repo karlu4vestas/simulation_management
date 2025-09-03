@@ -147,7 +147,7 @@ namespace VSM.Client.Datamodel
             this.Issue_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)) ?? this.Issue_retention;
 
             //the list of dropdown retentions is equal to retentionOptions except for the cleaned retention value
-            this.Target_retentions = this.All_retentions.Where(r => r.Id != this.Cleaned_retention.Id && !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)).ToList() ?? this.Target_retentions;
+            this.Target_retentions = this.All_retentions.Where(r => !r.Name.Contains("clean", StringComparison.OrdinalIgnoreCase) && !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)).ToList() ?? this.Target_retentions;
         }
         public List<RetentionTypeDTO> All_retentions = new();
         public List<RetentionTypeDTO> Target_retentions = new();
