@@ -48,8 +48,10 @@ namespace VSM.Client.Pages
         {
             try
             {
-                retention_config = await DataModel.Instance.GetRetentionOptionsAsync();
-
+                if (rootFolder != null)
+                    retention_config = await rootFolder.GetRetentionOptionsAsync();
+                else
+                    Console.WriteLine($"missing rootfolder: cannot load retention options");
             }
             catch (Exception ex)
             {
