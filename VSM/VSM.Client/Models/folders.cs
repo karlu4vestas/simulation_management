@@ -6,10 +6,17 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public abstract class ChangeRetentionDelegate
     {
+        protected Retention from;
         public Retention to;
         public ChangeRetentionDelegate(Retention to)
         {
-            this.to = to;
+            this.to = to.Clone();
+            this.from = new Retention(); //dummy
+        }
+        public ChangeRetentionDelegate(Retention from, Retention to)
+        {
+            this.from = from.Clone();
+            this.to = to.Clone();
         }
         public abstract bool update_retention(FolderNode node);
     }
@@ -20,6 +27,7 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class AddPathProtectionOnMixedSubtreesDelegate : ChangeRetentionDelegate
     {
+        //add path protection without consideration for the source retention. except that it must no be of the type to.TypeId (pathretentiontype)
         public AddPathProtectionOnMixedSubtreesDelegate(Retention to) : base(to) { }
         public override bool update_retention(FolderNode node)
         {
@@ -33,11 +41,7 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class AddPathProtectionToParentPathProtectionDelegate : ChangeRetentionDelegate
     {
-        private Retention from;
-        public AddPathProtectionToParentPathProtectionDelegate(Retention from, Retention to) : base(to)
-        {
-            this.from = from;
-        }
+        public AddPathProtectionToParentPathProtectionDelegate(Retention from, Retention to) : base(from, to) { }
         public override bool update_retention(FolderNode node)
         {
             return node.Retention.TypeId == to.TypeId && node.Retention.PathId == from.PathId;
@@ -49,11 +53,7 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class ChangeOnFullmatchDelegate : ChangeRetentionDelegate
     {
-        private Retention from;
-        public ChangeOnFullmatchDelegate(Retention from, Retention to) : base(to)
-        {
-            this.from = from;
-        }
+        public ChangeOnFullmatchDelegate(Retention from, Retention to) : base(from, to) { }
         public override bool update_retention(FolderNode node)
         {
             return node.Retention.TypeId == from.TypeId && node.Retention.PathId == from.PathId;
