@@ -20,51 +20,29 @@ namespace VSM.Client.Datamodel
         public string Owner => dto.Owner;
         public string Approvers => dto.Approvers;
         public List<string> AllInitials => new List<string> { Owner }.Concat(Approvers.Split(',')).ToList();
-        private FolderNode? _folderTree;
-        private RetentionConfiguration retentionConfiguration = new RetentionConfiguration(new RetentionConfigurationDTO());
-        private List<FolderType>? _foldertypes;
-        public async Task<RetentionConfiguration> GetRetentionOptionsAsync()
+        // the content of the following property must be loaded on demand by calling LoadFolderRetentions()
+        public FolderNode FolderTree { get; set; } = new FolderNode(new FolderNodeDTO());
+        public RetentionConfiguration RetentionConfiguration { get; set; } = new RetentionConfiguration(new RetentionConfigurationDTO());
+        public async Task LoadFolderRetentions()
         {
-            try
-            {
-                RetentionConfigurationDTO dto = await API.Instance.GetRetentionTypesFromApiAsync();
-                retentionConfiguration = dto == null ? retentionConfiguration : new RetentionConfiguration(dto);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching retention types: {ex.Message}");
-            }
-            return retentionConfiguration;
-        }
-        public async Task<List<FolderType>> GetFolderTypesAsync()
-        {
-            if (_foldertypes == null)
-            {
-                List<FolderTypeDTO> foldertype_dto = await API.Instance.GetFolderTypesFromApiAsync();
-                _foldertypes = foldertype_dto.Select(dto => (FolderType)dto).ToList();
-            }
-            return _foldertypes;
-        }
-        public async Task<FolderNode?> GetFolderTreeAsync()
-        {
-            if (_folderTree == null)
-            {
-                List<FolderNodeDTO> dto_folders = await API.Instance.GetFoldersByRootFolderIdAsync(this);
-                _folderTree = await ConstructFolderTreeFromNodes(this, dto_folders);
-                if (_folderTree == null)
-                {
-                    Console.WriteLine($"Error: No folder tree found for root folder with ID {Id}");
-                }
-            }
-            return _folderTree;
-        }
+            this.RetentionConfiguration = await GetRetentionOptionsAsync();
+            List<FolderNodeDTO> dto_folders = await API.Instance.GetFoldersByRootFolderIdAsync(this);
 
+            if (dto_folders.Count == 0 || RetentionConfiguration.All_retentions.Count == 0)
+            {
+                throw new Exception($"unable to load foldertree or retention configuration. Folder count,retention type count {dto_folders.Count}, {RetentionConfiguration.All_retentions.Count}");
+            }
+
+            FolderTree = await ConstructFolderTreeFromNodes(this, dto_folders);
+        }
+        private async Task<RetentionConfiguration> GetRetentionOptionsAsync()
+        {
+            RetentionConfigurationDTO dto = await API.Instance.GetRetentionTypesFromApiAsync();
+            return new RetentionConfiguration(dto);
+        }
         public async Task UpdateAggregation()
         {
-            if (_folderTree != null)
-            {
-                await _folderTree.UpdateAggregation();
-            }
+            await FolderTree.UpdateAggregation();
         }
         private static async Task<FolderNode> ConstructFolderTreeFromNodes(RootFolder rootFolder, List<FolderNodeDTO> dto_nodes)
         {
@@ -103,6 +81,5 @@ namespace VSM.Client.Datamodel
                 print_folder_leaf_levels(child, level + 1);
             }
         }
-
     }
 }

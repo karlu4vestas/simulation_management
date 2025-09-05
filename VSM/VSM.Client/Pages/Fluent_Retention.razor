@@ -54,7 +54,7 @@
                         </ChildContent>
                     </TemplateColumn>
                    
-                        @foreach (var key in retention_config.All_retentions)
+                        @foreach (var key in rootFolder.RetentionConfiguration.All_retentions)
                         {                
                             <TemplateColumn TGridItem="ViewNode" Title="@key.Name" Width="100px">
                                 <ChildContent Context="item">
@@ -67,7 +67,7 @@
                                         var buttonClass = isSelected ? (is_cleaned_column ? "e-flat-selected-grey" : "e-flat-selected")
                                         : (target_retention_cell == cell ? "e-flat-target" : "e-flat");
                                         <button class="@buttonClass" @onclick="() => OnCellClick(cell)">
-                                            @if (item.Data.AttributDict.TryGetValue(key.Id, out var val))
+                                            @if (item.Data.AttributeDict.TryGetValue(key.Id, out var val))
                                             {
                                                 @val
                                             } else
@@ -128,7 +128,7 @@
                         {
                             <div style="display: flex; align-items: center; gap: 10px;">
                                 <FluentCombobox Label="Change retention:" Autofocus="true"
-                                    Items="@retention_config.Target_retentions" OptionValue="@(r => r.Id.ToString())"
+                                    Items="@rootFolder.RetentionConfiguration.Target_retentions" OptionValue="@(r => r.Id.ToString())"
                                     OptionText="@(r => $"{r.Name}")" @bind-Value="@new_retention_key.Id_AsString"
                                     @bind-Value:after="OnRetentionChangedAsync" Height="300px" Position="SelectPosition.Above" Immediate
                                     ImmediateDelay="100" Disabled="@isProcessing" />
@@ -141,11 +141,11 @@
                     <div class="grid">
                         @{
                             var cell = target_retention_cell ?? selected_cell;
-                            @if (cell!=null && cell.retention_key.Id == retention_config.Path_retentiontype?.Id)
+                            @if (cell!=null && cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype?.Id)
                             {
                                 <span>List of Path retentions: </span>
                                 <div style="display: flex; align-items: center; gap: 10px;">
-                                    <FluentDataGrid Items="@retention_config.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
+                                    <FluentDataGrid Items="@rootFolder.RetentionConfiguration.Path_protections.AsQueryable()" TGridItem="PathProtectionDTO" ItemSize="25"
                                                 ShowHover="true" DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky"
                                                 MultiLine="true">
                                         <TemplateColumn Title="Protected path" Width="1800px">

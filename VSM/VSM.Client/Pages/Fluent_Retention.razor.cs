@@ -13,15 +13,13 @@ namespace VSM.Client.Pages
     {
         //Data for visualization
         VisibleTable visibleTable = new();
-        private bool isLoading = true;
+        bool isLoading = true;
         RetentionCell? selected_cell = null;
         RetentionCell? target_retention_cell = null;
-        private bool isProcessing = false;
+        bool isProcessing = false;
         RetentionKey new_retention_key = new();
-
         //data from the DataModel
         public RootFolder? rootFolder { get; set; }
-        private RetentionConfiguration retention_config = new RetentionConfiguration(new RetentionConfigurationDTO());
 
         protected override void OnInitialized()
         {
@@ -40,25 +38,9 @@ namespace VSM.Client.Pages
                 StateHasChanged();
                 // Load both data and retention options
                 await LoadDataAsync();
-                //Thread.Sleep(10000);
             }
             isLoading = false;
         }
-        private async Task LoadRetentionOptionsAsync()
-        {
-            try
-            {
-                if (rootFolder != null)
-                    retention_config = await rootFolder.GetRetentionOptionsAsync();
-                else
-                    Console.WriteLine($"missing rootfolder: cannot load retention options");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading retention configuration: {ex.Message}");
-            }
-        }
-
         private async Task LoadDataAsync()
         {
             try
@@ -67,15 +49,10 @@ namespace VSM.Client.Pages
                 await InvokeAsync(StateHasChanged);
 
                 // first load retention options because we need them to generate testdata and folder structure
-                await LoadRetentionOptionsAsync();
-
                 if (rootFolder != null)
                 {
-                    var folderTree = await rootFolder.GetFolderTreeAsync();
-                    if (folderTree != null)
-                    {
-                        visibleTable.SetVisibleRoot(folderTree);
-                    }
+                    await rootFolder.LoadFolderRetentions();
+                    visibleTable.SetVisibleRoot(rootFolder.FolderTree);
                     await rootFolder.UpdateAggregation();
                 }
             }
@@ -106,23 +83,23 @@ namespace VSM.Client.Pages
         {
             try
             {
-                if (selected_cell != null && new_retention_key != null && rootFolder != null && retention_config != null)
+                if (selected_cell != null && new_retention_key != null && rootFolder != null)
                 {
                     StateHasChanged(); // Update UI to show progress
                     isProcessing = true;
 
                     //start by verifying if we need to change the list of pathprotections
-                    if (new_retention_key.Id == retention_config.Path_retentiontype.Id)
+                    if (new_retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //add a path protection if it doesn't already exist
-                        if (retention_config.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
+                        if (rootFolder.RetentionConfiguration.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
                         {
                             Console.WriteLine($"Path protection already exists for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
                             return;
                         }
 
                         // Create and persist the new path protection in order to get an ID assigned
-                        var path_protection = await selected_cell.Node.AddPathProtection(retention_config);
+                        var path_protection = await selected_cell.Node.AddPathProtection(rootFolder.RetentionConfiguration);
                         if (path_protection == null)//|| path_protection.Id == 0)
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
@@ -130,10 +107,10 @@ namespace VSM.Client.Pages
                         }
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {path_protection.Path}");
                     }
-                    else if (selected_cell.retention_key.Id == retention_config.Path_retentiontype.Id)
+                    else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
-                        int remove_count = await selected_cell.Node.RemovePathProtection(retention_config, new_retention_key.Id);
+                        int remove_count = await selected_cell.Node.RemovePathProtection(rootFolder.RetentionConfiguration, new_retention_key.Id);
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
                         //no removal happened so abandon the update
                         if (remove_count == 0)
@@ -150,7 +127,7 @@ namespace VSM.Client.Pages
                     if (new_retention_key != null)
                     {
                         selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
-                        selected_cell.retention_key.Name = retention_config.Find_by_Id(new_retention_key.Id)?.Name ?? "unknown";
+                        selected_cell.retention_key.Name = rootFolder.RetentionConfiguration.Find_by_Id(new_retention_key.Id)?.Name ?? "unknown";
                         target_retention_cell = selected_cell;
                         selected_cell = null;
                     }
@@ -174,18 +151,14 @@ namespace VSM.Client.Pages
 
         private async Task SelectPathRetention(PathProtectionDTO pathprotection)
         {
-            FolderNode? root = rootFolder == null ? null : await rootFolder.GetFolderTreeAsync();
-            FolderNode? folder = root == null ? null : await root.find_by_folder_id(pathprotection.Folder_Id);
-
-            if (folder != null && visibleTable.VisibleRootNode != null)
+            FolderNode? folder = rootFolder == null ? null : await rootFolder.FolderTree.find_by_folder_id(pathprotection.Folder_Id);
+            if (rootFolder != null && folder != null && visibleTable.VisibleRootNode != null)
             {
-                Console.WriteLine($"Found the folder node for pathprotection {folder.FullPath}");
-
                 //unfolder the VisibleRows to show folder and select the node where the pathprotection is defined
                 visibleTable.ExpandToNode(folder);
-                selected_cell = new RetentionCell(folder, retention_config.Path_retentiontype);
+                selected_cell = new RetentionCell(folder, rootFolder.RetentionConfiguration.Path_retentiontype);
                 target_retention_cell = null;
-                new_retention_key.Id = retention_config.Path_retentiontype.Id;
+                new_retention_key.Id = rootFolder.RetentionConfiguration.Path_retentiontype.Id;
             }
             else
             {
@@ -325,7 +298,6 @@ namespace VSM.Client.Pages
                 }
             }
         }
-
         public void ExpandToNode(FolderNode node)
         {
             //create a hashlist for fast lookup which folder are already expanded. Basically a look of all id ViewNode.Data.Id list for 

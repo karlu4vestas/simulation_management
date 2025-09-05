@@ -1,6 +1,5 @@
 namespace VSM.Client.Datamodel
 {
-
     /// <summary>
     /// we use ChangeRetentionDelegate in order to use the same iterator over a subtree when we need to change the retentype and the PathRetention_Id
     /// The delegate is responsible for determining which nodes should have their retention settings updated. and it also containts the target retentype and pathretention_id
@@ -16,7 +15,6 @@ namespace VSM.Client.Datamodel
         }
         public abstract bool update_retention(FolderNode node);
     }
-
     /// <summary>
     // usecases: add a path protection to a tree with a mix of 
     //      1) subtrees with path retentions that must not be overwritten (node.Retention_Id == to_retention_Id) = true 
@@ -30,7 +28,6 @@ namespace VSM.Client.Datamodel
             return node.Retention_Id != to_retention_Id;
         }
     }
-
     /// <summary>
     // usecases: add a path retention to a pathprotect tree with possible subtrees with other path retentions that must not be overwritten 
     //    1) an existing parent PathProtection   (node.Retention_Id == to_retention_Id)=true and (node.Path_Protection_Id == from_path_protection_id)=true 
@@ -63,18 +60,22 @@ namespace VSM.Client.Datamodel
             this.from_path_protection_id = 0;
         }
         // case for when all values can be different and must be matched
-        public ChangeOnFullmatchDelegate(int from_retentiontype_Id, int from_path_protection_id, int to_retentiontype_Id, int to_path_protection_id) : base(to_retentiontype_Id, to_path_protection_id)
+        public ChangeOnFullmatchDelegate(int from_retentiontype_Id, int from_path_protection_id, int to_retentiontype_Id, int to_path_protection_id)
+            : base(to_retentiontype_Id, to_path_protection_id)
         {
             this.from_retentiontype_Id = from_retentiontype_Id;
             this.from_path_protection_id = from_path_protection_id;
         }
-
         public override bool update_retention(FolderNode node)
         {
             return node.Retention_Id == from_retentiontype_Id && node.Path_Protection_Id == from_path_protection_id;
         }
     }
-
+    public class Retention
+    {
+        public int TypeId;
+        public int PathId;
+    }
     public class FolderNode
     {
         protected FolderNodeDTO dto;
@@ -83,7 +84,6 @@ namespace VSM.Client.Datamodel
         {
             this.dto = dto;
         }
-
         //mapped to server fields
         public int Id => dto.Id;
         public int Parent_Id => dto.Parent_Id;
@@ -91,9 +91,18 @@ namespace VSM.Client.Datamodel
 
         public string Name => dto.Name;
         public int Type_Id => dto.Type_Id;
-        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
-        public int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
-        //@todo client side help fields
+        /*public Retention Retention
+        {
+            get => new Retention { TypeId = dto.Retention_Id, PathId = dto.Path_Protection_Id };
+            set
+            {
+                dto.Retention_Id = value.TypeId;
+                dto.Path_Protection_Id = value.PathId;
+            }
+        }*/
+        private int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
+        private int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
+        //client side helper fields
         public string FullPath
         {
             get
@@ -109,7 +118,7 @@ namespace VSM.Client.Datamodel
             }
         }
         public bool IsLeaf { get { return !Children.Any(); } }
-        public Dictionary<int, int> AttributDict { get; set; } = new();
+        public Dictionary<int, int> AttributeDict { get; set; } = new();
         public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
         public List<FolderNode> Children { get; set; } = new();
         public async Task<FolderNode> find_by_folder_id(int folder_id)
@@ -117,7 +126,6 @@ namespace VSM.Client.Datamodel
             // Iterative DFS to find folder by ID
             var stack = new Stack<FolderNode>();
             stack.Push(this);
-
             while (stack.Count > 0)
             {
                 var currentNode = stack.Pop();
@@ -125,13 +133,11 @@ namespace VSM.Client.Datamodel
                 {
                     return currentNode; // Found the folder
                 }
-
                 // Add children to stack for further exploration
                 foreach (var child in currentNode.Children)
                 {
                     stack.Push(child);
                 }
-
                 // Yield control periodically for large trees to prevent UI blocking
                 if (stack.Count % 100 == 0)
                 {
@@ -276,7 +282,7 @@ namespace VSM.Client.Datamodel
         public async Task UpdateAggregation()
         {
             // Initialize the AttributDict for this folder
-            AttributDict.Clear();
+            AttributeDict.Clear();
 
             // Use a stack for iterative depth-first traversal (avoiding recursion)
             var stack = new Stack<(FolderNode node, bool visited)>();
@@ -293,13 +299,13 @@ namespace VSM.Client.Datamodel
                     if (!processedFolders.Contains(currentNode.Id))
                     {
                         // Initialize this node's AttributDict
-                        currentNode.AttributDict.Clear();
+                        currentNode.AttributeDict.Clear();
                         if (currentNode.IsLeaf)
                         {
                             // Leaf node: count its retention value
                             if (currentNode != null)
                             {
-                                currentNode.AttributDict[currentNode.Retention_Id] = 1;
+                                currentNode.AttributeDict[currentNode.Retention_Id] = 1;
                             }
                         }
                         else
@@ -307,10 +313,10 @@ namespace VSM.Client.Datamodel
                             // Internal node: aggregate children's counts
                             foreach (var child in currentNode.Children)
                             {
-                                foreach (var kvp in child.AttributDict)
+                                foreach (var kvp in child.AttributeDict)
                                 {
-                                    currentNode.AttributDict[kvp.Key] =
-                                        currentNode.AttributDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
+                                    currentNode.AttributeDict[kvp.Key] =
+                                        currentNode.AttributeDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
                                 }
                             }
                             // InnerNode doesn't have its own retention value to add
@@ -363,6 +369,4 @@ namespace VSM.Client.Datamodel
             }
         }
     }
-
-
 }
