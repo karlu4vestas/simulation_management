@@ -62,7 +62,7 @@ namespace VSM.Client.Datamodel
     public class Retention
     {
         public int TypeId = 0;
-        public int PathId = 0;
+        public int PathId = 0; // means no path protection
         public Retention()
         {
         }
