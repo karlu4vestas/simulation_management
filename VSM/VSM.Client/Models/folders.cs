@@ -1,22 +1,25 @@
 namespace VSM.Client.Datamodel
 {
-
     /// <summary>
     /// we use ChangeRetentionDelegate in order to use the same iterator over a subtree when we need to change the retentype and the PathRetention_Id
     /// The delegate is responsible for determining which nodes should have their retention settings updated. and it also containts the target retentype and pathretention_id
     /// </summary>
     public abstract class ChangeRetentionDelegate
     {
-        public int to_retention_Id;
-        public int to_path_protection_id;
-        public ChangeRetentionDelegate(int to_retentiontype_Id, int to_path_protection_id)
+        protected Retention from;
+        public Retention to;
+        public ChangeRetentionDelegate(Retention to)
         {
-            this.to_retention_Id = to_retentiontype_Id;
-            this.to_path_protection_id = to_path_protection_id;
+            this.to = to.Clone();
+            this.from = new Retention(); //dummy
+        }
+        public ChangeRetentionDelegate(Retention from, Retention to)
+        {
+            this.from = from.Clone();
+            this.to = to.Clone();
         }
         public abstract bool update_retention(FolderNode node);
     }
-
     /// <summary>
     // usecases: add a path protection to a tree with a mix of 
     //      1) subtrees with path retentions that must not be overwritten (node.Retention_Id == to_retention_Id) = true 
@@ -24,13 +27,13 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class AddPathProtectionOnMixedSubtreesDelegate : ChangeRetentionDelegate
     {
-        public AddPathProtectionOnMixedSubtreesDelegate(int to_retentiontype_Id, int to_path_protection_id) : base(to_retentiontype_Id, to_path_protection_id) { }
+        //add path protection without consideration for the source retention. except that it must no be of the type to.TypeId (pathretentiontype)
+        public AddPathProtectionOnMixedSubtreesDelegate(Retention to) : base(to) { }
         public override bool update_retention(FolderNode node)
         {
-            return node.Retention_Id != to_retention_Id;
+            return node.Retention.TypeId != to.TypeId;
         }
     }
-
     /// <summary>
     // usecases: add a path retention to a pathprotect tree with possible subtrees with other path retentions that must not be overwritten 
     //    1) an existing parent PathProtection   (node.Retention_Id == to_retention_Id)=true and (node.Path_Protection_Id == from_path_protection_id)=true 
@@ -38,14 +41,10 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class AddPathProtectionToParentPathProtectionDelegate : ChangeRetentionDelegate
     {
-        private int from_path_protection_id;
-        public AddPathProtectionToParentPathProtectionDelegate(int from_path_protection_id, int path_retention_id, int to_path_protection_id) : base(path_retention_id, to_path_protection_id)
-        {
-            this.from_path_protection_id = from_path_protection_id;
-        }
+        public AddPathProtectionToParentPathProtectionDelegate(Retention from, Retention to) : base(from, to) { }
         public override bool update_retention(FolderNode node)
         {
-            return node.Retention_Id == to_retention_Id && node.Path_Protection_Id == from_path_protection_id;
+            return node.Retention.TypeId == to.TypeId && node.Retention.PathId == from.PathId;
         }
     }
 
@@ -54,27 +53,35 @@ namespace VSM.Client.Datamodel
     /// </summary>
     public class ChangeOnFullmatchDelegate : ChangeRetentionDelegate
     {
-        private int from_retentiontype_Id;
-        private int from_path_protection_id;
-        //case for when to and from pathretention_id are 0
-        public ChangeOnFullmatchDelegate(int from_retentiontype_Id, int to_retentiontype_Id) : base(to_retentiontype_Id, 0)
-        {
-            this.from_retentiontype_Id = from_retentiontype_Id;
-            this.from_path_protection_id = 0;
-        }
-        // case for when all values can be different and must be matched
-        public ChangeOnFullmatchDelegate(int from_retentiontype_Id, int from_path_protection_id, int to_retentiontype_Id, int to_path_protection_id) : base(to_retentiontype_Id, to_path_protection_id)
-        {
-            this.from_retentiontype_Id = from_retentiontype_Id;
-            this.from_path_protection_id = from_path_protection_id;
-        }
-
+        public ChangeOnFullmatchDelegate(Retention from, Retention to) : base(from, to) { }
         public override bool update_retention(FolderNode node)
         {
-            return node.Retention_Id == from_retentiontype_Id && node.Path_Protection_Id == from_path_protection_id;
+            return node.Retention.TypeId == from.TypeId && node.Retention.PathId == from.PathId;
         }
     }
-
+    public class Retention
+    {
+        public int TypeId = 0;
+        public int PathId = 0; // means no path protection
+        public Retention()
+        {
+        }
+        public Retention(int TypeId, int PathId = 0)
+        {
+            this.TypeId = TypeId;
+            this.PathId = PathId;
+        }
+        public Retention(Retention retention)
+        {
+            this.TypeId = retention.TypeId;
+            this.PathId = retention.PathId;
+        }
+        // override copy constructor
+        public Retention Clone()
+        {
+            return new Retention(this);
+        }
+    }
     public class FolderNode
     {
         protected FolderNodeDTO dto;
@@ -83,7 +90,6 @@ namespace VSM.Client.Datamodel
         {
             this.dto = dto;
         }
-
         //mapped to server fields
         public int Id => dto.Id;
         public int Parent_Id => dto.Parent_Id;
@@ -91,9 +97,16 @@ namespace VSM.Client.Datamodel
 
         public string Name => dto.Name;
         public int Type_Id => dto.Type_Id;
-        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
-        public int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
-        //@todo client side help fields
+        public Retention Retention
+        {
+            get => new Retention { TypeId = dto.Retention_Id, PathId = dto.Path_Protection_Id };
+            set
+            {
+                dto.Retention_Id = value.TypeId;
+                dto.Path_Protection_Id = value.PathId;
+            }
+        }
+        //client side helper fields
         public string FullPath
         {
             get
@@ -109,7 +122,7 @@ namespace VSM.Client.Datamodel
             }
         }
         public bool IsLeaf { get { return !Children.Any(); } }
-        public Dictionary<int, int> AttributDict { get; set; } = new();
+        public Dictionary<int, int> AttributeDict { get; set; } = new();
         public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
         public List<FolderNode> Children { get; set; } = new();
         public async Task<FolderNode> find_by_folder_id(int folder_id)
@@ -117,7 +130,6 @@ namespace VSM.Client.Datamodel
             // Iterative DFS to find folder by ID
             var stack = new Stack<FolderNode>();
             stack.Push(this);
-
             while (stack.Count > 0)
             {
                 var currentNode = stack.Pop();
@@ -125,13 +137,11 @@ namespace VSM.Client.Datamodel
                 {
                     return currentNode; // Found the folder
                 }
-
                 // Add children to stack for further exploration
                 foreach (var child in currentNode.Children)
                 {
                     stack.Push(child);
                 }
-
                 // Yield control periodically for large trees to prevent UI blocking
                 if (stack.Count % 100 == 0)
                 {
@@ -141,9 +151,9 @@ namespace VSM.Client.Datamodel
             throw new Exception($"Folder with ID {folder_id} not found.");
         }
 
-        public async Task ChangeRetentions(byte from_retentiontype_Id, byte to_retentiontype_Id)
+        public async Task ChangeRetentions(Retention from, Retention to)
         {
-            await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_retentiontype_Id, to_retentiontype_Id));
+            await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from, to));
         }
 
         public async Task<PathProtectionDTO> AddPathProtection(RetentionConfiguration retention_config)
@@ -153,7 +163,11 @@ namespace VSM.Client.Datamodel
             //   - siblings 
             //   - parent to one or more path protections at lower level
             //   - child
+            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
+
             PathProtectionDTO? parent_protection = FindClosestPathProtectedParent(retention_config);
+            Retention? parent_path_retention = parent_protection == null ? null : new Retention(path_retentiontype_id, parent_protection.Id);
+
             PathProtectionDTO new_path_protection = new PathProtectionDTO
             {
                 //Id = pathProtection.Id, // Id will be set by the server
@@ -163,13 +177,13 @@ namespace VSM.Client.Datamodel
                 Path = this.FullPath
             };
             retention_config.Path_protections.Add(new_path_protection);
+            Retention new_path_retention = new Retention(path_retentiontype_id, new_path_protection.Id);
 
-            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
-            if (parent_protection != null)
+            if (parent_path_retention != null)
                 //add a sub pathprotection to a parent pathprotection    
-                await ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_protection.Id, path_retentiontype_id, new_path_protection.Id));
+                await ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
             else
-                await ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(path_retentiontype_id, new_path_protection.Id));
+                await ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
 
             return new_path_protection;
         }
@@ -194,20 +208,23 @@ namespace VSM.Client.Datamodel
             //         else  
             //            -then set the retention of leaves under this node to (path protection type,  from_path_protectection.Id).
             //         In this way we do not touch path protection of other children.
-            PathProtectionDTO? from_path_retention = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == this.Id);
-            int remove_count = retention_config.Path_protections.RemoveAll(p => p.Folder_Id == this.Id);
             int path_retentiontype_id = retention_config.Path_retentiontype.Id;
 
-            // check if any of the pathretentions from retention_config are a parent of from_path_retention_folder
+            PathProtectionDTO? from_path_protection = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == this.Id);
+            int remove_count = retention_config.Path_protections.RemoveAll(p => p.Folder_Id == this.Id);
+            Retention? from_path_retention = from_path_protection == null ? null : new Retention(path_retentiontype_id, from_path_protection.Id);
+
+            // check for the presence of a parent of path_protection_folder
             PathProtectionDTO? parent_path_protection = this.FindClosestPathProtectedParent(retention_config);
-            if (from_path_retention == null || remove_count == 0)
-                throw new ArgumentException("Invalid path protection folder specified.");
+            Retention? to_parent_path_retention = parent_path_protection == null ? null : new Retention(path_retentiontype_id, parent_path_protection.Id);
+            if (from_path_retention == null)
+                throw new ArgumentException("Invalid new path protection folder specified.");
             else
             {
-                if (parent_path_protection != null)
-                    await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(path_retentiontype_id, from_path_retention.Id, path_retentiontype_id, parent_path_protection.Id));
+                if (to_parent_path_retention != null)
+                    await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_parent_path_retention));
                 else
-                    await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(path_retentiontype_id, from_path_retention.Id, to_retention_Id, 0));
+                    await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, new Retention(to_retention_Id)));
             }
             return remove_count;
         }
@@ -215,7 +232,7 @@ namespace VSM.Client.Datamodel
         {
             //select the subtree to folder incl folder that have retention equal to  (from_retention_ID, from_path_protection_id)
             // and change the retentions to (to_retention_ID, to_path_protection_id)
-            Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} to_retention_ID: {change_delegate.to_retention_Id}, to_path_protection_id: {change_delegate.to_path_protection_id} ");
+            //Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} to_retention_ID: {change_delegate.to_retention.TypeId}, to_path_protection_id: {change_delegate.to_retention.PathId} ");
             int number_of_change_leafs = 0;
             int number_of_unchanged_leafs = 0;
             var stack = new Stack<FolderNode>();
@@ -229,8 +246,7 @@ namespace VSM.Client.Datamodel
                     // use the delegate to check if current node matches the criteria and update if so
                     if (change_delegate.update_retention(currentNode))
                     {
-                        currentNode.Retention_Id = change_delegate.to_retention_Id;
-                        currentNode.Path_Protection_Id = change_delegate.to_path_protection_id;
+                        currentNode.Retention = change_delegate.to.Clone();
                         number_of_change_leafs++;
                     }
                     else
@@ -260,7 +276,7 @@ namespace VSM.Client.Datamodel
             // print fullpath, retention_id, path_protection_id
             if (this.IsLeaf)
                 Console.WriteLine($"leaf fullpath, retention_id, path_protection_id:" +
-                                  $" {this.FullPath} {this.Retention_Id} {this.Path_Protection_Id}");
+                                  $" {this.FullPath} {this.Retention.TypeId} {this.Retention.PathId}");
             foreach (var child in this.Children)
             {
                 child.print_leafs();
@@ -276,7 +292,7 @@ namespace VSM.Client.Datamodel
         public async Task UpdateAggregation()
         {
             // Initialize the AttributDict for this folder
-            AttributDict.Clear();
+            AttributeDict.Clear();
 
             // Use a stack for iterative depth-first traversal (avoiding recursion)
             var stack = new Stack<(FolderNode node, bool visited)>();
@@ -293,13 +309,13 @@ namespace VSM.Client.Datamodel
                     if (!processedFolders.Contains(currentNode.Id))
                     {
                         // Initialize this node's AttributDict
-                        currentNode.AttributDict.Clear();
+                        currentNode.AttributeDict.Clear();
                         if (currentNode.IsLeaf)
                         {
                             // Leaf node: count its retention value
                             if (currentNode != null)
                             {
-                                currentNode.AttributDict[currentNode.Retention_Id] = 1;
+                                currentNode.AttributeDict[currentNode.Retention.TypeId] = 1;
                             }
                         }
                         else
@@ -307,10 +323,10 @@ namespace VSM.Client.Datamodel
                             // Internal node: aggregate children's counts
                             foreach (var child in currentNode.Children)
                             {
-                                foreach (var kvp in child.AttributDict)
+                                foreach (var kvp in child.AttributeDict)
                                 {
-                                    currentNode.AttributDict[kvp.Key] =
-                                        currentNode.AttributDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
+                                    currentNode.AttributeDict[kvp.Key] =
+                                        currentNode.AttributeDict.GetValueOrDefault(kvp.Key, 0) + kvp.Value;
                                 }
                             }
                             // InnerNode doesn't have its own retention value to add
@@ -363,6 +379,4 @@ namespace VSM.Client.Datamodel
             }
         }
     }
-
-
 }
