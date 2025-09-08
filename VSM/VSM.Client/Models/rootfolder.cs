@@ -92,7 +92,7 @@ namespace VSM.Client.Datamodel
             PathProtectionDTO new_path_protection = new PathProtectionDTO
             {
                 //Id = pathProtection.Id, // Id will be set by the server
-                Id = DataModel.Instance.NewID,  //untill we use persistance to get an ID
+                Id = Library.Instance.NewID,  //untill we use persistance to get an ID
                 Rootfolder_Id = folderNode.Rootfolder_Id,
                 Folder_Id = folderNode.Id,
                 Path = folderNode.FullPath

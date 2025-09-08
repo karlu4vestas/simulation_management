@@ -26,9 +26,9 @@ namespace VSM.Client.Pages
             isLoading = true;
             // Just set up initial state, don't block with async operations
             StateHasChanged();
-            if (rootFolder != DataModel.Instance.SelectedRootFolder)
+            if (rootFolder != Datamodel.Library.Instance.SelectedRootFolder)
             {
-                rootFolder = DataModel.Instance.SelectedRootFolder;
+                rootFolder = Datamodel.Library.Instance.SelectedRootFolder;
             }
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)

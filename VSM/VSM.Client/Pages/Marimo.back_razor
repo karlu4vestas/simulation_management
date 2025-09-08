@@ -69,9 +69,9 @@
     protected override void OnInitialized()
     {
         //looks like OnInitialized is called twice so lets check if we have already processed the root TreeNode
-        /*if( rootFolder != DataModel.Instance.GetSelectedRootFolder() ) 
+        /*if( rootFolder != Library.Instance.GetSelectedRootFolder() ) 
         {
-            rootFolder = DataModel.Instance.GetSelectedRootFolder(); 
+            rootFolder = Library.Instance.GetSelectedRootFolder(); 
             if( rootFolder != null ){
                 if( rootFolder.FolderTree == null ){
                     TreeRoots.Clear();

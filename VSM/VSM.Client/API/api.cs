@@ -39,7 +39,7 @@ namespace VSM.Client.SharedAPI
             }
         }
 
-        public async Task<List<RootFolderDTO>> LoadTheUsersRootFolders(string user)
+        public async Task<List<RootFolderDTO>> LoadUserRootFolders(string user)
         {
             try
             {

@@ -7,11 +7,11 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (DataModel.Instance.UsersRootFolders.Count == 0)
+    @if (Library.Instance.UsersRootFolders.Count == 0)
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
-            <FluentTextField @bind-Value="@DataModel.Instance.User" Placeholder="your initials"></FluentTextField>
+            <FluentTextField @bind-Value="@Library.Instance.User" Placeholder="your initials"></FluentTextField>
             <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
         </div>
 
@@ -25,10 +25,10 @@
     else
     {
         <FluentStack Orientation="Orientation.Vertical">
-            <p>User: @DataModel.Instance.User</p>
+            <p>User: @Library.Instance.User</p>
             <hr />
             <div class="grid">
-                <FluentDataGrid Items="@DataModel.Instance.UsersRootFolders.AsQueryable()" TGridItem="RootFolder"
+                <FluentDataGrid Items="@Library.Instance.UsersRootFolders.AsQueryable()" TGridItem="RootFolder"
                     OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
                     GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
 
@@ -64,15 +64,15 @@
         </FluentStack>
         <FluentStack Orientation="Orientation.Vertical">
             <hr />
-            @if (DataModel.Instance.SelectedRootFolder != null)
+            @if (Library.Instance.SelectedRootFolder != null)
             {
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Secure folder:</span>
-                    @DataModel.Instance.SelectedRootFolder.Root_path </div>
-                string ownerstring = string.Join(", ", DataModel.Instance.SelectedRootFolder.AllInitials);
+                    @Library.Instance.SelectedRootFolder.Root_path </div>
+                string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Owners:</span> @ownerstring</div>
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Change retention:</span>
-                    <FluentCombobox Autofocus="true" Items="@cleanup_frequencies"
-                        @bind-Value="@DataModel.Instance.SelectedRootFolder.Cleanup_frequency"
+                    <FluentCombobox Autofocus="true" Items="@Library.Instance.CleanupFrequencies"
+                        @bind-Value="@Library.Instance.SelectedRootFolder.Cleanup_frequency"
                         @bind-Value:after="UpdateCleanUpFrequency" Height="300px" Position="SelectPosition.Above" Immediate
                         ImmediateDelay="100" />
                 </div>
@@ -82,10 +82,9 @@
 </FluentStack>
 @code {
     bool has_loaded_rootFolders = false;
-    private List<string> cleanup_frequencies = ["inactive", "1 week", "2 weeks", "3 weeks", "4 weeks", "6 weeks"];
     async Task OnLoginClicked()
     {
-        if (DataModel.Instance.User.Length > 0)
+        if (Library.Instance.User.Length > 0)
         {
             try
             {
@@ -94,7 +93,7 @@
                 await InvokeAsync(StateHasChanged);
 
                 // first load retention options because we need them to generate testdata and folder structure
-                await DataModel.Instance.LoadUsersRootFolders();
+                await Library.Instance.Load();
                 has_loaded_rootFolders = true;
             }
             finally
@@ -106,15 +105,15 @@
     //selecte the folder for the details panel
     private void OnSelectRootFolder(FluentDataGridRow<RootFolder> row)
     {
-        DataModel.Instance.SelectedRootFolder = row.Item;
+        Library.Instance.SelectedRootFolder = row.Item;
     }
     private void UpdateCleanUpFrequency()
     {
-        Console.WriteLine($"new cleanup_frequency:{DataModel.Instance.SelectedRootFolder?.Cleanup_frequency}");
+        Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.Cleanup_frequency}");
     }
     private void Go2retention(RootFolder root_folder)
     {
-        DataModel.Instance.SelectedRootFolder = root_folder;
+        Library.Instance.SelectedRootFolder = root_folder;
         Navigation.NavigateTo("retention");
     }
 }
