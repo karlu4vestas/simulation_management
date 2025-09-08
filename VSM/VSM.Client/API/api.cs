@@ -12,14 +12,14 @@ namespace VSM.Client.SharedAPI
         private static readonly Lazy<API> _instance = new Lazy<API>(() => new API());
         public static API Instance => _instance.Value;
 
-        public async Task<RetentionConfigurationDTO> GetRetentionTypesFromApiAsync()
+        public async Task<RetentionTypesTO> GetRetentionTypesFromApiAsync()
         {
             List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>("http://127.0.0.1:5173/retentiontypes/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? new List<RetentionTypeDTO>();
 
-            return new RetentionConfigurationDTO(all_retentions);
+            return new RetentionTypesTO(all_retentions);
         }
         //                List<PathProtectionDTO> pathProtectionDTOs = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>("http://127.0.0.1:5173/pathprotections/?rootfolder_id={rootFolder.Id}", new JsonSerializerOptions
 

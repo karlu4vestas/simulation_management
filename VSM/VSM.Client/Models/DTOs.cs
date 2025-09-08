@@ -70,32 +70,27 @@ namespace VSM.Client.Datamodel
             this.dto = dto;
         }
     }
-    public class RetentionConfigurationDTO
+    public class RetentionTypesTO
     {
-        public RetentionConfigurationDTO(List<RetentionTypeDTO>? all_retentions = null)
+        public RetentionTypesTO(List<RetentionTypeDTO>? all_retentions = null)
         {
             if (all_retentions != null)
                 this.All_retentions = all_retentions;
-
             this.Path_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("path", StringComparison.OrdinalIgnoreCase)) ?? this.Path_retention;
-
             this.Cleaned_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("cleaned", StringComparison.OrdinalIgnoreCase)) ?? this.Cleaned_retention;
-
             this.Issue_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)) ?? this.Issue_retention;
         }
         public List<RetentionTypeDTO> All_retentions = new();
-        public List<RetentionTypeDTO> Target_retentions = new();
         public RetentionTypeDTO Path_retention = new();
         public RetentionTypeDTO Cleaned_retention = new();
         public RetentionTypeDTO Issue_retention = new();
-        public List<PathProtectionDTO> Path_protections = new();
     }
 
     //@todo: convert from the DTOs
-    public class RetentionConfiguration
+    public class RetentionTypes
     {
-        RetentionConfigurationDTO dto;
-        public RetentionConfiguration(RetentionConfigurationDTO dto)
+        RetentionTypesTO dto;
+        public RetentionTypes(RetentionTypesTO dto)
         {
             this.dto = dto;
             //the list of dropdown retentions is equal to retentionOptions except for the issue and cleaned retention value
@@ -107,7 +102,6 @@ namespace VSM.Client.Datamodel
         public RetentionTypeDTO Path_retentiontype => dto.Path_retention;
         public RetentionTypeDTO Cleaned_retentiontype => dto.Cleaned_retention;
         public RetentionTypeDTO Issue_retentiontype => dto.Issue_retention;
-        public List<PathProtectionDTO> Path_protections => dto.Path_protections;
         public RetentionTypeDTO? Find_by_Name(string name)
         {
             return this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
@@ -115,10 +109,6 @@ namespace VSM.Client.Datamodel
         public RetentionTypeDTO? Find_by_Id(int id)
         {
             return this.All_retentions.FirstOrDefault(r => r.Id == id);
-        }
-        public PathProtectionDTO? Find_PathProtection_by_FolderId(int folder_id)
-        {
-            return this.Path_protections.FirstOrDefault(r => r.Folder_Id == folder_id);
         }
     }
 }

@@ -9,7 +9,7 @@ using VSM.Client.Datamodel;
 
 namespace VSM.Client.Pages
 {
-    public partial class Fluent_Retention : ComponentBase
+    public partial class RetentionPage : ComponentBase
     {
         //Data for visualization
         VisibleTable visibleTable = new();
@@ -92,14 +92,14 @@ namespace VSM.Client.Pages
                     if (new_retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //add a path protection if it doesn't already exist
-                        if (rootFolder.RetentionConfiguration.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
+                        if (rootFolder.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
                         {
                             Console.WriteLine($"Path protection already exists for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
                             return;
                         }
 
                         // Create and persist the new path protection in order to get an ID assigned
-                        var path_protection = await rootFolder.AddPathProtection(selected_cell.Node, rootFolder.RetentionConfiguration);
+                        var path_protection = await rootFolder.AddPathProtection(selected_cell.Node);
                         if (path_protection == null)//|| path_protection.Id == 0)
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
@@ -110,7 +110,7 @@ namespace VSM.Client.Pages
                     else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
-                        int remove_count = await rootFolder.RemovePathProtection(selected_cell.Node, rootFolder.RetentionConfiguration, new_retention_key.Id);
+                        int remove_count = await rootFolder.RemovePathProtection(selected_cell.Node, new_retention_key.Id);
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
                         //no removal happened so abandon the update
                         if (remove_count == 0)
