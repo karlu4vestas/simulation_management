@@ -7,7 +7,7 @@
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (DataModel.Instance.TheUsersRootFolders.Count == 0)
+    @if (DataModel.Instance.UsersRootFolders.Count == 0)
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
@@ -28,7 +28,7 @@
             <p>User: @DataModel.Instance.User</p>
             <hr />
             <div class="grid">
-                <FluentDataGrid Items="@DataModel.Instance.TheUsersRootFolders.AsQueryable()" TGridItem="RootFolder"
+                <FluentDataGrid Items="@DataModel.Instance.UsersRootFolders.AsQueryable()" TGridItem="RootFolder"
                     OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
                     GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
 
@@ -94,7 +94,7 @@
                 await InvokeAsync(StateHasChanged);
 
                 // first load retention options because we need them to generate testdata and folder structure
-                await DataModel.Instance.LoadTheUsersRootFolders();
+                await DataModel.Instance.LoadUsersRootFolders();
                 has_loaded_rootFolders = true;
             }
             finally

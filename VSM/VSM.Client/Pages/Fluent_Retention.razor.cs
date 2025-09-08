@@ -99,7 +99,7 @@ namespace VSM.Client.Pages
                         }
 
                         // Create and persist the new path protection in order to get an ID assigned
-                        var path_protection = await selected_cell.Node.AddPathProtection(rootFolder.RetentionConfiguration);
+                        var path_protection = await rootFolder.AddPathProtection(selected_cell.Node, rootFolder.RetentionConfiguration);
                         if (path_protection == null)//|| path_protection.Id == 0)
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
@@ -110,7 +110,7 @@ namespace VSM.Client.Pages
                     else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
-                        int remove_count = await selected_cell.Node.RemovePathProtection(rootFolder.RetentionConfiguration, new_retention_key.Id);
+                        int remove_count = await rootFolder.RemovePathProtection(selected_cell.Node, rootFolder.RetentionConfiguration, new_retention_key.Id);
                         Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
                         //no removal happened so abandon the update
                         if (remove_count == 0)

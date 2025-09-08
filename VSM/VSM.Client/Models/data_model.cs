@@ -11,22 +11,22 @@ namespace VSM.Client.Datamodel
         public static DataModel Instance => _instance.Value;
         public RootFolder? SelectedRootFolder { get; set; }
         public string User { get; set; } = "";
-        public List<RootFolder> TheUsersRootFolders { get; set; } = new List<RootFolder>();
+        public List<RootFolder> UsersRootFolders { get; set; } = new List<RootFolder>();
         private static byte _current_id = 0;
         public byte NewID
         {
             get => _current_id++;
         }
-        public async Task LoadTheUsersRootFolders()
+        public async Task LoadUsersRootFolders()
         {
             if (User == null || User.Length == 0)
             {
-                TheUsersRootFolders = [];
+                UsersRootFolders = [];
             }
             else
             {
                 List<RootFolderDTO> rootFolderDTOs = await API.Instance.LoadTheUsersRootFolders(User);
-                TheUsersRootFolders = rootFolderDTOs.Select(dto => new RootFolder(dto)).ToList();
+                UsersRootFolders = rootFolderDTOs.Select(dto => new RootFolder(dto)).ToList();
             }
         }
     }

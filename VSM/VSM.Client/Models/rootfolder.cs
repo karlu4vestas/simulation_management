@@ -67,9 +67,84 @@ namespace VSM.Client.Datamodel
                 }
             }
             FolderNode root = nodeLookup[rootFolder.Folder_Id];
-            await root.SetParentFolderAsync();
+            await root.SetParentFolderLink();
             //print_folder_leaf_levels(root, 0);
             return root;
+        }
+
+        public async Task<PathProtectionDTO> AddPathProtection(FolderNode folderNode, RetentionConfiguration retention_config)
+        {
+            // Should handle adding if there is no path protections and 
+            // adding to existing path protections
+            //   - siblings 
+            //   - parent to one or more path protections at lower level
+            //   - child
+            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
+
+            PathProtectionDTO? parent_protection = FindClosestPathProtectedParent(folderNode, retention_config);
+            Retention? parent_path_retention = parent_protection == null ? null : new Retention(path_retentiontype_id, parent_protection.Id);
+
+            PathProtectionDTO new_path_protection = new PathProtectionDTO
+            {
+                //Id = pathProtection.Id, // Id will be set by the server
+                Id = DataModel.Instance.NewID,  //untill we use persistance to get an ID
+                Rootfolder_Id = folderNode.Rootfolder_Id,
+                Folder_Id = folderNode.Id,
+                Path = folderNode.FullPath
+            };
+            retention_config.Path_protections.Add(new_path_protection);
+            Retention new_path_retention = new Retention(path_retentiontype_id, new_path_protection.Id);
+
+            if (parent_path_retention != null)
+                //add a sub pathprotection to a parent pathprotection    
+                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
+            else
+                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
+
+            return new_path_protection;
+        }
+
+        private PathProtectionDTO? FindClosestPathProtectedParent(FolderNode folderNode, RetentionConfiguration retention_config)
+        {
+            PathProtectionDTO? closest_path_protection = null;
+            FolderNode current = folderNode;
+            while (current.Parent != null && closest_path_protection == null)
+            {
+                closest_path_protection = retention_config.Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
+                current = current.Parent;
+            }
+            return closest_path_protection;
+        }
+
+        public async Task<int> RemovePathProtection(FolderNode folderNode, RetentionConfiguration retention_config, int to_retention_Id)
+        {
+            // step 1: find this node path protection entry 
+            // step 2: remove it from the list if found
+            // step 3: Verify if this node has a parent PathProtection in the retention_config
+            //         If there is no parent path protection, 
+            //            -then set the retention of leaves under this nodes to (to_retention_Id, to_path_protection_id=0). 
+            //         else  
+            //            -then set the retention of leaves under this node to (path protection type,  from_path_protectection.Id).
+            //         In this way we do not touch path protection of other children.
+            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
+
+            PathProtectionDTO? from_path_protection = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == folderNode.Id);
+            int remove_count = retention_config.Path_protections.RemoveAll(p => p.Folder_Id == folderNode.Id);
+            Retention? from_path_retention = from_path_protection == null ? null : new Retention(path_retentiontype_id, from_path_protection.Id);
+
+            // check for the presence of a parent of path_protection_folder
+            PathProtectionDTO? parent_path_protection = FindClosestPathProtectedParent(folderNode, retention_config);
+            Retention? to_parent_path_retention = parent_path_protection == null ? null : new Retention(path_retentiontype_id, parent_path_protection.Id);
+            if (from_path_retention == null)
+                throw new ArgumentException("Invalid new path protection folder specified.");
+            else
+            {
+                if (to_parent_path_retention != null)
+                    await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_parent_path_retention));
+                else
+                    await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, new Retention(to_retention_Id)));
+            }
+            return remove_count;
         }
         void print_folder_leaf_levels(FolderNode folderNode, int level)
         {
@@ -81,5 +156,74 @@ namespace VSM.Client.Datamodel
                 print_folder_leaf_levels(child, level + 1);
             }
         }
+
+        public async Task<PathProtectionDTO> AddPathProtection(FolderNode folderNode, RetentionConfiguration retention_config)
+        {
+            // Should handle adding if there is no path protections and 
+            // adding to existing path protections
+            //   - siblings 
+            //   - parent to one or more path protections at lower level
+            //   - child
+            PathProtectionDTO? parent_protection = FindClosestPathProtectedParent(folderNode, retention_config);
+            PathProtectionDTO new_path_protection = new PathProtectionDTO
+            {
+                //Id = pathProtection.Id, // Id will be set by the server
+                Id = DataModel.Instance.NewID,  //untill we use persistance to get an ID
+                Rootfolder_Id = folderNode.Rootfolder_Id,
+                Folder_Id = folderNode.Id,
+                Path = folderNode.FullPath
+            };
+            retention_config.Path_protections.Add(new_path_protection);
+
+            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
+            if (parent_protection != null)
+                //add a sub pathprotection to a parent pathprotection    
+                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_protection.Id, path_retentiontype_id, new_path_protection.Id));
+            else
+                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(path_retentiontype_id, new_path_protection.Id));
+
+            return new_path_protection;
+        }
+
+        private PathProtectionDTO? FindClosestPathProtectedParent(FolderNode folderNode, RetentionConfiguration retention_config)
+        {
+            PathProtectionDTO? closest_path_protection = null;
+            FolderNode current = folderNode;
+            while (current.Parent != null && closest_path_protection == null)
+            {
+                closest_path_protection = retention_config.Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
+                current = current.Parent;
+            }
+            return closest_path_protection;
+        }
+
+        public async Task<int> RemovePathProtection(FolderNode folderNode, RetentionConfiguration retention_config, int to_retention_Id)
+        {
+            // step 1: find this node path protection entry 
+            // step 2: remove it from the list if found
+            // step 3: Verify if this node has a parent PathProtection in the retention_config
+            //         If there is no parent path protection, 
+            //            -then set the retention of leaves under this nodes to (to_retention_Id, to_path_protection_id=0). 
+            //         else  
+            //            -then set the retention of leaves under this node to (path protection type,  from_path_protectection.Id).
+            //         In this way we do not touch path protection of other children.
+            PathProtectionDTO? from_path_retention = retention_config.Path_protections.FirstOrDefault(p => p.Folder_Id == folderNode.Id);
+            int remove_count = retention_config.Path_protections.RemoveAll(p => p.Folder_Id == folderNode.Id);
+            int path_retentiontype_id = retention_config.Path_retentiontype.Id;
+
+            // check if any of the pathretentions from retention_config are a parent of from_path_retention_folder
+            PathProtectionDTO? parent_path_protection = FindClosestPathProtectedParent(folderNode, retention_config);
+            if (from_path_retention == null || remove_count == 0)
+                throw new ArgumentException("Invalid path protection folder specified.");
+            else
+            {
+                if (parent_path_protection != null)
+                    await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(path_retentiontype_id, from_path_retention.Id, path_retentiontype_id, parent_path_protection.Id));
+                else
+                    await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(path_retentiontype_id, from_path_retention.Id, to_retention_Id, 0));
+            }
+            return remove_count;
+        }
+
     }
 }

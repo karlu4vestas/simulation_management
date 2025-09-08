@@ -78,6 +78,7 @@ namespace VSM.Client.Datamodel
         }
         // override copy constructor
         public Retention Clone()
+        public override bool update_retention(FolderNode node)
         {
             return new Retention(this);
         }
@@ -85,7 +86,6 @@ namespace VSM.Client.Datamodel
     public class FolderNode
     {
         protected FolderNodeDTO dto;
-
         public FolderNode(FolderNodeDTO dto)
         {
             this.dto = dto;
@@ -94,7 +94,6 @@ namespace VSM.Client.Datamodel
         public int Id => dto.Id;
         public int Parent_Id => dto.Parent_Id;
         public int Rootfolder_Id => dto.Rootfolder_Id;
-
         public string Name => dto.Name;
         public int Type_Id => dto.Type_Id;
         public Retention Retention
@@ -107,6 +106,10 @@ namespace VSM.Client.Datamodel
             }
         }
         //client side helper fields
+        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
+        public int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
+        //client side help fields. 
+        // It is reconstructed on the fly,, which is ok because it is only used for display of the path protection list and when the user selects a folder
         public string FullPath
         {
             get
@@ -152,6 +155,7 @@ namespace VSM.Client.Datamodel
         }
 
         public async Task ChangeRetentions(Retention from, Retention to)
+        public async Task ChangeRetentions(byte from_retentiontype_Id, byte to_retentiontype_Id)
         {
             await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from, to));
         }
@@ -282,7 +286,6 @@ namespace VSM.Client.Datamodel
                 child.print_leafs();
             }
         }
-
         /// <summary>
         /// Aggregates counts of different retention values by iterating the folder tree using depth-first traversal.
         /// The iteration starts from the leaves and aggregates up to the current level using post-order processing.
@@ -355,7 +358,7 @@ namespace VSM.Client.Datamodel
                 }
             }
         }
-        public async Task SetParentFolderAsync()
+        public async Task SetParentFolderLink()
         {
             // Set the Parent property to the immediate parent for each node in the hierarchy (iterative, no recursion)
             var stack = new Stack<(FolderNode node, FolderNode? parent)>();
