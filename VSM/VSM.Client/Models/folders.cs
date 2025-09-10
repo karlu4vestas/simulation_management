@@ -152,10 +152,6 @@ namespace VSM.Client.Datamodel
             }
             throw new Exception($"Folder with ID {folder_id} not found.");
         }
-        public async Task ChangeRetentions(Retention from, Retention to)
-        {
-            await ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from, to));
-        }
         public async Task ChangeRetentionsOfSubtree(ChangeRetentionDelegate change_delegate)
         {
             //select the subtree to folder incl folder that have retention equal to  (from_retention_ID, from_path_protection_id)

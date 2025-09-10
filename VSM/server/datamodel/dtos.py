@@ -97,6 +97,7 @@ class RetentionTypePublic(RetentionTypeBase):
 # the question is whether we need a foreigne key to the folder id 
 class PathProtectionBase(SQLModel):
     rootfolder_id: int   = Field(default=None, foreign_key="rootfolderdto.id")
+    folder_id: int       = Field(default=None, foreign_key="foldernodedto.id")
     path: str            = Field(default="")
 
 class PathProtectionDTO(PathProtectionBase, table=True):
@@ -107,3 +108,6 @@ class PathProtectionPublic(PathProtectionBase):
 
 class PathProtectionCreate(PathProtectionBase):
     pass
+
+class CleanupFrequencyUpdate(SQLModel):
+    cleanup_frequency: str

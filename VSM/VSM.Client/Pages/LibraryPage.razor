@@ -42,13 +42,13 @@
 
                     <TemplateColumn Title="Cleanup frequency" Width="300px">
                         <ChildContent Context="folder">
-                            @(folder.Cleanup_frequency)
+                            @(folder.Cleanup_Frequency)
                         </ChildContent>
                     </TemplateColumn>
 
                     <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
-                            @if (folder.Cleanup_frequency != null && folder.Cleanup_frequency != "inactive")
+                            @if (folder.Cleanup_Frequency != null && folder.Cleanup_Frequency != "inactive")
                             {
                                 <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to
                                     retentions</FluentButton>
@@ -72,9 +72,8 @@
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Owners:</span> @ownerstring</div>
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Change retention:</span>
                     <FluentCombobox Autofocus="true" Items="@Library.Instance.CleanupFrequencies"
-                        @bind-Value="@Library.Instance.SelectedRootFolder.Cleanup_frequency"
-                        @bind-Value:after="UpdateCleanUpFrequency" Height="300px" Position="SelectPosition.Above" Immediate
-                        ImmediateDelay="100" />
+                        @bind-Value="@cleanup_frequency" @bind-Value:after="UpdateCleanUpFrequency" Height="300px"
+                        Position="SelectPosition.Above" Immediate ImmediateDelay="100" />
                 </div>
             }
         </FluentStack>
@@ -82,6 +81,7 @@
 </FluentStack>
 @code {
     bool has_loaded_rootFolders = false;
+    string cleanup_frequency = "";
     async Task OnLoginClicked()
     {
         if (Library.Instance.User.Length > 0)
@@ -106,10 +106,21 @@
     private void OnSelectRootFolder(FluentDataGridRow<RootFolder> row)
     {
         Library.Instance.SelectedRootFolder = row.Item;
+        if (Library.Instance.SelectedRootFolder != null)
+            cleanup_frequency = Library.Instance.SelectedRootFolder.Cleanup_Frequency;
+        StateHasChanged();
     }
-    private void UpdateCleanUpFrequency()
+    private async Task UpdateCleanUpFrequency()
     {
-        Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.Cleanup_frequency}");
+        if (Library.Instance.SelectedRootFolder != null && cleanup_frequency !=
+        Library.Instance.SelectedRootFolder.Cleanup_Frequency)
+        {
+            UpdateFrequencyCmd cmd = new UpdateFrequencyCmd(Library.Instance.SelectedRootFolder, cleanup_frequency);
+            await cmd.Apply();
+            cleanup_frequency = Library.Instance.SelectedRootFolder.Cleanup_Frequency;
+            StateHasChanged();
+            Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.Cleanup_Frequency}");
+        }
     }
     private void Go2retention(RootFolder root_folder)
     {

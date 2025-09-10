@@ -1,8 +1,8 @@
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO
+from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO, PathProtectionCreate, CleanupFrequencyUpdate
 from datamodel.db import Database
 from sqlalchemy import create_engine, text, or_, func
 from app.config import AppConfig
@@ -90,15 +90,34 @@ def read_root_folders(initials: Optional[str] = Query(default=None)):
             ).all()
         return retention_types        
 
+# update a rootfolder's cleanup_frequency
+@app.put("/rootfolders/{rootfolder_id}/cleanup-frequency")
+def update_rootfolder_cleanup_frequency(rootfolder_id: int, update_data: CleanupFrequencyUpdate):
+    with Session(Database.get_engine()) as session:
+        # Find the rootfolder by ID
+        rootfolder = session.exec(
+            select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)
+        ).first()
+        
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
+        
+        # Update the cleanup_frequency
+        rootfolder.cleanup_frequency = update_data.cleanup_frequency
+        session.add(rootfolder)
+        session.commit()
+        session.refresh(rootfolder)
+        
+        return {"message": f"Cleanup frequency updated to '{update_data.cleanup_frequency}' for rootfolder {rootfolder_id}"}
+
+
+
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
 @app.get("/folders/", response_model=list[FolderNodeDTO])
 def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
         return folders
-
-
-
 
 # Endpoint to extract and send all FolderNodeDTOs as CSV
 @app.get("/folders/csv")
@@ -200,9 +219,54 @@ def read_folders_csv_zstd():
         }
     )
 
-#develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
-@app.get("/pathprotections/", response_model=list[PathProtectionDTO])
+#get alle path protections for  
+@app.get("/pathprotections/{rootfolder_id}", response_model=list[PathProtectionDTO])
 def read_pathprotections( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
         return paths
+
+# Add a new path protection to a specific root folder
+@app.post("/pathprotections")
+def add_path_protection(path_protection: PathProtectionDTO):
+    print(f"Adding path protection {path_protection}")
+    with Session(Database.get_engine()) as session:
+        # Check if path protection already exists for this path in this rootfolder
+        existing_protection = session.exec(
+            select(PathProtectionDTO).where(
+                (PathProtectionDTO.rootfolder_id == path_protection.rootfolder_id) & 
+                (PathProtectionDTO.folder_id == path_protection.folder_id)
+            )
+        ).first()
+        
+        if existing_protection:
+            raise HTTPException(status_code=409, detail="Path protection already exists for this path")
+        
+        # Create new path protection
+        new_protection = PathProtectionDTO(
+            rootfolder_id=path_protection.rootfolder_id,
+            folder_id=path_protection.folder_id,
+            path=path_protection.path
+        )
+        
+        session.add(new_protection)
+        session.commit()
+        session.refresh(new_protection)
+        return {"message": f"Path protection added for path '{path_protection.path}'", "id": new_protection.id}
+
+# Delete a path protection from a specific root folder
+@app.delete("/pathprotections/{protection_id}")
+def delete_path_protection(protection_id: int):
+    with Session(Database.get_engine()) as session:
+        # Find the path protection by ID and rootfolder_id
+        protection = session.exec(
+            select(PathProtectionDTO).where((PathProtectionDTO.id == protection_id))
+        ).first()
+        
+        if not protection:
+            raise HTTPException(status_code=404, detail="Path protection not found")
+        
+        session.delete(protection)
+        session.commit()
+        
+        return {"message": f"Path protection {protection_id} "}

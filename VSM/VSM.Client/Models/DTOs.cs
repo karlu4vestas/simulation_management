@@ -37,7 +37,7 @@ namespace VSM.Client.Datamodel
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public string Cleanup_frequency { get; set; } = ""; // indicates the folder's cleanup frequency
+        public string Cleanup_Frequency { get; set; } = ""; // indicates the folder's cleanup frequency
     }
     // so far we know: 
     // InnerNode, 
@@ -57,7 +57,7 @@ namespace VSM.Client.Datamodel
     public class RetentionType : RetentionTypeDTO { }
     public class PathProtectionDTO
     {
-        public byte Id { get; set; }
+        public int Id { get; set; }
         public int Rootfolder_Id { get; set; }
         public int Folder_Id { get; set; }
         public string Path { get; set; } = "";

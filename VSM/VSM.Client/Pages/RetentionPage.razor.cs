@@ -85,9 +85,9 @@ namespace VSM.Client.Pages
             {
                 if (selected_cell != null && new_retention_key != null && rootFolder != null)
                 {
-                    StateHasChanged(); // Update UI to show progress
                     isProcessing = true;
-
+                    await InvokeAsync(StateHasChanged);
+    
                     //start by verifying if we need to change the list of pathprotections
                     if (new_retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
@@ -98,28 +98,33 @@ namespace VSM.Client.Pages
                             return;
                         }
 
-                        // Create and persist the new path protection in order to get an ID assigned
-                        var path_protection = await rootFolder.AddPathProtection(selected_cell.Node);
-                        if (path_protection == null)//|| path_protection.Id == 0)
+                        AddPathProtectionCmd cmd = new AddPathProtectionCmd(rootFolder, selected_cell.Node);
+                        if (false == await cmd.Apply() )
                         {
                             Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
                             return;
                         }
-                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {path_protection.Path}");
+                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {cmd.pathProtection?.Path}");
                     }
                     else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
-                        int remove_count = await rootFolder.RemovePathProtection(selected_cell.Node, new_retention_key.Id);
-                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {remove_count}");
-                        //no removal happened so abandon the update
-                        if (remove_count == 0)
+                        RemovePathProtectionCmd cmd = new RemovePathProtectionCmd(rootFolder, selected_cell.Node, new_retention_key.Id);  
+                        if ( false == await cmd.Apply() ){
+                            Console.WriteLine($"OnRetentionChangedAsync: failed to remove patprotection for {selected_cell.retention_key.Id}");
                             return;
+                        } else
+                            Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {cmd.remove_count}");
                     }
                     else if (new_retention_key != null) // case for change of retention that does not involved pathRetention
                     {
-                        await selected_cell.Node.ChangeRetentions(new Retention(selected_cell.retention_key.Id), new Retention(new_retention_key.Id));
-                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")}");
+                        ChangeRetentionId2IdCmd cmd = new ChangeRetentionId2IdCmd(rootFolder, selected_cell.Node, selected_cell.retention_key.Id, new_retention_key.Id);
+                        if (false == await cmd.Apply())
+                        {
+                            Console.WriteLine($"OnRetentionChangedAsync: failed to change retention for {selected_cell.retention_key.Id} to {new_retention_key.Id}");
+                            return;
+                        } else
+                            Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString}");
                     }
 
                     // All done for the selected_cell. 
@@ -131,10 +136,6 @@ namespace VSM.Client.Pages
                         target_retention_cell = selected_cell;
                         selected_cell = null;
                     }
-
-                    // Update the aggregation from the root folder. 
-                    // This could be optimsed by only updating the modifed branch and its ancestors
-                    await rootFolder.UpdateAggregation();
                 }
             }
             catch (Exception ex)
