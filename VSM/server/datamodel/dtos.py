@@ -23,13 +23,14 @@ class RootFolderPublic(RootFolderBase):
 
 
 class FolderNodeBase(SQLModel):
-    rootfolder_id: int   = Field(default=None, foreign_key="rootfolderdto.id")
-    parent_id: int       = Field(default=0)  # 0 means no parent
-    name: str            = Field(default="")
-    type_id: int | None  = Field(default=None, foreign_key="foldertypedto.id")
-    retention_id: int | None = Field(default=None, foreign_key="retentiontypedto.id")
-    retention_date: str | None = None
-    modified: str | None = None
+    rootfolder_id: int              = Field(default=None, foreign_key="rootfolderdto.id")
+    parent_id: int                  = Field(default=0)  # 0 means no parent
+    name: str                       = Field(default="")
+    type_id: int | None             = Field(default=None, foreign_key="foldertypedto.id")
+    retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
+    pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
+    retention_date: str | None      = None
+    modified: str | None            = None
 
 class FolderNodeDTO(FolderNodeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -111,3 +112,8 @@ class PathProtectionCreate(PathProtectionBase):
 
 class CleanupFrequencyUpdate(SQLModel):
     cleanup_frequency: str
+
+class FolderRetentionUpdateDTO(SQLModel):
+    folder_id: int                  = Field(default=None, foreign_key="foldernodedto.id")
+    retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
+    pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
