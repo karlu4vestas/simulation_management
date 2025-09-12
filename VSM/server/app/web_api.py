@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO, PathProtectionCreate, CleanupFrequencyUpdate
+from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO, PathProtectionCreate, CleanupFrequencyUpdate,FolderRetentionUpdateDTO
 from datamodel.db import Database
 from sqlalchemy import create_engine, text, or_, func
 from app.config import AppConfig
@@ -270,3 +270,31 @@ def delete_path_protection(protection_id: int):
         session.commit()
         
         return {"message": f"Path protection {protection_id} "}
+    
+@app.post("/rootfolders/{rootfolder_id}/retentions")
+def changeretentions( rootfolder_id:int, retentions: list[FolderRetentionUpdateDTO]):
+    print(f"rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
+    with Session(Database.get_engine()) as session:
+        for retention in retentions:
+            folder = session.exec(
+                select(FolderNodeDTO).where(
+                    (FolderNodeDTO.rootfolder_id == rootfolder_id) & 
+                    (FolderNodeDTO.id == retention.folder_id)
+                )
+            ).first()
+            
+            if not folder:
+                raise HTTPException(status_code=404, detail=f"Folder {retention.folder_id} not found in rootfolder {rootfolder_id}")
+            
+            folder.retention_id = retention.retention_id
+            folder.pathprotection_id = retention.pathprotection_id
+            session.add(folder)
+        
+        session.commit()
+        
+        return {"message": f"Updated {len(retentions)} folders in rootfolder {rootfolder_id}"}
+
+ #class FolderRetentionChangesDTO(SQLModel):
+ #   folder_id: int                  = Field(default=None, foreign_key="foldernodedto.id")
+ #   retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
+ #   pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
