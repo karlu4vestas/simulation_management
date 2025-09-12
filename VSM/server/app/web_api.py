@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO, PathProtectionCreate, CleanupFrequencyUpdate,FolderRetentionUpdateDTO
+from datamodel.dtos import RetentionTypePublic, RetentionTypeDTO, FolderTypeDTO, FolderTypePublic, RootFolderDTO, RootFolderPublic, FolderNodeDTO, PathProtectionDTO, PathProtectionCreate, CleanupFrequencyUpdate, RetentionUpdateDTO
 from datamodel.db import Database
 from sqlalchemy import create_engine, text, or_, func
 from app.config import AppConfig
@@ -91,7 +91,7 @@ def read_root_folders(initials: Optional[str] = Query(default=None)):
         return retention_types        
 
 # update a rootfolder's cleanup_frequency
-@app.put("/rootfolders/{rootfolder_id}/cleanup-frequency")
+@app.post("/rootfolder/{rootfolder_id}/cleanup-frequency")
 def update_rootfolder_cleanup_frequency(rootfolder_id: int, update_data: CleanupFrequencyUpdate):
     with Session(Database.get_engine()) as session:
         # Find the rootfolder by ID
@@ -113,14 +113,14 @@ def update_rootfolder_cleanup_frequency(rootfolder_id: int, update_data: Cleanup
 
 
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
-@app.get("/folders/", response_model=list[FolderNodeDTO])
+@app.get("/rootfolder/{rootfolder_id}/folders/", response_model=list[FolderNodeDTO])
 def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
         return folders
 
 # Endpoint to extract and send all FolderNodeDTOs as CSV
-@app.get("/folders/csv")
+@app.get("/rootfolder/{rootfolder_id}/folders/csv")
 def read_folders_csv():
     def generate_csv():
         engine = Database.get_engine()
@@ -168,7 +168,7 @@ def read_folders_csv():
     )
 
 # Endpoint to extract and send all FolderNodeDTOs as compressed CSV using zstd
-@app.get("/folders/csv-zstd")
+@app.get("/rootfolder/{rootfolder_id}/folders/csv-zstd")
 def read_folders_csv_zstd():
     def generate_compressed_csv():
         compressor = ZstdCompressor(level=3)
@@ -269,10 +269,10 @@ def delete_path_protection(protection_id: int):
         session.delete(protection)
         session.commit()
         
-        return {"message": f"Path protection {protection_id} "}
-    
-@app.post("/rootfolders/{rootfolder_id}/retentions")
-def changeretentions( rootfolder_id:int, retentions: list[FolderRetentionUpdateDTO]):
+        return {"message": f"Path protection {protection_id} deleted"}
+
+@app.post("/rootfolder/{rootfolder_id}/retentions")
+def changeretentions( rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
     print(f"rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
     with Session(Database.get_engine()) as session:
         for retention in retentions:
@@ -294,7 +294,4 @@ def changeretentions( rootfolder_id:int, retentions: list[FolderRetentionUpdateD
         
         return {"message": f"Updated {len(retentions)} folders in rootfolder {rootfolder_id}"}
 
- #class FolderRetentionChangesDTO(SQLModel):
- #   folder_id: int                  = Field(default=None, foreign_key="foldernodedto.id")
- #   retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
- #   pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
+ 

@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace VSM.Client.Datamodel
 {
     /// <summary>
@@ -152,13 +154,14 @@ namespace VSM.Client.Datamodel
             }
             throw new Exception($"Folder with ID {folder_id} not found.");
         }
-        public async Task ChangeRetentionsOfSubtree(ChangeRetentionDelegate change_delegate)
+        public async Task<List<RetentionUpdateDTO>> ChangeRetentionsOfSubtree(ChangeRetentionDelegate change_delegate)
         {
             //select the subtree to folder incl folder that have retention equal to  (from_retention_ID, from_path_protection_id)
             // and change the retentions to (to_retention_ID, to_path_protection_id)
             //Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} to_retention_ID: {change_delegate.to_retention.TypeId}, to_path_protection_id: {change_delegate.to_retention.PathId} ");
-            int number_of_change_leafs = 0;
             int number_of_unchanged_leafs = 0;
+            List<RetentionUpdateDTO> retentionUpdates = new List<RetentionUpdateDTO>();
+
             var stack = new Stack<FolderNode>();
             stack.Push(this);
             while (stack.Count > 0)
@@ -171,7 +174,12 @@ namespace VSM.Client.Datamodel
                     if (change_delegate.update_retention(currentNode))
                     {
                         currentNode.Retention = change_delegate.to.Clone();
-                        number_of_change_leafs++;
+                        retentionUpdates.Add(new RetentionUpdateDTO
+                        {
+                            Folder_id = currentNode.Id,
+                            Retention_id = currentNode.Retention.TypeId,
+                            Pathprotection_id = currentNode.Retention.PathId
+                        });
                     }
                     else
                     {
@@ -191,8 +199,9 @@ namespace VSM.Client.Datamodel
                     await Task.Yield();
                 }
             }
-            Console.WriteLine($"ChangeRetentionsOfSubtree changed leafs, unchanged leafs : {number_of_change_leafs} {number_of_unchanged_leafs}");
+            Console.WriteLine($"ChangeRetentionsOfSubtree changed leafs, unchanged leafs : {retentionUpdates.Count} {number_of_unchanged_leafs}");
             // print_leafs(folder);
+            return retentionUpdates;
         }
         void print_leafs()
         {

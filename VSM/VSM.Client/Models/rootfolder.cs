@@ -83,8 +83,8 @@ namespace VSM.Client.Datamodel
         public PathProtectionDTO? FindClosestPathProtectedParent(FolderNode folderNode)
         {
             PathProtectionDTO? closest_path_protection = null;
-            FolderNode current = folderNode;
-            while (current.Parent != null && closest_path_protection == null)
+            FolderNode? current = folderNode.Parent;
+            while (current != null && closest_path_protection == null)
             {
                 closest_path_protection = Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
                 current = current.Parent;

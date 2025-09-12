@@ -111,4 +111,10 @@ namespace VSM.Client.Datamodel
             return this.All_retentions.FirstOrDefault(r => r.Id == id);
         }
     }
+    public class RetentionUpdateDTO
+    {
+        public required int Folder_id { get; set; }
+        public required int Retention_id { get; set; }
+        public required int Pathprotection_id { get; set; }
+    }
 }

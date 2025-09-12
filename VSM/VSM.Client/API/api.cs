@@ -51,7 +51,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                string requestUrl = $"http://127.0.0.1:5173/folders/?rootfolder_id={rootFolder.Id}";
+                string requestUrl = $"http://127.0.0.1:5173/rootfolder/{rootFolder.Id}/folders";
                 List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>(requestUrl, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
@@ -65,13 +65,12 @@ namespace VSM.Client.SharedAPI
                 return new List<FolderNodeDTO>();
             }
         }
-
         public async Task<bool> UpdateRootFolderCleanupFrequency(int rootFolderId, string cleanupFrequency)
         {
             try
             {
                 var updateData = new { cleanup_frequency = cleanupFrequency };
-                var response = await httpClient.PutAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/cleanup-frequency", updateData, new JsonSerializerOptions
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolder/{rootFolderId}/cleanup-frequency", updateData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true
                 });
@@ -84,7 +83,6 @@ namespace VSM.Client.SharedAPI
                 return false;
             }
         }
-
         public async Task<List<PathProtectionDTO>> GetPathProtectionsByRootFolderId(int rootFolderId)
         {
             List<PathProtectionDTO> pathProtections = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>($"http://127.0.0.1:5173/pathprotections/{rootFolderId}", new JsonSerializerOptions
@@ -123,7 +121,6 @@ namespace VSM.Client.SharedAPI
                 return null;
             }
         }
-
         public async Task<bool> DeletePathProtectionByRootFolder(int pathProtectionId)
         {
             try
@@ -140,6 +137,24 @@ namespace VSM.Client.SharedAPI
         }
 
         //@todo create a push method to update a folders retention values (retentiontype, pathprotection)
+        public async Task<bool> UpdateRootFolderRetention(int rootFolderId, List<RetentionUpdateDTO> retentionUpdates)
+        {
+            try
+            {
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolder/{rootFolderId}/retentions", retentionUpdates, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                });
+
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating folder retentions: {ex.Message}");
+                return false;
+            }
+        }
 
     }
 }

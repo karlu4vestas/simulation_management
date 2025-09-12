@@ -24,6 +24,7 @@ public class CommandManager
         // Implementation for removing a command
     }
 }
+//@todo we need for all commands to have a rollback option. That is we must implement as rollback function for all commands in order to reload data from server 
 public abstract class Command
 {
     public string Name { get; }
@@ -109,11 +110,18 @@ public class AddPathProtectionCmd : Command
             rootFolder.Path_protections.Add(this.pathProtection);
 
             Retention new_path_retention = new Retention(path_retentiontype_id, this.pathProtection.Id);
+            List<RetentionUpdateDTO> retentionUpdates = new List<RetentionUpdateDTO>();
             if (parent_path_retention != null)
                 //add a sub pathprotection to a parent pathprotection    
-                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
+                retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
             else
-                await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
+                retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
+
+            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            if (!result)
+            {
+                throw new Exception("AddPathProtectionCmd:Failed to update retentions via API.");
+            }
         }
         finally
         {
@@ -154,24 +162,31 @@ public class RemovePathProtectionCmd : Command
             int path_retentiontype_id = rootFolder.RetentionConfiguration.Path_retentiontype.Id;
 
             PathProtectionDTO? from_path_protection = rootFolder.Path_protections.FirstOrDefault(p => p.Folder_Id == folderNode.Id);
-            int from_path_protection_id = from_path_protection?.Id ?? 0;
-            bool result = from_path_protection_id == 0 ? false : await API.Instance.DeletePathProtectionByRootFolder(from_path_protection_id);
+            if (from_path_protection == null)
+                throw new ArgumentException("Invalid new path protection folder specified.");
+
+            PathProtectionDTO valid_from_path_protection = from_path_protection; //get rid of these null warnings
+
+            // check for the presence of a parent of path_protection_folder
+            PathProtectionDTO? parent_path_protection = rootFolder.FindClosestPathProtectedParent(folderNode);
+            Retention to_retention = parent_path_protection == null ? new Retention(to_retention_Id) : new Retention(path_retentiontype_id, parent_path_protection.Id);
+
+            Retention from_path_retention = new Retention(path_retentiontype_id, valid_from_path_protection.Id);
+
+            //change of client
+            remove_count = rootFolder.Path_protections.RemoveAll(p => p.Folder_Id == folderNode.Id);
+            List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_retention));
+
+            //change on server
+            bool result = await API.Instance.DeletePathProtectionByRootFolder(valid_from_path_protection.Id);
             if (!result)
             {
                 throw new Exception("Failed to delete path protection via API.");
             }
-
-            remove_count = rootFolder.Path_protections.RemoveAll(p => p.Folder_Id == folderNode.Id);
-            Retention? from_path_retention = from_path_protection == null ? null : new Retention(path_retentiontype_id, from_path_protection.Id);
-
-            // check for the presence of a parent of path_protection_folder
-            PathProtectionDTO? parent_path_protection = rootFolder.FindClosestPathProtectedParent(folderNode);
-            Retention? to_retention = parent_path_protection == null ? new Retention(to_retention_Id) : new Retention(path_retentiontype_id, parent_path_protection.Id);
-            if (from_path_retention == null)
-                throw new ArgumentException("Invalid new path protection folder specified.");
-            else
+            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            if (!result)
             {
-                await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_retention));
+                throw new Exception("RemovePathProtectionCmd: Failed to update retentions via API.");
             }
         }
         finally
@@ -202,14 +217,21 @@ public class ChangeRetentionId2IdCmd : Command
 
     public override async Task<bool> Apply()
     {
+        bool result = false;
         try
         {
-            await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(new Retention(from_retention_Id), new Retention(to_retention_Id)));
+            List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(new Retention(from_retention_Id), new Retention(to_retention_Id)));
+
+            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            if (!result)
+            {
+                throw new Exception("ChangeRetentionId2IdCmd: Failed to update retentions via API.");
+            }
         }
         finally
         {
             await rootFolder.UpdateAggregation();
         }
-        return true;
+        return result;
     }
 }

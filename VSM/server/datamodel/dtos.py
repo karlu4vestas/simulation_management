@@ -113,7 +113,7 @@ class PathProtectionCreate(PathProtectionBase):
 class CleanupFrequencyUpdate(SQLModel):
     cleanup_frequency: str
 
-class FolderRetentionUpdateDTO(SQLModel):
+class RetentionUpdateDTO(SQLModel):
     folder_id: int                  = Field(default=None, foreign_key="foldernodedto.id")
     retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
     pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
