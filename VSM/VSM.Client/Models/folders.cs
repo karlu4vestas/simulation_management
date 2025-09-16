@@ -246,7 +246,7 @@ namespace VSM.Client.Datamodel
                         {
                             // Leaf node: count its retention value
                             if (currentNode != null)
-                            {
+                            {   
                                 currentNode.AttributeDict[currentNode.Retention.TypeId] = 1;
                             }
                         }

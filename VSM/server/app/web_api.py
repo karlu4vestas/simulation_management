@@ -117,6 +117,8 @@ def update_rootfolder_cleanup_frequency(rootfolder_id: int, update_data: Cleanup
 def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
+        #@TODO  calculate the retention setting using the retention_days, state of the using current date and retention type
+
         return folders
 
 # Endpoint to extract and send all FolderNodeDTOs as CSV
@@ -288,6 +290,7 @@ def changeretentions( rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
             
             folder.retention_id = retention.retention_id
             folder.pathprotection_id = retention.pathprotection_id
+            #@TODO  calculate the number of retention_days using current date and retention type 
             session.add(folder)
         
         session.commit()
