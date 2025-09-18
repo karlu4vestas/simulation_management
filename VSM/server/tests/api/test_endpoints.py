@@ -16,7 +16,7 @@ def client():
     if db.is_empty() and AppConfig.is_unit_test():
             db.clear_all_tables_and_schemas()
             db.create_db_and_tables()
-            from testdata.generate_test_data import insert_test_data_in_db
+            from server.testdata.vts_generate_test_data import insert_test_data_in_db
             insert_test_data_in_db(db.get_engine()) 
 
     return TestClient(app)

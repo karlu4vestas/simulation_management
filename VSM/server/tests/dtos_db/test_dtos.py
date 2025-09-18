@@ -157,8 +157,8 @@ class TestFolderNodeDTO:
             parent_id=1,
             name="TestNode",
             type_id=2,
-            modified="2025-08-12T10:30:00Z",
-            retention_date="2025-12-31",
+            modified_date="2025-08-12T10:30:00Z",
+            expiration_date="2025-12-31",
             retention_id=5
         )
         test_session.add(original_node)
@@ -178,8 +178,8 @@ class TestFolderNodeDTO:
         assert retrieved_node.parent_id == original_node.parent_id
         assert retrieved_node.name == original_node.name
         assert retrieved_node.type_id == original_node.type_id
-        assert retrieved_node.modified == original_node.modified
-        assert retrieved_node.retention_date == original_node.retention_date
+        assert retrieved_node.modified == original_node.modified_date
+        assert retrieved_node.retention_date == original_node.expiration_date
         assert retrieved_node.retention_id == original_node.retention_id
 
     def test_folder_node_attributes_update_and_retrieve(self, test_session):
@@ -196,8 +196,8 @@ class TestFolderNodeDTO:
         node_id = initial_node.id
         
         # Update attributes
-        initial_node.modified = "2025-08-12T15:45:00Z"
-        initial_node.retention_date = "2026-01-01"
+        initial_node.modified_date = "2025-08-12T15:45:00Z"
+        initial_node.expiration_date = "2026-01-01"
         initial_node.retention_id = 3
         test_session.commit()
         
@@ -506,8 +506,8 @@ class TestDTODatabaseIntegration:
             parent_id=123456,
             name="Test node with special chars äöü",
             type_id=1,
-            retention_date="2025-12-31",
-            modified="2025-08-11T14:30:00Z"
+            expiration_date="2025-12-31",
+            modified_date="2025-08-11T14:30:00Z"
         )
         
         expected_retention = RetentionTypeDTO(
@@ -529,8 +529,8 @@ class TestDTODatabaseIntegration:
             parent_id=expected_folder_node.parent_id,
             name=expected_folder_node.name,
             type_id=expected_folder_node.type_id,
-            retention_date=expected_folder_node.retention_date,
-            modified=expected_folder_node.modified
+            expiration_date=expected_folder_node.expiration_date,
+            modified_date=expected_folder_node.modified_date
         )
         
         retention = RetentionTypeDTO(
@@ -562,8 +562,8 @@ class TestDTODatabaseIntegration:
         assert retrieved_node.parent_id == expected_folder_node.parent_id
         assert retrieved_node.name == expected_folder_node.name
         assert retrieved_node.type_id == expected_folder_node.type_id
-        assert retrieved_node.retention_date == expected_folder_node.retention_date
-        assert retrieved_node.modified == expected_folder_node.modified
+        assert retrieved_node.retention_date == expected_folder_node.expiration_date
+        assert retrieved_node.modified == expected_folder_node.modified_date
         
         assert retrieved_retention.name == expected_retention.name
         assert retrieved_retention.is_system_managed == expected_retention.is_system_managed

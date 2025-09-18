@@ -116,8 +116,8 @@ class TestDatabaseOperations:
             node = FolderNodeDTO(
                 name="TestNode", 
                 type_id=1,
-                modified="2025-08-11T10:30:00Z",
-                retention_date="2025-12-31",
+                modified_date="2025-08-11T10:30:00Z",
+                expiration_date="2025-12-31",
                 retention_id=5
             )
             session.add(node)
@@ -131,8 +131,8 @@ class TestDatabaseOperations:
             
             assert retrieved_node is not None
             assert retrieved_node.name == "TestNode"
-            assert retrieved_node.modified == "2025-08-11T10:30:00Z"
-            assert retrieved_node.retention_date == "2025-12-31"
+            assert retrieved_node.modified_date == "2025-08-11T10:30:00Z"
+            assert retrieved_node.expiration_date == "2025-12-31"
             assert retrieved_node.retention_id == 5
 
     def test_folder_type_enum_like_behavior(self, database_with_tables):
