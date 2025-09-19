@@ -118,7 +118,15 @@ def start_new_cleanup_cycle(rootfolder_id: int):
 # Delete simulation: This case is for simulations in the database that were not found on disk in a full scan of the root folder
 #   Set the retention_id to the id for "missing"
 
-def insert_or_update_simulations(rootfolder_id: int, simulations: list[dict]):
+from typing import NamedTuple, Literal
+from datetime import date
+
+class FileInfo(NamedTuple):
+    id: int=None
+    filepath: str
+    modified: date
+    status: Literal["clean", "issue", "normal"]
+def insert_or_update_simulation_db(rootfolder_id: int, simulations: list[FileInfo]):
     with Session(Database.get_engine()) as session:
         root_folder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not root_folder:
@@ -195,6 +203,6 @@ def insert_or_update_simulations(rootfolder_id: int, simulations: list[dict]):
 
 
 #todo implement hierarchical inserts
-def insert_simulations(rootfolder_id: int, inserts:list[FolderNodeDTO]):
+def insert_simulations(rootfolder_id: int, simulations: list[FileInfo]):
     print(f"TBD start insert_simulations rootfolder_id{rootfolder_id} inserting number of folders {len(inserts)}")
     pass
