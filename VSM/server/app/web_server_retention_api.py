@@ -5,7 +5,7 @@ from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlmodel import Session, select
 from datamodel.dtos import RetentionTypeDTO, RootFolderDTO, FolderNodeDTO, RetentionUpdateDTO
 from datamodel.db import Database
-from sqlalchemy import create_engine, text, or_, func
+from sqlalchemy import create_engine, text, or_, func, case
 from testdata.vts_generate_test_data import insert_test_data_in_db
 from web_api import app, read_retention_types_by_domain_name, read_retention_types_by_domain_id, read_root_folder_cleanup_frequencies
 
@@ -16,6 +16,11 @@ def get_scan_retentions() -> dict[str, RetentionTypeDTO]:
     retentions = read_retention_types_by_domain_name(simulation_domain_name="vts")
     scan_retentions = {retention.name.lower(): retention.id for retention in retentions if retention.name.lower() in ["clean", "issue", "missing"]}
     return scan_retentions
+
+def get_retention_dict() -> dict[str, RetentionTypeDTO]:
+    retentions = read_retention_types_by_domain_name(simulation_domain_name="vts")
+    retention_dict = {retention.name.lower(): retention.id for retention in retentions}
+    return retention_dict
 
 # -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
 # The consistency of these calculations is highly critical to the system working correctly
@@ -60,6 +65,15 @@ def change_retention_category( rootfolder_id: int, retentions: list[RetentionUpd
         print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
         return {"message": f"Updated rootfolder {rootfolder_id} with {len(retentions)} retentions"}
 
+# now use the expiration dates to calculate the retention categories that the user will see in the webclient
+# @todo: this double loop will be very slow for large number of folders
+def calc_numeric_retention_id(numeric_retention_types: dict[str,RetentionTypeDTO], rootfolder: RootFolderDTO, folder: FolderNodeDTO) -> int:
+    days_until_expiration = (folder.expiration_date - rootfolder.cleanup_status_date).days
+    i = 0
+    while( i<len(numeric_retention_types.values) and days_until_expiration > numeric_retention_types.values[i]) :
+        i += 1
+    return numeric_retention_types.values[i].id if i<len(numeric_retention_types.values) else numeric_retention_types.values[-1].id           
+
 # The following is called by the scheduler when it starts a new cleanup round
 # extract all folders with an numeric retentiontypes 
 # fail is any of the folders have a missing expiration date 
@@ -94,14 +108,10 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         if len([ folder for folder in folders if folder.expiration_date is None ])>0:
             raise HTTPException(status_code=404, detail="Path protection not found")
 
-        # now use the expiration dates to calculate the retention categories that the user will see in the webclient
-        # @todo: this double loop will be very slow for large number of folders
+
         for folder in folders:
-            days_until_expiration = (folder.expiration_date - rootfolder.cleanup_status_date).days
-            i = 0
-            while( i<len(retention_types.values) and days_until_expiration > retention_types.values[i]) :
-                i += 1
-            folder.retention_id = retention_types.values[i].id if i<len(retention_types.values) else retention_types.values[-1].id           
+            folder.retention_id = calc_numeric_retention_id(numeric_retention_types_dict, rootfolder, folder)
+
 
         print(f"start_new_cleanup_cycle rootfolder_id: {rootfolder_id} updated retention of {len(folders)} folders" )
 
@@ -165,65 +175,69 @@ def update_simulation_attributes_in_db(session:Session, rootfolder: RootFolderDT
     # 1) ALL: we need to update the modified_date
     #    because this is the date that is used to calculate the expiration_date
 
-    # 2) ALL: we need to update the expiration_date - at least for numeric retention types - but better for all so data are consistent
-    #    because this is the date that is used to determine the numeric retention category 
+    # 2) ALL: we need to update the expiration_date if it is None or < modified_date + days_to_analyse because we are conservative about cleanup
+    # if we update the expiration date then also update numeric retention types 
 
     # 3) update retention_id on subset: 
-    #    3.1 for all where ((sim.retention_id is not None) and (folder.retention_id==path_retention_id)) we need to assign sim.retention_id to folder.retention_id
+    #    3.1 for all retentions where ((sim.retention_id is not None) and (folder.retention_id!=path_retention_id)) we assign sim.retention_id to folder.retention_id
     #        because for all, except those under path protection, the user must be able to see if the simulation is clean or has an issue
-    #        sidenote: maybe we should not have path_retention.id because if we remove path_protection then we will not know if the simulation is clean or has an issue
-    #    3.2 for all where the retention_type is numeric: we need to calculate the retention_id for numeric retentions
 
 
+    # Create a query using rootfolder.id and the filepaths from the list of simulations. 
+    # Order the results to match the same order as the simulations list.
+    # This is important for the subsequent update operation to maintain consistency.
 
-
-
-
-
-
-    # can we query so that the query result and simulations are in the same order. This will make it easy to update their attributes
-
-    existing_folders = session.exec(
-        select(FolderNodeDTO).where(
+    query = (
+        select(FolderNodeDTO)
+        .where(
             (FolderNodeDTO.rootfolder_id == rootfolder.id) &
-            (FolderNodeDTO.path.in_( [sim.filepath.lower() for sim in simulations] ))
+            (FolderNodeDTO.path.in_([sim.filepath.lower() for sim in simulations]))
+        )
+        .order_by(
+            case(
+                {sim.filepath.lower(): index for index, sim in enumerate(simulations)},
+                value=FolderNodeDTO.path,
+                else_=len(simulations)
             )
-        ).all()
+        )
+    )
 
-    # pair existing folder and simulation for each sync of their attributes
-    existing_folders_dict: dict[str, FolderNodeDTO] = {folder.path.lower(): folder for folder in existing_folders}
+    # Execute the ordered query to get results in the same order as simulations
+    existing_folders = session.exec(query).all()
+    #verify ordering as i am a little uncertain about the query
+    equals_ordering = all(folder.path.lower() == sim.filepath.lower() for folder, sim in zip(existing_folders, simulations))
+    if not equals_ordering:
+        raise HTTPException(status_code=500, detail=f"Ordering of existing folders does not match simulations for rootfolder {rootfolder.id}")
 
-    # Update FileInfo.id for existing folders so we can determine 
-    # what records can be updated and what records need to be created
-    # furthermore, for existing simulations also take the retention_id from the existing folder if sim.retention.id is None
-    simulations = [
-            sim._replace( id = existing_folders_dict[sim.filepath.lower()].id, 
-                          retention_id = existing_folders_dict[sim.filepath.lower()].retention_id if sim.retention_id is None else sim.retention_id
-                        )
-            if sim.filepath.lower() in existing_folders_dict 
-            else sim
-            for sim in simulations
+
+    path_retention_id         = get_retention_dict().get("path")
+    update_expiration_date    = [(folder.expiration_date is None or (sim.modified + rootfolder.days_to_analyse > folder.expiration_date)) 
+                                 for folder, sim in zip(existing_folders, simulations)]
+    update_numeric_retentions = [expiration_update and (folder.retention_id != path_retention_id) and (sim.retention_id is None)
+                                 for folder, sim, expiration_update in zip(existing_folders, simulations, update_expiration_date)]
+
+    #get the numeric retention types in a dict for fast lookup
+    numeric_retention_types_dict:dict[int,RetentionTypeDTO] = {retention.id:retention for retention in retention_types if retention.days_to_cleanup is not None}
+
+    # Prepare bulk update data for existing folders
+    bulk_updates = [
+        {
+            "id": folder.id,
+            "modified_date": sim.modified,
+            "expiration_date": sim.modified + rootfolder.days_to_analyse if update_expiration else folder.expiration_date,
+            "retention_id": sim.retention_id 
+                            if (sim.retention_id is not None and folder.retention_id != path_retention_id) 
+                            else folder.retention_id 
+                            if not update_numeric_retention 
+                            else calc_numeric_retention_id(numeric_retention_types_dict, rootfolder, folder),
+        }
+        for folder, sim, update_expiration, update_numeric_retention in zip(existing_folders, simulations, update_expiration_date, update_numeric_retentions)  
     ]
+            
+    # Execute bulk update
+    session.bulk_update_mappings(FolderNodeDTO, bulk_updates)
 
-    total_simulations = len(simulations)
-
-
-    with Session(Database.get_engine()) as session:
-        # Prepare bulk update data for existing folders
-        bulk_updates = [
-            {
-                "id": sim.id,
-                "retention_id": sim.retention_id,
-                "modified_date": sim.modified,
-                "expiration_date": sim.modified + rootfolder.days_to_analyse
-            }
-            for sim in simulations
-        ]
-                
-        # Execute bulk update
-        session.bulk_update_mappings(FolderNodeDTO, bulk_updates)
-
-        return {"updated_count": len(bulk_updates)}
+    return {"updated_count": len(bulk_updates)}
 
 
 # Helper functions for hierarchical insert
