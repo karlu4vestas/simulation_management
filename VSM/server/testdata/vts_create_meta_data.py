@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, DaysToAnalyseDTO 
+from datamodel.dtos import SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
 
 def insert_vts_metadata_in_db(engine:Engine):
     with Session(engine) as session:
@@ -46,7 +46,7 @@ def insert_vts_metadata_in_db(engine:Engine):
 
     with Session(engine) as session:
         session.add(FolderTypeDTO(name="InnerNode", simulation_domain_id=sim_id ))
-        session.add(FolderTypeDTO(name="VTS", simulation_domain_id=sim_id ))
+        session.add(FolderTypeDTO(name="vts_simulation", simulation_domain_id=sim_id ))
         session.commit()
 
         folder_types = session.exec(select(FolderTypeDTO)).all()
@@ -70,15 +70,15 @@ def insert_vts_metadata_in_db(engine:Engine):
             print(f" - {cleanup.name} (ID: {cleanup.id})")
 
     with Session(engine) as session:
-        session.add(DaysToAnalyseDTO(name="1 day",    days= 1, simulation_domain_id=sim_id ))
-        session.add(DaysToAnalyseDTO(name="2 weeks",  days=14, simulation_domain_id=sim_id ))
-        session.add(DaysToAnalyseDTO(name="3 weeks",  days=21, simulation_domain_id=sim_id ))
-        session.add(DaysToAnalyseDTO(name="4 weeks",  days=28, simulation_domain_id=sim_id ))
-        session.add(DaysToAnalyseDTO(name="6 weeks",  days=42, simulation_domain_id=sim_id ))
-        session.add(DaysToAnalyseDTO(name="8 weeks",  days=56, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="1 day",    days= 1, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="2 weeks",  days=14, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="3 weeks",  days=21, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="4 weeks",  days=28, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="6 weeks",  days=42, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="8 weeks",  days=56, simulation_domain_id=sim_id ))
         session.commit()
 
-        days_to_analyse = session.exec(select(DaysToAnalyseDTO)).all()
+        days_to_analyse = session.exec(select(CycleTimeDTO)).all()
         print("Test data for days to analyse inserted successfully:")
         for days in days_to_analyse:
             print(f" - {days.name} (ID: {days.id})")

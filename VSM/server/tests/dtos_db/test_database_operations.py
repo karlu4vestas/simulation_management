@@ -37,15 +37,15 @@ class TestDatabaseOperations:
         
         with Session(engine) as session:
             # Create parent node
-            parent = FolderNodeDTO(name="Parent", type_id=1)
+            parent = FolderNodeDTO(name="Parent", nodetype_id=1)
             session.add(parent)
             session.commit()
             session.refresh(parent)
             
             # Create child nodes
             assert parent.id is not None
-            child1 = FolderNodeDTO(parent_id=parent.id, name="Child1", type_id=2)
-            child2 = FolderNodeDTO(parent_id=parent.id, name="Child2", type_id=2)
+            child1 = FolderNodeDTO(parent_id=parent.id, name="Child1", nodetype_id=2)
+            child2 = FolderNodeDTO(parent_id=parent.id, name="Child2", nodetype_id=2)
             
             session.add(child1)
             session.add(child2)
@@ -73,7 +73,7 @@ class TestDatabaseOperations:
             
             # Update
             node.name = "UpdatedFolder"
-            node.type_id = 99
+            node.nodetype_id = 99
             session.add(node)
             session.commit()
             
@@ -83,7 +83,7 @@ class TestDatabaseOperations:
             
             assert updated_node is not None
             assert updated_node.name == "UpdatedFolder"
-            assert updated_node.type_id == 99
+            assert updated_node.nodetype_id == 99
 
     def test_delete_retention_record(self, database_with_tables, sample_retention_data):
         """Test deleting a RetentionDTO record"""
@@ -115,7 +115,7 @@ class TestDatabaseOperations:
             # Create a folder node with attributes
             node = FolderNodeDTO(
                 name="TestNode", 
-                type_id=1,
+                nodetype_id=1,
                 modified_date="2025-08-11T10:30:00Z",
                 expiration_date="2025-12-31",
                 retention_id=5

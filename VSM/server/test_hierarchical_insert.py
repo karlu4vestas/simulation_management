@@ -10,7 +10,7 @@ from app.web_server_retention_api import (
     normalize_and_split_path, 
     find_existing_node, 
     generate_path_ids,
-    insert_hierarchy_for_path,
+    insert_hierarchy_for_one_filepath,
     insert_simulations_in_db,
     FileInfo
 )

@@ -127,7 +127,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.id == original_node.id
         assert retrieved_node.parent_id == original_node.parent_id
         assert retrieved_node.name == original_node.name
-        assert retrieved_node.type_id == original_node.type_id
+        assert retrieved_node.type_id == original_node.nodetype_id
 
     def test_folder_node_with_defaults_create_and_retrieve(self, test_session):
         """Test FolderNodeDTO with default values through database round-trip"""
@@ -156,7 +156,7 @@ class TestFolderNodeDTO:
         original_node = FolderNodeDTO(
             parent_id=1,
             name="TestNode",
-            type_id=2,
+            nodetype_id=2,
             modified_date="2025-08-12T10:30:00Z",
             expiration_date="2025-12-31",
             retention_id=5
@@ -177,7 +177,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.id == original_node.id
         assert retrieved_node.parent_id == original_node.parent_id
         assert retrieved_node.name == original_node.name
-        assert retrieved_node.type_id == original_node.type_id
+        assert retrieved_node.type_id == original_node.nodetype_id
         assert retrieved_node.modified == original_node.modified_date
         assert retrieved_node.retention_date == original_node.expiration_date
         assert retrieved_node.retention_id == original_node.retention_id
@@ -188,7 +188,7 @@ class TestFolderNodeDTO:
         initial_node = FolderNodeDTO(
             parent_id=1,
             name="UpdateTest",
-            type_id=1
+            nodetype_id=1
         )
         test_session.add(initial_node)
         test_session.commit()
@@ -219,14 +219,14 @@ class TestFolderNodeDTO:
         # Create expected parent folder
         expected_parent = FolderNodeDTO(
             name="ParentFolder", 
-            type_id=1, 
+            nodetype_id=1, 
             parent_id=0  # Root level
         )
         
         # Create and save parent
         parent = FolderNodeDTO(
             name=expected_parent.name,
-            type_id=expected_parent.type_id,
+            nodetype_id=expected_parent.nodetype_id,
             parent_id=expected_parent.parent_id
         )
         test_session.add(parent)
@@ -238,14 +238,14 @@ class TestFolderNodeDTO:
         expected_child = FolderNodeDTO(
             parent_id=parent_id or 0,  # Use stored ID
             name="ChildFolder",
-            type_id=2
+            nodetype_id=2
         )
         
         # Create child folder from expected values
         child = FolderNodeDTO(
             parent_id=expected_child.parent_id,
             name=expected_child.name,
-            type_id=expected_child.type_id
+            nodetype_id=expected_child.nodetype_id
         )
         test_session.add(child)
         test_session.commit()
@@ -260,12 +260,12 @@ class TestFolderNodeDTO:
         # Verify parent attributes match expected
         assert retrieved_parent.name == expected_parent.name
         assert retrieved_parent.parent_id == expected_parent.parent_id
-        assert retrieved_parent.type_id == expected_parent.type_id
+        assert retrieved_parent.type_id == expected_parent.nodetype_id
         
         # Verify child attributes match expected
         assert retrieved_child.name == expected_child.name
         assert retrieved_child.parent_id == parent_id  # Use stored parent ID
-        assert retrieved_child.type_id == expected_child.type_id
+        assert retrieved_child.type_id == expected_child.nodetype_id
         
         # Query children by parent_id
         children = test_session.exec(
@@ -459,7 +459,7 @@ class TestDTODatabaseIntegration:
         root_folder = RootFolderDTO(
             path="/test", folder_id=1, owner="test", approvers="test"#, active_cleanup=False
         )
-        folder_node = FolderNodeDTO(parent_id=0, name="test", type_id=0)
+        folder_node = FolderNodeDTO(parent_id=0, name="test", nodetype_id=0)
         folder_type = FolderTypeDTO(name="TestType")
         retention = RetentionTypeDTO(name="TestRetention")
         
@@ -505,7 +505,7 @@ class TestDTODatabaseIntegration:
         expected_folder_node = FolderNodeDTO(
             parent_id=123456,
             name="Test node with special chars äöü",
-            type_id=1,
+            nodetype_id=1,
             expiration_date="2025-12-31",
             modified_date="2025-08-11T14:30:00Z"
         )
@@ -528,7 +528,7 @@ class TestDTODatabaseIntegration:
         folder_node = FolderNodeDTO(
             parent_id=expected_folder_node.parent_id,
             name=expected_folder_node.name,
-            type_id=expected_folder_node.type_id,
+            nodetype_id=expected_folder_node.nodetype_id,
             expiration_date=expected_folder_node.expiration_date,
             modified_date=expected_folder_node.modified_date
         )
@@ -561,7 +561,7 @@ class TestDTODatabaseIntegration:
         
         assert retrieved_node.parent_id == expected_folder_node.parent_id
         assert retrieved_node.name == expected_folder_node.name
-        assert retrieved_node.type_id == expected_folder_node.type_id
+        assert retrieved_node.type_id == expected_folder_node.nodetype_id
         assert retrieved_node.retention_date == expected_folder_node.expiration_date
         assert retrieved_node.modified == expected_folder_node.modified_date
         

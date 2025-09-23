@@ -108,7 +108,7 @@ def generate_node( session: Session,
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
             name=f"VTS_{parent_name}_{sibling_counter + 1}" if parent_id > 0 else f"VTS_{parent_name}",
-            type_id=node_type.id,  
+            nodetype_id=node_type.id,  
             retention_id=retention_generator.next().id
         )
     elif node_type.name=="InnerNode":
@@ -116,7 +116,7 @@ def generate_node( session: Session,
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
             name=f"{parent_name}_{sibling_counter + 1}" if parent_id > 0 else f"{parent_name}",
-            type_id=node_type.id,
+            nodetype_id=node_type.id,
             retention_id=0
         )
     else:
