@@ -6,10 +6,11 @@ from zstandard import ZstdCompressor
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session, select
-from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, PathProtectionDTO, CleanupFrequencyUpdate, SimulationDomainDTO
+from sqlmodel import Session, func, select
+from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO
 from datamodel.db import Database
 from app.config import AppConfig
+#from app.web_server_retention_api import start_new_cleanup_cycle
 from testdata.vts_generate_test_data import insert_test_data_in_db
 
 app = FastAPI()
@@ -148,20 +149,36 @@ def read_rootfolder_cleanupfrequency(root_folder_id: int):
 
         return rootfolder.cleanup_frequency_days
 
-# update a rootfolder's cleanup_frequency
-@app.post("/rootfolder/{rootfolder_id}/cleanupfrequency")
-def update_rootfolder_cleanupfrequency(rootfolder_id: int, update_data: CleanupFrequencyUpdate):
+# update a rootfolder's cleanup_configuration
+@app.post("/rootfolder/{rootfolder_id}/cleanup_configuration")
+def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfiguration):
+    is_valid, message = cleanup_configuration.is_valid()
+    if not is_valid:
+        raise HTTPException(status_code=404, detail=message)
+
+    # if we are to start cleanup then set the cleanup_round_start_date to today if required
+    # else set it to None to avoid a scenario where a scheduler tries to start a cleanup round based on an old date
+    if cleanup_configuration.can_start_cleanup():
+        if cleanup_configuration.cleanup_round_start_date is None:
+            cleanup_configuration.cleanup_round_start_date = func.current_date()
+    else:
+        cleanup_configuration.cleanup_round_start_date = None
+
+    #now the configuration is consistent
     with Session(Database.get_engine()) as session:
         rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
-        
-        # Update the cleanup_frequency
-        rootfolder.cleanup_frequency = update_data.cleanup_frequency
+      
+        rootfolder.set_cleanup_configuration(cleanup_configuration)
         session.add(rootfolder)
         session.commit()
-        
-        return {"message": f"Cleanup frequency updated to '{update_data.cleanup_frequency}' for rootfolder {rootfolder_id}"}
+
+        if cleanup_configuration.can_start_cleanup():
+            print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
+            start_new_cleanup_cycle(rootfolder_id)
+
+        return {"message": f"Cleanup configuration updated for rootfolder {rootfolder_id}"}
 
 @app.get("/rootfolder/{rootfolder_id}/retentiontypes", response_model=list[str, RetentionTypeDTO])
 def read_rootfolder_retentiontypes(rootfolder_id: int):

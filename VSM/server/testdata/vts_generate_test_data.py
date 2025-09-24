@@ -28,10 +28,10 @@ class RandomNodeType:
             self.folder_types = session.exec(select(FolderTypeDTO)).all()
             if not self.folder_types:
                 raise ValueError("No folder types found")
-            
-        # Fix: use next() with a generator expression to find the "VTS" folder type
-        self.simulation_type = next((x for x in self.folder_types if x.name == "VTS"), None)
-        self.inner_node_type = next((x for x in self.folder_types if x.name == "InnerNode"), None)
+
+        # Fix: use next() with a generator expression to find the "vts_simulation" folder type
+        self.simulation_type = next((x for x in self.folder_types if x.name == "vts_simulation"), None)
+        self.inner_node_type = next((x for x in self.folder_types if x.name == "inner_node"), None)
         if self.simulation_type is None or self.inner_node_type is None:
             raise ValueError("Required folder types are not found")
         

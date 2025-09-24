@@ -14,13 +14,13 @@ def insert_vts_metadata_in_db(engine:Engine):
             raise ValueError("vts simulation domain not found")
 
     # **Retention Catalog** (key=retention_label, value=days_to_cleanup):
-    # - **`marked`** (0 days): Mandatory state. This state is for simulation were the retention expired (`retention_expiration_date <= cleanup_status_date`). Changing to this retention sets `retention_expiration_date = cleanup_status_date`
-    # - **`next`** (cleanup_frequency days): Mandatory state. New simulations created in the current cleanup round, that are not path-protected, will be marked for cleanup in the next cleanup round by setting setting `retention_expiration_date = modified_date` for new simulations. Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_status_date + cleanup_frequency`
-    # - **`90d`** (90 days): Changing to this retention sets `retention_expiration_date = cleanup_status_date + 90 days`
-    # - **`180d`** (180 days): Changing to this retention sets `retention_expiration_date = cleanup_status_date + 180 days`
-    # - **`365d`** (365 days): Changing to this retention sets `retention_expiration_date = cleanup_status_date + 365 days`
-    # - **`730d`** (730 days): Changing to this retention sets `retention_expiration_date = cleanup_status_date + 730 days`
-    # - **`1095d`** (1095 days): Changing to this retention sets `retention_expiration_date = cleanup_status_date + 1095 days`
+    # - **`marked`** (0 days): Mandatory state. This state is for simulation were the retention expired (`retention_expiration_date <= cleanup_round_start_date`). Changing to this retention sets `retention_expiration_date = cleanup_round_start_date`
+    # - **`next`** (cleanup_frequency days): Mandatory state. New simulations created in the current cleanup round, that are not path-protected, will be marked for cleanup in the next cleanup round by setting setting `retention_expiration_date = modified_date` for new simulations. Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_round_start_date + cleanup_frequency`
+    # - **`90d`** (90 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 90 days`
+    # - **`180d`** (180 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 180 days`
+    # - **`365d`** (365 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 365 days`
+    # - **`730d`** (730 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 730 days`
+    # - **`1095d`** (1095 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 1095 days`
     # - **`path`**: (null) `this state is for path protected simulations`
     # - **`clean`**: (null) `this state is for clean simulation so the user can see all simulations`
     # - **`issue`**: (null) `this state is for simulation with a cleanup issue so the user can see all simulations`
