@@ -10,7 +10,6 @@ from sqlmodel import Session, func, select
 from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO
 from datamodel.db import Database
 from app.config import AppConfig
-#from app.web_server_retention_api import start_new_cleanup_cycle
 from testdata.vts_generate_test_data import insert_test_data_in_db
 
 app = FastAPI()
@@ -66,61 +65,76 @@ async def get_current_test_mode() -> dict:
 simulation_domain_name: Literal["vts"]
 simulation_domain_names = ["vts"]  # Define the allowed domain names
 
-@app.get("/simulation_domain/", response_model=list[SimulationDomainDTO])
-def read_simulation_domains(domain_name: Optional[str] = Query(default=None)):
+@app.get("/simulationdomains/", response_model=list[SimulationDomainDTO])
+def read_simulation_domains():
     with Session(Database.get_engine()) as session:
-        simulation_domain = session.exec(select(SimulationDomainDTO)).where(SimulationDomainDTO.name == domain_name).first()
+        simulation_domains = session.exec(select(SimulationDomainDTO)).all()
+        if not simulation_domains:
+            raise HTTPException(status_code=404, detail="SimulationDomain not found")
+        return simulation_domains
+"""def read_simulation_domains(domain_name: Optional[str] = Query(default=None)):
+    with Session(Database.get_engine()) as session:
+        simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == domain_name)).first()
         if not simulation_domain:
             raise HTTPException(status_code=404, detail="SimulationDomain not found")
         return simulation_domain
-@app.get("/simulation_domain/dict", response_model=dict[str,SimulationDomainDTO])
-def read_simulation_domains_dict(domain_name: Optional[str] = Query(default=None)):
-    return {domain.name.lower(): domain for domain in read_simulation_domains(domain_name)}
+"""
+#@app.get("/simulationdomains/dict", response_model=dict[str,SimulationDomainDTO]) #disable webapi untill we need it
+def read_simulation_domains_dict():
+    return {domain.name.lower(): domain for domain in read_simulation_domains()}
 
-@app.get("/retentiontypes/", response_model=list[RetentionTypeDTO])
-def read_retentiontypes_by_domain_id(simulation_domain_id: int):
+@app.get("/simulationdomains/{domain_name}", response_model=SimulationDomainDTO)
+def read_simulation_domain_by_name(domain_name: str):
     with Session(Database.get_engine()) as session:
-        retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulation_domain_id == simulation_domain_id)).all()
+        simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == domain_name)).first()
+        if not simulation_domain:
+            raise HTTPException(status_code=404, detail=f"SimulationDomain for {domain_name}not found")
+        return simulation_domain
+
+@app.get("/simulationdomains/{simulationdomain_id}/retentiontypes/", response_model=list[RetentionTypeDTO])
+def read_retentiontypes_by_domain_id(simulationdomain_id: int):
+    with Session(Database.get_engine()) as session:
+        retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulation_domain_id == simulationdomain_id)).all()
         if not retention_types or len(retention_types) == 0:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         return retention_types
-@app.get("/retentiontypes/dict", response_model=dict[str,RetentionTypeDTO])
-def read_retentiontypes_dict_by_domain_id(simulation_domain_id: int):
-    return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulation_domain_id)}
+#@app.get("/simulationdomain/{simulationdomain_id}/retentiontypes/dict", response_model=dict[str,RetentionTypeDTO]) do not expose before needed
+def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int):
+    return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
-@app.get("/foldertypes/", response_model=list[FolderTypeDTO])
-def read_folder_types_pr_domain_id(simulation_domain_id: int):
+@app.get("/simulationdomains/{simulationdomain_id}/foldertypes/", response_model=list[FolderTypeDTO])
+def read_folder_types_pr_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        folder_types = session.exec(select(FolderTypeDTO).where(FolderTypeDTO.simulation_domain_id == simulation_domain_id)).all()
+        folder_types = session.exec(select(FolderTypeDTO).where(FolderTypeDTO.simulation_domain_id == simulationdomain_id)).all()
         if not folder_types or len(folder_types) == 0:
             raise HTTPException(status_code=404, detail="foldertypes not found")
         return folder_types
-@app.get("/foldertypes/dict", response_model=dict[str,FolderTypeDTO])
-def read_folder_type_dict_pr_domain_id(simulation_domain_id: int):
-    return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulation_domain_id)}
+#@app.get("/foldertypes/dict", response_model=dict[str,FolderTypeDTO]) #isadble webapi untill we need it
+def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
+    return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulationdomain_id)}
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
-@app.get("/cycletime/", response_model=list[CycleTimeDTO])
-def read_cycle_time(simulation_domain_id: int):
+@app.get("/simulationdomains/{simulationdomain_id}/cycletimes/", response_model=list[CycleTimeDTO])
+def read_cycle_time(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulation_domain_id == simulation_domain_id)).all()
+        cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulation_domain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:
             raise HTTPException(status_code=404, detail="CycleTime not found")
         return cycle_time
-@app.get("/cycletime/dict", response_model=dict[str,CycleTimeDTO])
-def read_cycle_time_dict(simulation_domain_id: int):
-    return {cycle.name.lower(): cycle for cycle in read_cycle_time(simulation_domain_id)}
+#@app.get("/simulationdomain/{simulationdomain_id}/cycletimes/dict", response_model=dict[str,CycleTimeDTO]) # do not expose before needed
+def read_cycle_time_dict(simulationdomain_id: int):
+    return {cycle.name.lower(): cycle for cycle in read_cycle_time(simulationdomain_id)}
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
-@app.get("/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
-def read_cleanup_frequency(simulation_domain_id: int):
+@app.get("/simulationdomains/{simulationdomain_id}/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
+def read_cleanup_frequency(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cleanup_frequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulation_domain_id == simulation_domain_id)).all()
+        cleanup_frequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulation_domain_id == simulationdomain_id)).all()
         if not cleanup_frequency or len(cleanup_frequency) == 0:
             raise HTTPException(status_code=404, detail="CleanupFrequency not found")
         return cleanup_frequency
-@app.get("/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO])
-def read_cleanup_frequency_dict(simulation_domain_id: int):
+#@app.get("/simulationdomain/{simulation_domain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
+def read_cleanup_frequency_name_dict(simulation_domain_id: int):
     return {cleanup.name.lower(): cleanup for cleanup in read_cleanup_frequency(simulation_domain_id)}
 
 
@@ -128,29 +142,20 @@ def read_cleanup_frequency_dict(simulation_domain_id: int):
 
 # we must only allow the webclient to read the RootFolders
 @app.get("/rootfolders/", response_model=list[RootFolderDTO])
-def read_root_folders(simulation_domain_id: int, initials: Optional[str] = Query(default=None)):
+def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(default=None)):
     with Session(Database.get_engine()) as session:
-        if initials is None or len(initials) == 0 or simulation_domain_id is None or simulation_domain_id == 0:
+        if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
             raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
         else:
             root_folders = session.exec(
-                select(RootFolderDTO).where( (RootFolderDTO.simulation_domain_id == simulation_domain_id) &
+                select(RootFolderDTO).where( (RootFolderDTO.simulation_domain_id == simulationdomain_id) &
                     ((RootFolderDTO.owner == initials) | (RootFolderDTO.approvers.like(f"%{initials}%")))
                 )
             ).all()
         return root_folders        
 
-@app.get("/rootfolder/{root_folder_id}/cleanupfrequency", response_model=CleanupFrequencyDTO)
-def read_rootfolder_cleanupfrequency(root_folder_id: int):
-    with Session(Database.get_engine()) as session:
-        rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == root_folder_id)).first()
-        if not rootfolder:
-            raise HTTPException(status_code=404, detail="rootfolder not found")
-
-        return rootfolder.cleanup_frequency_days
-
 # update a rootfolder's cleanup_configuration
-@app.post("/rootfolder/{rootfolder_id}/cleanup_configuration")
+@app.post("/rootfolders/{rootfolder_id}/cleanup_configuration")
 def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfiguration):
     is_valid, message = cleanup_configuration.is_valid()
     if not is_valid:
@@ -176,16 +181,17 @@ def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configur
 
         if cleanup_configuration.can_start_cleanup():
             print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
-            start_new_cleanup_cycle(rootfolder_id)
+            #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
+            #start_new_cleanup_cycle(rootfolder_id)
 
         return {"message": f"Cleanup configuration updated for rootfolder {rootfolder_id}"}
 
-@app.get("/rootfolder/{rootfolder_id}/retentiontypes", response_model=list[str, RetentionTypeDTO])
+@app.get("/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
 def read_rootfolder_retentiontypes(rootfolder_id: int):
-    return read_rootfolder_retention_type_dict(rootfolder_id).values()
-
-@app.get("/rootfolder/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO])
-def read_rootfolder_retention_type_dict(rootfolder_id: int):
+    retention_types:list[RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder_id).values()
+    return retention_types
+#@app.get("/rootfolders/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO]) #do not expose untill needed
+def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, RetentionTypeDTO]:
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
@@ -195,9 +201,9 @@ def read_rootfolder_retention_type_dict(rootfolder_id: int):
         if not retention_types:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         
-        if not retention_types.get("path",None):
-            raise HTTPException(status_code=404, detail="retentiontypes does not contain 'path' retention type")
-        retention_types["path"] = rootfolder.cycletime
+        if not retention_types.get("+next",None):
+            raise HTTPException(status_code=404, detail="retentiontypes does not contain 'next' retention type")
+        
         return retention_types
 
 def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, RetentionTypeDTO]:
@@ -207,14 +213,14 @@ def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str,
 
 
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
-@app.get("/rootfolder/{rootfolder_id}/folders/", response_model=list[FolderNodeDTO])
+@app.get("/rootfolders/{rootfolder_id}/folders/", response_model=list[FolderNodeDTO])
 def read_folders( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
         return folders
 
 # Endpoint to extract and send all FolderNodeDTOs as CSV
-@app.get("/rootfolder/{rootfolder_id}/folders/csv")
+@app.get("/rootfolders/{rootfolder_id}/folders/csv")
 def read_folders_csv():
     def generate_csv():
         engine = Database.get_engine()
@@ -262,7 +268,7 @@ def read_folders_csv():
     )
 
 # Endpoint to extract and send all FolderNodeDTOs as compressed CSV using zstd
-@app.get("/rootfolder/{rootfolder_id}/folders/csv-zstd")
+@app.get("/rootfolders/{rootfolder_id}/folders/csv-zstd")
 def read_folders_csv_zstd():
     def generate_compressed_csv():
         compressor = ZstdCompressor(level=3)
@@ -314,14 +320,14 @@ def read_folders_csv_zstd():
     )
 
 #get all path protections for a specific root folder
-@app.get("/rootfolder/{rootfolder_id}/pathprotections", response_model=list[PathProtectionDTO])
+@app.get("/rootfolders/{rootfolder_id}/pathprotections", response_model=list[PathProtectionDTO])
 def read_pathprotections( rootfolder_id: int ):
     with Session(Database.get_engine()) as session:
         paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
         return paths
 
 # Add a new path protection to a specific root folder
-@app.post("/rootfolder/{rootfolder_id}/pathprotection")
+@app.post("/rootfolders/{rootfolder_id}/pathprotection")
 def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
     print(f"Adding path protection {path_protection}")
     with Session(Database.get_engine()) as session:
@@ -345,10 +351,10 @@ def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
         
         session.add(new_protection)
         session.commit()
-        return {"message": f"Path protection added for path '{path_protection.path}'"}
+        return {"message": f"Path protection added id '{new_protection.id}' for path '{new_protection.path}'"}
 
 # Delete a path protection from a specific root folder
-@app.delete("/rootfolder/{rootfolder_id}/pathprotection")
+@app.delete("/rootfolders/{rootfolder_id}/pathprotection")
 def delete_path_protection(rootfolder_id: int, protection_id: int):
     with Session(Database.get_engine()) as session:
         # Find the path protection by ID and rootfolder_id

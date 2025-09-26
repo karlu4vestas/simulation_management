@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Field, Session, select, asc
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
+from datamodel.dtos import FolderTypeEnum, RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
 
 
 class TestRootFolderDTO:
@@ -301,7 +301,7 @@ class TestFolderTypeDTO:
     def test_folder_type_with_defaults_create_and_retrieve(self, test_session):
         """Test FolderTypeDTO with default values through database round-trip"""
         # Create with defaults
-        original_type = FolderTypeDTO()  # Uses default name "InnerNode"
+        original_type = FolderTypeDTO(name=FolderTypeEnum.INNERNODE)  # Uses default name "InnerNode"
         test_session.add(original_type)
         test_session.commit()
         test_session.refresh(original_type)
@@ -312,12 +312,12 @@ class TestFolderTypeDTO:
         retrieved_type = test_session.get(FolderTypeDTO, type_id)
         
         # Verify defaults persisted correctly
-        assert retrieved_type.name == "InnerNode"  # Default value
+        assert retrieved_type.name == FolderTypeEnum.INNERNODE  # Default value
 
     def test_folder_type_query_by_name(self, test_session):
         """Test querying FolderTypeDTO by name"""
         # Define expected folder types
-        expected_type_names = ["InnerNode", "LeafNode", "VTSSimulation", "CustomType"]
+        expected_type_names = [FolderTypeEnum.INNERNODE, FolderTypeEnum.VTS_SIMULATION]
         expected_types = [FolderTypeDTO(name=name) for name in expected_type_names]
         
         # Create folder types from expected data
@@ -327,7 +327,7 @@ class TestFolderTypeDTO:
         test_session.commit()
         
         # Query by specific name
-        target_name = "VTSSimulation"
+        target_name = FolderTypeEnum.VTS_SIMULATION
         vts_type = test_session.exec(
             select(FolderTypeDTO).where(FolderTypeDTO.name == target_name)
         ).first()

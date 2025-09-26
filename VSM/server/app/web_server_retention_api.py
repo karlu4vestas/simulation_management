@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from bisect import bisect_left
 from fastapi import HTTPException
 from sqlmodel import Session, select
-from datamodel.dtos import CleanupConfiguration, FolderTypeDTO, RetentionTypeDTO, RootFolderDTO, FolderNodeDTO, RetentionUpdateDTO
+from datamodel.dtos import CleanupConfiguration, FolderTypeDTO, FolderTypeEnum, RetentionTypeDTO, RootFolderDTO, FolderNodeDTO, RetentionUpdateDTO
 from datamodel.db import Database
 from sqlalchemy import func, case
 from app.web_api import app, read_folder_type_dict_pr_domain_id, read_pathprotections, read_rootfolder_retention_type_dict, read_rootfolder_numeric_retentiontypes_dict 
@@ -410,7 +410,7 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
     print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
     nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulation_domain_id)
-    innernode_type_id =nodetypes.get("inner_node", None).id
+    innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
     if not innernode_type_id:
         raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=innernode for {rootfolder.id}")
 

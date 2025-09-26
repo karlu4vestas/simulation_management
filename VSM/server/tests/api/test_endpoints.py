@@ -99,6 +99,35 @@ class TestRetentionAPI:
         assert isinstance(first_item["is_system_managed"], bool)
         assert isinstance(first_item["id"], int)
 
+    def test_get_rootfolder_retentions(self, client):
+        # Test GET /rootfolders/{id}/retentiontypes endpoint
+        # First get a root folder
+        root_folders_response = client.get("/rootfolders/?simulationdomain_id=1&initials=jajac")
+        assert root_folders_response.status_code == 200
+        
+        root_folders = root_folders_response.json()
+        if len(root_folders) > 0:
+            rootfolder_id = root_folders[0]["id"]
+            
+            # Test both with and without trailing slash
+            response1 = client.get(f"/rootfolders/{rootfolder_id}/retentiontypes")
+            assert response1.status_code == 200
+            
+            response2 = client.get(f"/rootfolders/{rootfolder_id}/retentiontypes/")
+            assert response2.status_code == 200
+            
+            # Both should return the same data
+            data1 = response1.json()
+            data2 = response2.json()
+            assert data1 == data2
+            
+            # Verify structure
+            assert isinstance(data1, list)
+            if len(data1) > 0:
+                first_item = data1[0]
+                expected_keys = {"name", "display_rank", "is_system_managed", "id"}
+                assert set(first_item.keys()) == expected_keys
+
 class TestRootFolderAPI:
     # Test API endpoints for RootFolder operations
 
@@ -116,7 +145,7 @@ class TestRootFolderAPI:
         # Test GET /root-folders endpoint with initials query
         client = TestClient(app)
         initials = "jajac"
-        response = client.get(f"/rootfolders/?initials={initials}")
+        response = client.get(f"/rootfolders/?simulationdomain_id=1&initials={initials}")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         root_folders = response.json()

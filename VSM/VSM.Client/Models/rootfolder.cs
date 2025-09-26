@@ -11,10 +11,21 @@ namespace VSM.Client.Datamodel
         }
         public int Id => dto.Id;
         public int Folder_Id => dto.Folder_Id;
-        public string Cleanup_Frequency
+        public CleanupConfigurationDTO CleanupConfiguration
         {
-            get { return dto.Cleanup_Frequency; }
-            set { dto.Cleanup_Frequency = value; }
+            get
+            {
+                return new CleanupConfigurationDTO
+                {
+                    CleanupFrequency = dto.CleanupFrequency,
+                    CycleTime = dto.CycleTime
+                };
+            }
+            set
+            {
+                dto.CleanupFrequency = value.CleanupFrequency;
+                dto.CycleTime = value.CycleTime;
+            }
         }
 
         public string Root_path => dto.Path;
@@ -23,7 +34,7 @@ namespace VSM.Client.Datamodel
         public List<string> AllInitials => new List<string> { Owner }.Concat(Approvers.Split(',')).ToList();
         // the content of the following property must be loaded on demand by calling LoadFolderRetentions()
         public FolderNode FolderTree { get; set; } = new FolderNode(new FolderNodeDTO());
-        public RetentionTypes RetentionConfiguration { get; set; } = new RetentionTypes(new RetentionTypesTO());
+        public RetentionTypes RetentionConfiguration { get; set; } = new RetentionTypes(new RetentionTypesDTO());
         public List<PathProtectionDTO> Path_protections { get; set; } = new();
 
         public PathProtectionDTO? Find_PathProtection_by_FolderId(int folder_id)
@@ -44,7 +55,7 @@ namespace VSM.Client.Datamodel
         }
         private async Task<RetentionTypes> GetRetentionOptionsAsync()
         {
-            RetentionTypesTO dto = await API.Instance.GetRetentionTypes();
+            RetentionTypesDTO dto = await API.Instance.GetRootfolderRetentionTypes(this);
             return new RetentionTypes(dto);
         }
         public async Task UpdateAggregation()

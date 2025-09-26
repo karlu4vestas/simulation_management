@@ -1,6 +1,6 @@
 import pytest
 from sqlmodel import Session, select
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
+from datamodel.dtos import FolderTypeEnum, RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
 from datamodel.db import Database
 
 
@@ -141,24 +141,21 @@ class TestDatabaseOperations:
         
         with Session(engine) as session:
             # Create standard folder types
-            inner_node = FolderTypeDTO(name="InnerNode")
-            vts_simulation = FolderTypeDTO(name="VTSSimulation")
-            leaf_node = FolderTypeDTO(name="LeafNode")
+            inner_node = FolderTypeDTO(name=FolderTypeEnum.INNERNODE)
+            vts_simulation = FolderTypeDTO(name=FolderTypeEnum.VTS_SIMULATION)
             
             session.add(inner_node)
             session.add(vts_simulation)
-            session.add(leaf_node)
             session.commit()
             
             # Retrieve all folder types
             statement = select(FolderTypeDTO)
             folder_types = session.exec(statement).all()
-            
-            assert len(folder_types) == 3
+
+            assert len(folder_types) == 2
             type_names = [ft.name for ft in folder_types]
-            assert "InnerNode" in type_names
-            assert "VTSSimulation" in type_names
-            assert "LeafNode" in type_names
+            assert FolderTypeEnum.INNERNODE in type_names
+            assert FolderTypeEnum.VTS_SIMULATION in type_names
 
     def test_retention_display_ranking(self, database_with_tables):
         """Test RetentionDTO display ranking functionality"""

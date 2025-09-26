@@ -3,6 +3,7 @@ from typing import Optional
 from datetime import date
 from typing import NamedTuple, Literal, Optional
 from dataclasses import dataclass
+from enum import Enum
 
 
 
@@ -11,12 +12,20 @@ class SimulationDomainDTO(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(default="")
 
+class FolderTypeEnum(str, Enum):
+    """
+    Enumeration of legal folder type names for simulation domains.
+    'innernode' must exist for all domains and will be applied to all folders that are not simulations.
+    """
+    INNERNODE = "innernode"
+    VTS_SIMULATION = "vts_simulation"
+
 
 # see values in vts_create_meta_data
-# "innernode" must exist of all domains and will be applied to all folders that are not simulations
+# FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
 class FolderTypeBase(SQLModel):
     simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str = Field(default="InnerNode")
+    name: str | None = None
 
 class FolderTypeDTO(FolderTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -36,7 +45,7 @@ class RetentionTypeDTO(RetentionTypeBase, table=True):
 # time from initialization of the simulation til cleanup of the simulation
 class CleanupFrequencyBase(SQLModel):
     simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str = Field(default="InnerNode")
+    name: str | None = None
     days: int = Field(default=0)
 
 class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
@@ -46,7 +55,7 @@ class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
 # see values in vts_create_meta_data
 class CycleTimeBase(SQLModel):
     simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str = Field(default="InnerNode")
+    name: str | None = None
     days: int = Field(default=0)
 
 class CycleTimeDTO(CycleTimeBase, table=True):
@@ -78,8 +87,8 @@ class RootFolderBase(SQLModel):
     owner: str | None                     = None
     approvers: str | None                 = Field(default=None)  # comma separated approvers
     path: str | None                      = None   # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
-    cycletime: int | None                 = None   # days from initialization of the simulations til it can be cleaned
-    cleanup_frequency: int | None         = None   # number of days between cleanup rounds
+    cycletime: int                        = 0      # from initialization of the simulations til it can be cleaned. 0 means not set
+    cleanup_frequency: int                = 0      # number of days between cleanup rounds. 0 means not set
     cleanup_round_start_date: date | None = None   # at what date did the current cleanup round start
     def get_cleanup_configuration(self) -> CleanupConfiguration:
         return CleanupConfiguration(self.cycletime, self.cleanup_frequency, self.cleanup_round_start_date)

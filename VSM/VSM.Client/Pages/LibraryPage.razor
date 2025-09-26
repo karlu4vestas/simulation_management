@@ -40,15 +40,20 @@
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Cleanup frequency" Width="300px">
+                    <TemplateColumn Title="Cleanup frequency" Width="160px">
                         <ChildContent Context="folder">
-                            @(folder.Cleanup_Frequency)
+                            @($"{frequencyConverter.GetName(folder.CleanupConfiguration.CleanupFrequency)}")
                         </ChildContent>
                     </TemplateColumn>
 
+                    <TemplateColumn Title="Cycle time" Width="160px">
+                        <ChildContent Context="folder">
+                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.CycleTime)}")
+                        </ChildContent>
+                    </TemplateColumn>
                     <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
-                            @if (folder.Cleanup_Frequency != null && folder.Cleanup_Frequency != "inactive")
+                            @if (folder.CleanupConfiguration.CanStartCleanup)
                             {
                                 <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to
                                     retentions</FluentButton>
@@ -71,18 +76,62 @@
                 string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 160px; display: inline-block;">Owners & approvers:</span>
                     @ownerstring</div>
-                <div style="display:flex"><span style="width: 160px; display: inline-block;">Cleanup frequency:</span>
-                    <FluentCombobox Autofocus="true" Items="@Library.Instance.CleanupFrequencies"
-                        @bind-Value="@cleanup_frequency" @bind-Value:after="UpdateCleanUpFrequency" Height="300px"
-                        Position="SelectPosition.Above" Immediate ImmediateDelay="100" />
+                <div style="display:flex"><span style="width: 160px; display: inline-block;">Cycle time:</span>
+                    <FluentCombobox Autofocus="true" Items="@cycleTimeConverter?.Names()" @bind-Value="@cycle_time_name"
+                        @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
+                        ImmediateDelay="100" />
+                    <span style="width: 260px; display: inline-block;"> - days needed to analyse a simulation</span>
+                </div>
+                <div style="display:flex"><span style="width: 160px; display: inline-block;">Cleanup frequency</span>
+                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@cleanup_frequency_name"
+                        @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
+                        ImmediateDelay="100" />
+                    <span style="width: 260px; display: inline-block;"> Days between cleanups</span>
                 </div>
             }
         </FluentStack>
     }
 </FluentStack>
 @code {
+    public class NamesDays
+    {
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+
+    public class NamesDaysLookup
+    {
+        private readonly string _defaultName;
+        private readonly int _defaultDays;
+        private readonly Dictionary<string, int> _nameToDays;
+        private readonly Dictionary<int, string> _daysToName;
+        public NamesDaysLookup(IEnumerable<NamesDays> items)
+        {
+            var list = items.ToList();
+            if (list.Count == 0)
+                list.Add(new NamesDays());
+
+            // store first entry as fallback
+            _defaultName = list[0].Name;
+            _defaultDays = list[0].Days;
+
+            _nameToDays = list.ToDictionary(x => x.Name, x => x.Days);
+            _daysToName = list.ToDictionary(x => x.Days, x => x.Name);
+        }
+        public List<string> Names() => _nameToDays.Keys.ToList();
+        public int GetDays(string name) => _nameToDays.TryGetValue(name, out var days) ? days : _defaultDays;
+        public string GetName(int days) => _daysToName.TryGetValue(days, out var name) ? name : _defaultName;
+    }
+
+
     bool has_loaded_rootFolders = false;
-    string cleanup_frequency = "";
+    CleanupConfigurationDTO cleanup_config = new CleanupConfigurationDTO();
+    string cleanup_frequency_name = "";
+    string cycle_time_name = "";
+
+    NamesDaysLookup frequencyConverter = new NamesDaysLookup(new List<NamesDays>());
+    NamesDaysLookup cycleTimeConverter = new NamesDaysLookup(new List<NamesDays>());
+
     async Task OnLoginClicked()
     {
         if (Library.Instance.User.Length > 0)
@@ -95,6 +144,12 @@
 
                 // first load retention options because we need them to generate testdata and folder structure
                 await Library.Instance.Load();
+
+                frequencyConverter = new NamesDaysLookup(
+                Library.Instance.CleanupFrequencies.Select(x => new NamesDays { Name = x.Name, Days = x.Days }));
+                cycleTimeConverter = new NamesDaysLookup(
+                Library.Instance.CycleTimes.Select(x => new NamesDays { Name = x.Name, Days = x.Days }));
+
                 has_loaded_rootFolders = true;
             }
             finally
@@ -108,19 +163,27 @@
     {
         Library.Instance.SelectedRootFolder = row.Item;
         if (Library.Instance.SelectedRootFolder != null)
-            cleanup_frequency = Library.Instance.SelectedRootFolder.Cleanup_Frequency;
+        {
+            cleanup_config = Library.Instance.SelectedRootFolder.CleanupConfiguration;
+            cleanup_frequency_name = frequencyConverter.GetName(cleanup_config.CleanupFrequency);
+            cycle_time_name = cycleTimeConverter.GetName(cleanup_config.CycleTime);
+        }
         StateHasChanged();
     }
-    private async Task UpdateCleanUpFrequency()
+    private async Task UpdateCleanUpConfiguration()
     {
-        if (Library.Instance.SelectedRootFolder != null && cleanup_frequency !=
-        Library.Instance.SelectedRootFolder.Cleanup_Frequency)
+        if (Library.Instance.SelectedRootFolder != null && cleanup_frequency_name.Length > 0 && cycle_time_name.Length > 0)
         {
-            UpdateFrequencyCmd cmd = new UpdateFrequencyCmd(Library.Instance.SelectedRootFolder, cleanup_frequency);
-            await cmd.Apply();
-            cleanup_frequency = Library.Instance.SelectedRootFolder.Cleanup_Frequency;
-            StateHasChanged();
-            Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.Cleanup_Frequency}");
+            cleanup_config.CleanupFrequency = frequencyConverter.GetDays(cleanup_frequency_name);
+            cleanup_config.CycleTime = cycleTimeConverter.GetDays(cycle_time_name);
+
+            if (cleanup_config.CanStartCleanup)
+            {
+                UpdateFrequencyCmd cmd = new UpdateFrequencyCmd(Library.Instance.SelectedRootFolder, cleanup_config);
+                await cmd.Apply();
+                StateHasChanged();
+                Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
+            }
         }
     }
     private void Go2retention(RootFolder root_folder)

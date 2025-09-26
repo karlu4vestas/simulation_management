@@ -1,8 +1,8 @@
+import random
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from datamodel.db import Database
-import random
 from . import vts_create_meta_data
 
 def insert_test_data_in_db(engine: Engine):
@@ -30,8 +30,8 @@ class RandomNodeType:
                 raise ValueError("No folder types found")
 
         # Fix: use next() with a generator expression to find the "vts_simulation" folder type
-        self.simulation_type = next((x for x in self.folder_types if x.name == "vts_simulation"), None)
-        self.inner_node_type = next((x for x in self.folder_types if x.name == "inner_node"), None)
+        self.simulation_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.VTS_SIMULATION), None)
+        self.inner_node_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.INNERNODE), None)
         if self.simulation_type is None or self.inner_node_type is None:
             raise ValueError("Required folder types are not found")
         
@@ -46,13 +46,14 @@ class RandomNodeType:
         if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
 
-def generate_root_folder(engine: Engine, domain_id:int, owner, approvers, cleanup_frequency, path, levels):
+def generate_root_folder(engine: Engine, domain_id:int, owner:str, approvers:str, cleanup_frequency:int, cycle_time:int, path, levels):
     
     with Session(engine) as session:
         root_folder = RootFolderDTO(
             simulation_domain_id=domain_id,
             owner=owner,
             approvers=approvers,
+            cycle_time=cycle_time,
             cleanup_frequency=cleanup_frequency,
             path=path
         )
@@ -66,20 +67,21 @@ def generate_root_folder(engine: Engine, domain_id:int, owner, approvers, cleanu
         session.commit()
 
 def insert_root_folders_metadata_in_db(engine):
+    from app.web_api import read_cleanup_frequency_name_dict
     with Session(engine) as session:
         vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
         domain_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0
-
+        frequency_name_dict:dict[str,CleanupFrequencyDTO] = read_cleanup_frequency_name_dict(vts_simulation_domain.id)
         if domain_id == 0:
             raise ValueError("vts simulation domain not found")
-
-        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", "1 week",   "R1",2)
-        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", "inactive", "R2",3)
-        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", "2 weeks",  "R3",4)
-        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", "3 weeks",  "R4",5)
-        generate_root_folder(engine, domain_id, "misve", "stefw, arlem", "4 weeks",  "R5",6)
-        generate_root_folder(engine, domain_id, "karlu", "arlem, caemh", "inactive", "R6",7)
-        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", "6 weeks",  "R7",8)
+        cycle_time:int = 0 #days
+        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", frequency_name_dict["1 week"].days,   cycle_time, "R1",2)
+        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", frequency_name_dict["inactive"].days, cycle_time, "R2",3)
+        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", frequency_name_dict["2 weeks"].days,  cycle_time, "R3",4)
+        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", frequency_name_dict["3 weeks"].days,  cycle_time, "R4",5)
+        generate_root_folder(engine, domain_id, "misve", "stefw, arlem", frequency_name_dict["4 weeks"].days,  cycle_time, "R5",6)
+        generate_root_folder(engine, domain_id, "karlu", "arlem, caemh", frequency_name_dict["inactive"].days, cycle_time, "R6",7)
+        generate_root_folder(engine, domain_id, "jajac", "stefw, misve", frequency_name_dict["6 weeks"].days,  cycle_time, "R7",8)
         #generate_root_folder(engine, domain_id, "caemh", "arlem, jajac", False, "R8",9)
         #generate_root_folder(engine, domain_id, "caemh", "arlem, jajac", False, "R9",10)
 
@@ -103,7 +105,7 @@ def generate_node( session: Session,
     child: Optional[FolderNodeDTO] = None
     if node_type is None: 
         return None
-    elif node_type.name=="VTS":
+    elif node_type.name==FolderTypeEnum.VTS_SIMULATION:
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,
@@ -111,7 +113,7 @@ def generate_node( session: Session,
             nodetype_id=node_type.id,  
             retention_id=retention_generator.next().id
         )
-    elif node_type.name=="InnerNode":
+    elif node_type.name==FolderTypeEnum.INNERNODE:
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,

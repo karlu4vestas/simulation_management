@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
+from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
 
 def insert_vts_metadata_in_db(engine:Engine):
     with Session(engine) as session:
@@ -45,8 +45,8 @@ def insert_vts_metadata_in_db(engine:Engine):
             print(f" - {retention.name} (ID: {retention.id})")
 
     with Session(engine) as session:
-        session.add(FolderTypeDTO(name="InnerNode", simulation_domain_id=sim_id ))
-        session.add(FolderTypeDTO(name="vts_simulation", simulation_domain_id=sim_id ))
+        session.add(FolderTypeDTO(name=FolderTypeEnum.INNERNODE, simulation_domain_id=sim_id ))
+        session.add(FolderTypeDTO(name=FolderTypeEnum.VTS_SIMULATION, simulation_domain_id=sim_id ))
         session.commit()
 
         folder_types = session.exec(select(FolderTypeDTO)).all()
@@ -70,6 +70,7 @@ def insert_vts_metadata_in_db(engine:Engine):
             print(f" - {cleanup.name} (ID: {cleanup.id})")
 
     with Session(engine) as session:
+        session.add(CycleTimeDTO(name="inactive", days=-1, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="1 day",    days= 1, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="2 weeks",  days=14, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="3 weeks",  days=21, simulation_domain_id=sim_id ))

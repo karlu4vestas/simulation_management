@@ -37,11 +37,11 @@ public abstract class Command
 
 public class UpdateFrequencyCmd : Command
 {
-    string NewFrequency;
+    CleanupConfigurationDTO cleanup_configuration;
     RootFolder rootFolder;
-    public UpdateFrequencyCmd(RootFolder rootFolder, string newCleanupFrequency) : base("Change cleanup Frequency")
+    public UpdateFrequencyCmd(RootFolder rootFolder, CleanupConfigurationDTO newCleanupFrequency) : base("Change cleanup Frequency")
     {
-        this.NewFrequency = newCleanupFrequency;
+        this.cleanup_configuration = newCleanupFrequency;
         this.rootFolder = rootFolder;
         CommandManager.Instance.Add(this);
     }
@@ -50,9 +50,9 @@ public class UpdateFrequencyCmd : Command
         bool result = false;
         try
         {
-            result = await API.Instance.UpdateRootFolderCleanupFrequency(this.rootFolder.Id, this.NewFrequency);
+            result = await API.Instance.UpdateCleanupConfigurationForRootFolder(this.rootFolder.Id, this.cleanup_configuration);
             if (result)
-                rootFolder.Cleanup_Frequency = NewFrequency;
+                rootFolder.CleanupConfiguration = cleanup_configuration;
         }
         finally
         {
@@ -117,7 +117,7 @@ public class AddPathProtectionCmd : Command
             else
                 retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
 
-            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
             if (!result)
             {
                 throw new Exception("AddPathProtectionCmd:Failed to update retentions via API.");
@@ -178,12 +178,12 @@ public class RemovePathProtectionCmd : Command
             List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_retention));
 
             //change on server
-            bool result = await API.Instance.DeletePathProtectionByRootFolder(valid_from_path_protection.Id);
+            bool result = await API.Instance.DeletePathProtectionByRootFolderAndPathProtection(rootFolder.Id, valid_from_path_protection.Id);
             if (!result)
             {
                 throw new Exception("Failed to delete path protection via API.");
             }
-            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
             if (!result)
             {
                 throw new Exception("RemovePathProtectionCmd: Failed to update retentions via API.");
@@ -222,7 +222,7 @@ public class ChangeRetentionId2IdCmd : Command
         {
             List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(new Retention(from_retention_Id), new Retention(to_retention_Id)));
 
-            result = await API.Instance.UpdateRootFolderRetention(rootFolder.Id, retentionUpdates);
+            result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
             if (!result)
             {
                 throw new Exception("ChangeRetentionId2IdCmd: Failed to update retentions via API.");

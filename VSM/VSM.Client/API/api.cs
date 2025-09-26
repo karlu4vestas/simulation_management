@@ -12,32 +12,70 @@ namespace VSM.Client.SharedAPI
         private static readonly Lazy<API> _instance = new Lazy<API>(() => new API());
         public static API Instance => _instance.Value;
 
-        public async Task<RetentionTypesTO> GetRetentionTypes()
+        public async Task<List<SimulationDomainDTO>> GetSimulationDomains()
         {
-            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>("http://127.0.0.1:5173/retentiontypes/", new JsonSerializerOptions
+            List<SimulationDomainDTO> all_domains = await httpClient.GetFromJsonAsync<List<SimulationDomainDTO>>("http://127.0.0.1:5173/simulationdomains/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
+            }) ?? new List<SimulationDomainDTO>();
+
+            return all_domains;
+        }
+        /// <summary>
+        /// call fastapi @app.get("/simulationdomains/{domain_name}", response_model=SimulationDomainDTO)
+        ///def read_simulation_domain_by_name(domain_name: str):
+        /// </summary>
+        public async Task<SimulationDomainDTO?> GetSimulationDomainByName(string domain_name)
+        {
+            SimulationDomainDTO? domain = await httpClient.GetFromJsonAsync<SimulationDomainDTO>($"http://127.0.0.1:5173/simulationdomains/{Uri.EscapeDataString(domain_name)}", new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            });
+            return domain;
+        }
+
+        public async Task<RetentionTypesDTO> GetRootfolderRetentionTypes(RootFolder rootfolder)
+        {
+            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>($"http://127.0.0.1:5173/rootfolders/{rootfolder.Id}/retentiontypes", new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             }) ?? new List<RetentionTypeDTO>();
 
-            return new RetentionTypesTO(all_retentions);
+            return new RetentionTypesDTO(all_retentions);
         }
-        public async Task<List<string>> GetCleanupFrequencies()
+        public async Task<List<CleanupFrequencyDTO>> GetCleanupFrequencies(int simulationDomainId)
         {
-            List<string> all_frequencies = await httpClient.GetFromJsonAsync<List<string>>("http://127.0.0.1:5173/cleanup_frequencies/", new JsonSerializerOptions
+            List<CleanupFrequencyDTO> all_frequencies = await httpClient.GetFromJsonAsync<List<CleanupFrequencyDTO>>($"http://127.0.0.1:5173/simulationdomains/{simulationDomainId}/cleanupfrequencies/", new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
-            }) ?? new List<string>();
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            }) ?? new List<CleanupFrequencyDTO>();
 
             return all_frequencies;
         }
-        public async Task<List<RootFolderDTO>> LoadUserRootFolders(string user)
+        public async Task<List<CycleTimeDTO>> GetCycleTimes(int simulationDomainId)
+        {
+            List<CycleTimeDTO> all_cycle_times = await httpClient.GetFromJsonAsync<List<CycleTimeDTO>>($"http://127.0.0.1:5173/simulationdomains/{simulationDomainId}/cycletimes/", new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            }) ?? new List<CycleTimeDTO>();
+
+            return all_cycle_times;
+        }
+        public async Task<List<RootFolderDTO>> RootFoldersByDomainUser(int simulationdomain_id, string user)
         {
             try
             {
-                string endpoint = $"http://127.0.0.1:5173/rootfolders/?initials={user}";
-                List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(endpoint, new JsonSerializerOptions
+                /*@app.get("/rootfolders/", response_model=list[RootFolderDTO])
+                def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(default=None)):*/
+                string requestUrl = $"http://127.0.0.1:5173/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
+                List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(requestUrl, new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 }) ?? new List<RootFolderDTO>();
                 return rootFolderDTOs;
             }
@@ -51,10 +89,11 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                string requestUrl = $"http://127.0.0.1:5173/rootfolder/{rootFolder.Id}/folders";
+                string requestUrl = $"http://127.0.0.1:5173/rootfolders/{rootFolder.Id}/folders";
                 List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>(requestUrl, new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 }) ?? new List<FolderNodeDTO>();
 
                 return base_folders;
@@ -65,14 +104,15 @@ namespace VSM.Client.SharedAPI
                 return new List<FolderNodeDTO>();
             }
         }
-        public async Task<bool> UpdateRootFolderCleanupFrequency(int rootFolderId, string cleanupFrequency)
+        public async Task<bool> UpdateCleanupConfigurationForRootFolder(int rootFolderId, CleanupConfigurationDTO cleanup_configuration)
         {
             try
             {
-                var updateData = new { cleanup_frequency = cleanupFrequency };
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolder/{rootFolderId}/cleanup-frequency", updateData, new JsonSerializerOptions
+                var updateData = new { cleanup_frequency = cleanup_configuration.CleanupFrequency, cycletime = cleanup_configuration.CycleTime };
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
                 {
-                    PropertyNameCaseInsensitive = true
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 });
 
                 return response.IsSuccessStatusCode;
@@ -85,7 +125,7 @@ namespace VSM.Client.SharedAPI
         }
         public async Task<List<PathProtectionDTO>> GetPathProtectionsByRootFolderId(int rootFolderId)
         {
-            List<PathProtectionDTO> pathProtections = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>($"http://127.0.0.1:5173/pathprotections/{rootFolderId}", new JsonSerializerOptions
+            List<PathProtectionDTO> pathProtections = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/pathprotections", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -97,7 +137,7 @@ namespace VSM.Client.SharedAPI
             try
             {
                 var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-                var response = await httpClient.PostAsJsonAsync("http://127.0.0.1:5173/pathprotections", pathProtection, jsonOptions);
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{pathProtection.Rootfolder_Id}/pathprotection", pathProtection, jsonOptions);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -121,11 +161,11 @@ namespace VSM.Client.SharedAPI
                 return null;
             }
         }
-        public async Task<bool> DeletePathProtectionByRootFolder(int pathProtectionId)
+        public async Task<bool> DeletePathProtectionByRootFolderAndPathProtection(int rootFolderId, int pathProtectionId)
         {
             try
             {
-                var response = await httpClient.DeleteAsync($"http://127.0.0.1:5173/pathprotections/{pathProtectionId}");
+                var response = await httpClient.DeleteAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/pathprotection?protection_id={pathProtectionId}");
 
                 return response.IsSuccessStatusCode;
             }
@@ -136,8 +176,7 @@ namespace VSM.Client.SharedAPI
             }
         }
 
-        //@todo create a push method to update a folders retention values (retentiontype, pathprotection)
-        public async Task<bool> UpdateRootFolderRetention(int rootFolderId, List<RetentionUpdateDTO> retentionUpdates)
+        public async Task<bool> UpdateRootFolderRetentions(int rootFolderId, List<RetentionUpdateDTO> retentionUpdates)
         {
             try
             {
@@ -155,6 +194,5 @@ namespace VSM.Client.SharedAPI
                 return false;
             }
         }
-
     }
 }

@@ -11,8 +11,11 @@ namespace VSM.Client.Datamodel
         public static Library Instance => _instance.Value;
         public RootFolder? SelectedRootFolder { get; set; }
         public string User { get; set; } = "";
+        // just hard code for now until we have more than one domain and know more about how to mix and match domains
+        private SimulationDomainDTO? Domain { get; set; }
         public List<RootFolder> UsersRootFolders { get; set; } = new List<RootFolder>();
-        public List<string> CleanupFrequencies = new List<string> { "inactive", "1 week", "2 weeks", "3 weeks", "4 weeks", "6 weeks" };
+        public List<CleanupFrequencyDTO> CleanupFrequencies { get; set; } = new List<CleanupFrequencyDTO>();
+        public List<CycleTimeDTO> CycleTimes { get; set; } = new List<CycleTimeDTO>();
         private static byte _current_id = 0;
         public byte NewID
         {
@@ -20,14 +23,17 @@ namespace VSM.Client.Datamodel
         }
         public async Task Load()
         {
-            if (User == null || User.Length == 0)
+            Domain = await API.Instance.GetSimulationDomainByName("vts");
+            if (User == null || User.Length == 0 || Domain == null)
             {
                 UsersRootFolders = [];
             }
             else
             {
-                List<RootFolderDTO> rootFolderDTOs = await API.Instance.LoadUserRootFolders(User);
-                UsersRootFolders = rootFolderDTOs.Select(dto => new RootFolder(dto)).ToList();
+                CleanupFrequencies = await API.Instance.GetCleanupFrequencies(Domain.Id);
+                CycleTimes = await API.Instance.GetCycleTimes(Domain.Id);
+                List<RootFolderDTO> rootFolderDTOs = await API.Instance.RootFoldersByDomainUser(Domain.Id, User);
+                UsersRootFolders = [.. rootFolderDTOs.Select(dto => new RootFolder(dto))];
             }
         }
     }

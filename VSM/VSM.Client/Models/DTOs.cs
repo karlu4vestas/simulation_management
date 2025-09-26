@@ -4,6 +4,68 @@ using System.Threading.Tasks;
 
 namespace VSM.Client.Datamodel
 {
+
+
+    /// <summary>
+    /// Enumeration of legal folder type names for simulation domains.
+    /// 'innernode' must exist for all domains and will be applied to all folders that are not simulations.
+    /// </summary>
+    public static class FolderTypeValues
+    {
+        public enum Types
+        {
+            INNERNODE,
+            VTS_SIMULATION
+        }
+
+        public static readonly Dictionary<Types, string> StringValues = new()
+        {
+            { Types.INNERNODE, "innernode" },
+            { Types.VTS_SIMULATION, "vts_simulation" }
+        };
+
+        // Direct access properties
+        public static string INNERNODE => StringValues[Types.INNERNODE];
+        public static string VTS_SIMULATION => StringValues[Types.VTS_SIMULATION];
+
+        public static string GetStringValue(Types folderType)
+        {
+            return StringValues.TryGetValue(folderType, out var value) ? value : folderType.ToString().ToLower();
+        }
+    }
+
+    public class SimulationDomainDTO
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+    public class CleanupFrequencyDTO
+    {
+        public int Id { get; set; }
+        public int Simulation_Domain_Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+    public class CycleTimeDTO
+    {
+        public int Id { get; set; }
+        public int Simulation_Domain_Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+    public class CleanupConfigurationDTO
+    {
+        public int CycleTime { get; set; }
+
+        public int CleanupFrequency { get; set; }
+
+        // if cleanup_frequency is set then cycletime must also be set
+        public bool IsValid { get { return CleanupFrequency == 0 || CycleTime > 0; } }
+
+        /// Return true if cleanup can be started with this configuration
+        public bool CanStartCleanup { get { return CleanupFrequency > 0 && CycleTime > 0; } }
+    }
+
     public class FolderNodeDTO
     {
         public int Id { get; set; }
@@ -16,19 +78,7 @@ namespace VSM.Client.Datamodel
         public string? Retention_Date { get; set; } = null;
         public string? Modified { get; set; } = null;
     }
-    //do not delete FolderType. It has been commented out at present because it is not usee
-    /*public class FolderType : FolderTypeDTO { }
-        private List<FolderType>? _foldertypes;
-        public async Task<List<FolderType>> GetFolderTypesAsync()
-        {
-            if (_foldertypes == null)
-            {
-                List<FolderTypeDTO> foldertype_dto = await API.Instance.GetFolderTypesFromApiAsync();
-                _foldertypes = foldertype_dto.Select(dto => (FolderType)dto).ToList();
-            }
-            return _foldertypes;
-        }
-    */
+
     // NodeAttributesDTO is only used for nodes with metadata. Most nodes is just an organization of subfolders and will not contain other metadata
     public class RootFolderDTO
     {
@@ -37,7 +87,8 @@ namespace VSM.Client.Datamodel
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public string Cleanup_Frequency { get; set; } = ""; // indicates the folder's cleanup frequency
+        public int CycleTime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
+        public int CleanupFrequency { get; set; } = 0; // number of days between cleanup rounds
     }
     // so far we know: 
     // InnerNode, 
@@ -45,15 +96,16 @@ namespace VSM.Client.Datamodel
     public class FolderTypeDTO
     {
         public byte Id { get; set; }
-        public string Name { get; set; } = "InnerNode";
+        public string Name { get; set; } = "";
     }
     public class RetentionTypeDTO
     {
         public byte Id { get; set; }
         public string Name { get; set; } = "";
-        public string IsSystemManaged { get; set; } = "";
+        public bool IsSystemManaged { get; set; } = false;
         public byte DisplayRank { get; set; } = 0;
     }
+
     public class RetentionType : RetentionTypeDTO { }
     public class PathProtectionDTO
     {
@@ -70,9 +122,9 @@ namespace VSM.Client.Datamodel
             this.dto = dto;
         }
     }
-    public class RetentionTypesTO
+    public class RetentionTypesDTO
     {
-        public RetentionTypesTO(List<RetentionTypeDTO>? all_retentions = null)
+        public RetentionTypesDTO(List<RetentionTypeDTO>? all_retentions = null)
         {
             if (all_retentions != null)
                 this.All_retentions = all_retentions;
@@ -89,8 +141,8 @@ namespace VSM.Client.Datamodel
     //@todo: convert from the DTOs
     public class RetentionTypes
     {
-        RetentionTypesTO dto;
-        public RetentionTypes(RetentionTypesTO dto)
+        RetentionTypesDTO dto;
+        public RetentionTypes(RetentionTypesDTO dto)
         {
             this.dto = dto;
             //the list of dropdown retentions is equal to retentionOptions except for the issue and cleaned retention value
