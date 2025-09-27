@@ -35,13 +35,13 @@ public abstract class Command
     public abstract Task<bool> Apply();
 }
 
-public class UpdateFrequencyCmd : Command
+public class UpdateCleanupConfigurationCmd : Command
 {
     CleanupConfigurationDTO cleanup_configuration;
     RootFolder rootFolder;
-    public UpdateFrequencyCmd(RootFolder rootFolder, CleanupConfigurationDTO newCleanupFrequency) : base("Change cleanup Frequency")
+    public UpdateCleanupConfigurationCmd(RootFolder rootFolder, CleanupConfigurationDTO newCleanupConfiguration) : base("Change cleanup Frequency")
     {
-        this.cleanup_configuration = newCleanupFrequency;
+        this.cleanup_configuration = newCleanupConfiguration;
         this.rootFolder = rootFolder;
         CommandManager.Instance.Add(this);
     }

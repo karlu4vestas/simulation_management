@@ -46,7 +46,7 @@ def sample_root_folder_data():
         "folder_id": 1,
         "owner": "JD",
         "approvers": "AB,CD",
-        "cleanup_frequency": "inactive"
+        "cleanupfrequency": "inactive"
     }
 
 

@@ -46,15 +46,15 @@ class RandomNodeType:
         if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
 
-def generate_root_folder(engine: Engine, domain_id:int, owner:str, approvers:str, cleanup_frequency:int, cycle_time:int, path, levels):
+def generate_root_folder(engine: Engine, domain_id:int, owner:str, approvers:str, cleanupfrequency:int, cycle_time:int, path, levels):
     
     with Session(engine) as session:
         root_folder = RootFolderDTO(
-            simulation_domain_id=domain_id,
+            simulationdomain_id=domain_id,
             owner=owner,
             approvers=approvers,
             cycle_time=cycle_time,
-            cleanup_frequency=cleanup_frequency,
+            cleanupfrequency=cleanupfrequency,
             path=path
         )
         session.add(root_folder)
@@ -67,11 +67,11 @@ def generate_root_folder(engine: Engine, domain_id:int, owner:str, approvers:str
         session.commit()
 
 def insert_root_folders_metadata_in_db(engine):
-    from app.web_api import read_cleanup_frequency_name_dict
+    from app.web_api import read_cleanupfrequency_name_dict
     with Session(engine) as session:
         vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
         domain_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0
-        frequency_name_dict:dict[str,CleanupFrequencyDTO] = read_cleanup_frequency_name_dict(vts_simulation_domain.id)
+        frequency_name_dict:dict[str,CleanupFrequencyDTO] = read_cleanupfrequency_name_dict(vts_simulation_domain.id)
         if domain_id == 0:
             raise ValueError("vts simulation domain not found")
         cycle_time:int = 0 #days
@@ -89,7 +89,7 @@ def insert_root_folders_metadata_in_db(engine):
             root_folders = session.exec(select(RootFolderDTO)).all()
             print("Test data for root_folders inserted successfully:")
             for rf in root_folders:
-                print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanup_frequency} Folder id: {rf.folder_id}")
+                print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanupfrequency} Folder id: {rf.folder_id}")
 
 
 from typing import Optional

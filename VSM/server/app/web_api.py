@@ -94,7 +94,7 @@ def read_simulation_domain_by_name(domain_name: str):
 @app.get("/simulationdomains/{simulationdomain_id}/retentiontypes/", response_model=list[RetentionTypeDTO])
 def read_retentiontypes_by_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulation_domain_id == simulationdomain_id)).all()
+        retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not retention_types or len(retention_types) == 0:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         return retention_types
@@ -105,7 +105,7 @@ def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int):
 @app.get("/simulationdomains/{simulationdomain_id}/foldertypes/", response_model=list[FolderTypeDTO])
 def read_folder_types_pr_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        folder_types = session.exec(select(FolderTypeDTO).where(FolderTypeDTO.simulation_domain_id == simulationdomain_id)).all()
+        folder_types = session.exec(select(FolderTypeDTO).where(FolderTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not folder_types or len(folder_types) == 0:
             raise HTTPException(status_code=404, detail="foldertypes not found")
         return folder_types
@@ -117,7 +117,7 @@ def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
 @app.get("/simulationdomains/{simulationdomain_id}/cycletimes/", response_model=list[CycleTimeDTO])
 def read_cycle_time(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulation_domain_id == simulationdomain_id)).all()
+        cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:
             raise HTTPException(status_code=404, detail="CycleTime not found")
         return cycle_time
@@ -127,15 +127,15 @@ def read_cycle_time_dict(simulationdomain_id: int):
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/simulationdomains/{simulationdomain_id}/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
-def read_cleanup_frequency(simulationdomain_id: int):
+def read_cleanupfrequency(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cleanup_frequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulation_domain_id == simulationdomain_id)).all()
-        if not cleanup_frequency or len(cleanup_frequency) == 0:
+        cleanupfrequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
+        if not cleanupfrequency or len(cleanupfrequency) == 0:
             raise HTTPException(status_code=404, detail="CleanupFrequency not found")
-        return cleanup_frequency
-#@app.get("/simulationdomain/{simulation_domain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
-def read_cleanup_frequency_name_dict(simulation_domain_id: int):
-    return {cleanup.name.lower(): cleanup for cleanup in read_cleanup_frequency(simulation_domain_id)}
+        return cleanupfrequency
+#@app.get("/simulationdomain/{simulationdomain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
+def read_cleanupfrequency_name_dict(simulationdomain_id: int):
+    return {cleanup.name.lower(): cleanup for cleanup in read_cleanupfrequency(simulationdomain_id)}
 
 
 #-----------------end retrieval of metadata for a simulation domain -------------------
@@ -148,7 +148,7 @@ def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(
             raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
         else:
             root_folders = session.exec(
-                select(RootFolderDTO).where( (RootFolderDTO.simulation_domain_id == simulationdomain_id) &
+                select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) &
                     ((RootFolderDTO.owner == initials) | (RootFolderDTO.approvers.like(f"%{initials}%")))
                 )
             ).all()
@@ -197,7 +197,7 @@ def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, Retentio
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
 
-        retention_types:dict[str,RetentionTypeDTO] = read_retentiontypes_dict_by_domain_id(rootfolder.simulation_domain_id)
+        retention_types:dict[str,RetentionTypeDTO] = read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
         if not retention_types:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         
@@ -372,7 +372,8 @@ from bisect import bisect_left
 from dataclasses import dataclass
 from datetime import date, timedelta
 from datamodel.dtos import Retention 
-from datamodel.dtos import RetentionUpdateDTO
+from datamodel.dtos import RetentionUpdateDTO, FolderTypeEnum
+from sqlalchemy import func, case
 
 class RetentionCalculator:
     def __init__(self, numeric_retention_types: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfiguration):
@@ -473,7 +474,7 @@ class FileInfo:
 # The consistency of these calculations is highly critical to the system working correctly
 
 
-# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanup_frequency and rootfolder.cycletime msut be set
+# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanupfrequency and rootfolder.cycletime msut be set
 # it will adjust the expiration dates to the user selected retention categories in the webclient
 #   the expiration date for non-numeric retentions is set to None
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type
@@ -490,7 +491,7 @@ def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
         # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
         # However, when a cleanup round is started they have time at "rootfolder.cycletime" to adjust retention
         if not cleanup_config.can_start_cleanup():
-            raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanup_frequency, cleanup_round_start_date or cycletime ")
+            raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
 
         # Get retention types for calculations
         retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_numeric_retentiontypes_dict(rootfolder_id), cleanup_config) 
@@ -774,7 +775,7 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
         
     print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
-    nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulation_domain_id)
+    nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
     innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
     if not innernode_type_id:
         raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=innernode for {rootfolder.id}")

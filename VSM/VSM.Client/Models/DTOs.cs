@@ -42,14 +42,14 @@ namespace VSM.Client.Datamodel
     public class CleanupFrequencyDTO
     {
         public int Id { get; set; }
-        public int Simulation_Domain_Id { get; set; }
+        public int simulationdomain_id { get; set; }
         public string Name { get; set; } = "";
         public int Days { get; set; }
     }
     public class CycleTimeDTO
     {
         public int Id { get; set; }
-        public int Simulation_Domain_Id { get; set; }
+        public int simulationdomain_id { get; set; }
         public string Name { get; set; } = "";
         public int Days { get; set; }
     }
@@ -59,7 +59,7 @@ namespace VSM.Client.Datamodel
 
         public int CleanupFrequency { get; set; }
 
-        // if cleanup_frequency is set then cycletime must also be set
+        // if cleanupfrequency is set then cycletime must also be set
         public bool IsValid { get { return CleanupFrequency == 0 || CycleTime > 0; } }
 
         /// Return true if cleanup can be started with this configuration
@@ -83,6 +83,7 @@ namespace VSM.Client.Datamodel
     public class RootFolderDTO
     {
         public int Id { get; set; } //ID of this DTO
+        public int SimulationDomain_Id { get; set; } //Id of the simulation domain this rootfolder belongs to
         public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner

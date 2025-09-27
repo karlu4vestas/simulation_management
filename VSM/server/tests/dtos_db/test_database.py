@@ -143,7 +143,7 @@ class TestDatabase:
             root_folder = RootFolderDTO(
                 path="/test/folder",
                 owner="testuser"
-                ##cleanup_frequency=""
+                ##cleanupfrequency=""
             )
             session.add(root_folder)
             session.commit()

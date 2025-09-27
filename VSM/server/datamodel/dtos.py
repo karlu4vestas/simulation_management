@@ -24,7 +24,7 @@ class FolderTypeEnum(str, Enum):
 # see values in vts_create_meta_data
 # FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
 class FolderTypeBase(SQLModel):
-    simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
     name: str | None = None
 
 class FolderTypeDTO(FolderTypeBase, table=True):
@@ -32,7 +32,7 @@ class FolderTypeDTO(FolderTypeBase, table=True):
 
 # see values in vts_create_meta_data
 class RetentionTypeBase(SQLModel):
-    simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
     name: str = Field(default="")
     days_to_cleanup: Optional[int] = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
     is_system_managed: bool = Field(default=False)
@@ -44,7 +44,7 @@ class RetentionTypeDTO(RetentionTypeBase, table=True):
 
 # time from initialization of the simulation til cleanup of the simulation
 class CleanupFrequencyBase(SQLModel):
-    simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
     name: str | None = None
     days: int = Field(default=0)
 
@@ -54,7 +54,7 @@ class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
 # how long time does the engineer require to analyse a simulation before it expires and can be cleaned
 # see values in vts_create_meta_data
 class CycleTimeBase(SQLModel):
-    simulation_domain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
     name: str | None = None
     days: int = Field(default=0)
 
@@ -63,38 +63,38 @@ class CycleTimeDTO(CycleTimeBase, table=True):
 
 
 # The configuration can be used as follow:
-#   a) deactivating cleanup is done by setting cleanup_frequency to None
-#   b) activating a cleanup round requires that cleanup_frequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
-#   c) cycletime can be set with cleanup is inactive cleanup_frequency is None
+#   a) deactivating cleanup is done by setting cleanupfrequency to None
+#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
+#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
 @dataclass # these parameters are needed together often
 class CleanupConfiguration:
     cycletime: int | None                        # days from initialization of the simulations til it can be cleaned
-    cleanup_frequency: int | None                # number of days between cleanup rounds
+    cleanupfrequency: int | None                # number of days between cleanup rounds
     cleanup_round_start_date: date | None = None # at what date did the current cleanup round start. If not set then we assume today
     def is_valid(self):
-        # if cleanup_frequency is set then cycletime must also be set
-        is_valid:bool = True if self.cleanup_frequency is None else (self.cycletime is not None and self.cycletime > 0)
+        # if cleanupfrequency is set then cycletime must also be set
+        is_valid:bool = True if self.cleanupfrequency is None else (self.cycletime is not None and self.cycletime > 0)
 
-        return (is_valid,"ok") if is_valid else (is_valid,"error: cycletime must be set if cleanup_frequency is set")
+        return (is_valid,"ok") if is_valid else (is_valid,"error: cycletime must be set if cleanupfrequency is set")
 
     #return true if cleanup can be started with this configuration
     def can_start_cleanup(self) -> bool:
-        return self.is_valid()[0] and (self.cleanup_frequency is not None)
+        return self.is_valid()[0] and (self.cleanupfrequency is not None)
 
 class RootFolderBase(SQLModel):
-    simulation_domain_id: int | None      = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int | None      = Field(default=None, foreign_key="simulationdomaindto.id") 
     folder_id: int | None                 = Field(default=None, foreign_key="foldernodedto.id") 
     owner: str | None                     = None
     approvers: str | None                 = Field(default=None)  # comma separated approvers
     path: str | None                      = None   # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
     cycletime: int                        = 0      # from initialization of the simulations til it can be cleaned. 0 means not set
-    cleanup_frequency: int                = 0      # number of days between cleanup rounds. 0 means not set
+    cleanupfrequency: int                = 0      # number of days between cleanup rounds. 0 means not set
     cleanup_round_start_date: date | None = None   # at what date did the current cleanup round start
     def get_cleanup_configuration(self) -> CleanupConfiguration:
-        return CleanupConfiguration(self.cycletime, self.cleanup_frequency, self.cleanup_round_start_date)
+        return CleanupConfiguration(self.cycletime, self.cleanupfrequency, self.cleanup_round_start_date)
     def set_cleanup_configuration(self, cleanup: CleanupConfiguration):
         self.cycletime = cleanup.cycletime
-        self.cleanup_frequency = cleanup.cleanup_frequency
+        self.cleanupfrequency = cleanup.cleanupfrequency
         self.cleanup_round_start_date = cleanup.cleanup_round_start_date
 
 class RootFolderDTO(RootFolderBase, table=True):

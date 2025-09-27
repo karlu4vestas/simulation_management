@@ -26,7 +26,7 @@ The longer the period is the more bytes are stored as work in progress. Example 
 
 ### Initial Setup
 
-A secure folder always starts in a state with `cleanup_frequency="inactive"`, meaning that the cleanup process is inactive.
+A secure folder always starts in a state with `cleanupfrequency="inactive"`, meaning that the cleanup process is inactive.
 
 The owner or approvers of the secure folder selects 
 - the cleanup frequency that they expect will work for their project: 15 days, 30 days, or 45 days. These choices can be adapted.
@@ -34,7 +34,7 @@ The owner or approvers of the secure folder selects
 
 ### Managing Cleanup Frequency
 
-The cleanup frequency can be changed or paused (`cleanup_frequency="inactive"`):
+The cleanup frequency can be changed or paused (`cleanupfrequency="inactive"`):
 
 - **Activating** the cleanup activity will define retention expiration dates as explained below
 - **Resuming** will use the previously defined retention expiration dates
@@ -59,9 +59,9 @@ We operate with the following retention states. All but the non-mandatory states
 
 **Retention Catalog** (key=retention_label, value=days_to_cleanup):
 - **`marked`** (0 days): Mandatory state. This state is for simulation were the retention expired (`retention_expiration_date <= cleanup_round_start_date`). Changing to this retention sets `retention_expiration_date = cleanup_round_start_date`
-- **`next`** (cleanup_frequency days): Mandatory state. 
+- **`next`** (cleanupfrequency days): Mandatory state. 
    - New simulations created in the current cleanup round, that are not path-protected, will have `retention_expiration_date = modified_date` and thus be part of ´Next` 
-   - Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_round_start_date + cleanup_frequency`
+   - Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_round_start_date + cleanupfrequency`
 - **`90d`** (90 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 90 days`
 - **`180d`** (180 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 180 days`
 - **`365d`** (365 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 365 days`
@@ -92,8 +92,8 @@ The calculation of the retention for the remaining simulations is based on:
 
 **Retention State Ranges:**
 - **`marked`**:  `days_to_cleanup ≤ 0`
-- **`next`**:    `0 < days_to_cleanup ≤ cleanup_frequency`
-- **`90d`**:     `2 × cleanup_frequency < days_to_cleanup ≤ 90 days`
+- **`next`**:    `0 < days_to_cleanup ≤ cleanupfrequency`
+- **`90d`**:     `2 × cleanupfrequency < days_to_cleanup ≤ 90 days`
 - **`180d`**:    `90 < days_to_cleanup ≤ 180 days`
 - **`365d`**:    `180 < days_to_cleanup ≤ 365 days`
 - **`730d`**:    `365 < days_to_cleanup ≤ 730 days`
@@ -113,8 +113,8 @@ The following pseudocode demonstrates how to determine the appropriate retention
 // Output: cat_retention_label (assigned retention category)
 
 i = 0
-cat = filter(retention_catalog, lambda e: e.value is not null)   // [0, cleanup_frequency, 90, 180, 365, 730, 1095]
-cat_days_to_cleanup = cat.values   // [0, cleanup_frequency, 90, 180, 365, 730, 1095]
+cat = filter(retention_catalog, lambda e: e.value is not null)   // [0, cleanupfrequency, 90, 180, 365, 730, 1095]
+cat_days_to_cleanup = cat.values   // [0, cleanupfrequency, 90, 180, 365, 730, 1095]
 
 while (i < len(cat_days_to_cleanup) && cat_days_to_cleanup[i] <= the_simulations_days_to_cleanup) {
     i++
@@ -131,7 +131,7 @@ This algorithm iterates through the retention catalog values in ascending order 
 - If a simulation has 80 days to cleanup, it gets assigned the `90d` retention label:
 - If a simulation has -1 days to cleanup, it gets assigned to the `marked` retention label
 - If a simulation was produced 1 day into the cleanup round then its retention expire in 1 day (`modified_date-cleanup_round_start_date`) and will be assigned to the `next` retention label
-- if a simulation' retention is changed to `next` then then its retention expire in `cleanup_frequency` days and will be assigned the `next` retention label
+- if a simulation' retention is changed to `next` then then its retention expire in `cleanupfrequency` days and will be assigned the `next` retention label
 
 ### Timeline for cleanup cycle ###
 The following shows:

@@ -71,19 +71,19 @@
             <hr />
             @if (Library.Instance.SelectedRootFolder != null)
             {
-                <div style="display:flex"><span style="width: 160px; display: inline-block;">Secure folder:</span>
+                <div style="display:flex"><span style="width: 170px; display: inline-block;">Secure folder:</span>
                     @Library.Instance.SelectedRootFolder.Root_path </div>
                 string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
-                <div style="display:flex"><span style="width: 160px; display: inline-block;">Owners & approvers:</span>
+                <div style="display:flex"><span style="width: 170px; display: inline-block;">Owners & approvers:</span>
                     @ownerstring</div>
-                <div style="display:flex"><span style="width: 160px; display: inline-block;">Cycle time:</span>
+                <div style="display:flex"><span style="width: 170px; display: inline-block;">Cycle time:</span>
                     <FluentCombobox Autofocus="true" Items="@cycleTimeConverter?.Names()" @bind-Value="@cycle_time_name"
                         @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
                         ImmediateDelay="100" />
-                    <span style="width: 260px; display: inline-block;"> - days needed to analyse a simulation</span>
+                    <span style="width: 320px; display: inline-block;"> - days needed to analyse a simulation</span>
                 </div>
-                <div style="display:flex"><span style="width: 160px; display: inline-block;">Cleanup frequency</span>
-                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@cleanup_frequency_name"
+                <div style="display:flex"><span style="width: 170px; display: inline-block;">Cleanup frequency</span>
+                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@cleanupfrequency_name"
                         @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
                         ImmediateDelay="100" />
                     <span style="width: 260px; display: inline-block;"> Days between cleanups</span>
@@ -98,7 +98,6 @@
         public string Name { get; set; } = "";
         public int Days { get; set; }
     }
-
     public class NamesDaysLookup
     {
         private readonly string _defaultName;
@@ -126,9 +125,8 @@
 
     bool has_loaded_rootFolders = false;
     CleanupConfigurationDTO cleanup_config = new CleanupConfigurationDTO();
-    string cleanup_frequency_name = "";
+    string cleanupfrequency_name = "";
     string cycle_time_name = "";
-
     NamesDaysLookup frequencyConverter = new NamesDaysLookup(new List<NamesDays>());
     NamesDaysLookup cycleTimeConverter = new NamesDaysLookup(new List<NamesDays>());
 
@@ -165,24 +163,24 @@
         if (Library.Instance.SelectedRootFolder != null)
         {
             cleanup_config = Library.Instance.SelectedRootFolder.CleanupConfiguration;
-            cleanup_frequency_name = frequencyConverter.GetName(cleanup_config.CleanupFrequency);
+            cleanupfrequency_name = frequencyConverter.GetName(cleanup_config.CleanupFrequency);
             cycle_time_name = cycleTimeConverter.GetName(cleanup_config.CycleTime);
         }
         StateHasChanged();
     }
     private async Task UpdateCleanUpConfiguration()
     {
-        if (Library.Instance.SelectedRootFolder != null && cleanup_frequency_name.Length > 0 && cycle_time_name.Length > 0)
+        if (Library.Instance.SelectedRootFolder != null && cleanupfrequency_name.Length > 0 && cycle_time_name.Length > 0)
         {
-            cleanup_config.CleanupFrequency = frequencyConverter.GetDays(cleanup_frequency_name);
+            cleanup_config.CleanupFrequency = frequencyConverter.GetDays(cleanupfrequency_name);
             cleanup_config.CycleTime = cycleTimeConverter.GetDays(cycle_time_name);
 
             if (cleanup_config.CanStartCleanup)
             {
-                UpdateFrequencyCmd cmd = new UpdateFrequencyCmd(Library.Instance.SelectedRootFolder, cleanup_config);
+                UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Library.Instance.SelectedRootFolder, cleanup_config);
                 await cmd.Apply();
                 StateHasChanged();
-                Console.WriteLine($"new cleanup_frequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
+                Console.WriteLine($"new cleanupfrequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
             }
         }
     }

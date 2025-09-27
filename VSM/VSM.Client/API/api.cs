@@ -69,15 +69,20 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                /*@app.get("/rootfolders/", response_model=list[RootFolderDTO])
-                def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(default=None)):*/
                 string requestUrl = $"http://127.0.0.1:5173/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
+
                 List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(requestUrl, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    //PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 }) ?? new List<RootFolderDTO>();
                 return rootFolderDTOs;
+            }
+            catch (JsonException jsonEx)
+            {
+                Console.WriteLine($"JSON deserialization error: {jsonEx.Message}");
+                Console.WriteLine($"JSON Path: {jsonEx.Path}");
+                return new List<RootFolderDTO>();
             }
             catch (Exception ex)
             {
@@ -108,7 +113,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                var updateData = new { cleanup_frequency = cleanup_configuration.CleanupFrequency, cycletime = cleanup_configuration.CycleTime };
+                var updateData = new { cleanupfrequency = cleanup_configuration.CleanupFrequency, cycletime = cleanup_configuration.CycleTime };
                 var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
