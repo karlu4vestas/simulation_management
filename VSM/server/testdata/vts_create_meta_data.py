@@ -71,7 +71,7 @@ def insert_vts_metadata_in_db(engine:Engine):
 
     with Session(engine) as session:
         session.add(CycleTimeDTO(name="inactive", days=-1, simulation_domain_id=sim_id ))
-        session.add(CycleTimeDTO(name="1 day",    days= 1, simulation_domain_id=sim_id ))
+        session.add(CycleTimeDTO(name="1 week",   days= 7, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="2 weeks",  days=14, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="3 weeks",  days=21, simulation_domain_id=sim_id ))
         session.add(CycleTimeDTO(name="4 weeks",  days=28, simulation_domain_id=sim_id ))

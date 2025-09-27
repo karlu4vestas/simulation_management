@@ -152,6 +152,17 @@ namespace VSM.Client.SharedAPI
                         }
                     }
                 }
+                else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Path protection already exists or conflicts with existing data: {errorContent}");
+                    return null;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Failed to add path protection. Status: {response.StatusCode}, Error: {errorContent}");
+                }
 
                 return null;
             }
@@ -180,7 +191,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolder/{rootFolderId}/retentions", retentionUpdates, new JsonSerializerOptions
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/retentions", retentionUpdates, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
