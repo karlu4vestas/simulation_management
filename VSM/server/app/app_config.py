@@ -5,10 +5,11 @@ from enum import Enum
 from typing import Literal
 
 
-class AppTestMode(str, Enum):
+class AppConfigMode(str, Enum):
     # Enumeration of available test modes for the application.
     UNIT_TEST = "unit_test"
     CLIENT_TEST = "client_test"
+    INTEGRATION_TEST = "integration_test"
     PRODUCTION = "production"
 
 
@@ -17,7 +18,7 @@ class AppConfig:
     
     _instance = None
     #_test_mode: TestMode = TestMode.UNIT_TEST
-    _test_mode: AppTestMode = AppTestMode.CLIENT_TEST
+    _test_mode: AppConfigMode = AppConfigMode.CLIENT_TEST
     
     def __new__(cls):
         if cls._instance is None:
@@ -31,38 +32,42 @@ class AppConfig:
             cls._instance = cls()
         return cls._instance
     
-    @staticmethod
-    def set_test_mode(mode: AppTestMode) -> None:
+    @classmethod
+    def set_test_mode(cls, mode: AppConfigMode) -> bool:
         # Alternative method to set test mode.
-        AppConfig.Instance()._test_mode = mode
+        cls._test_mode = mode
+        return True
 
-    @staticmethod
-    def get_test_mode() -> AppTestMode:
+    @classmethod
+    def get_test_mode(cls) -> AppConfigMode:
         # Check if current mode is unit_test.
-        return AppConfig.Instance()._test_mode
+        return cls._test_mode
 
-    @staticmethod
-    def is_unit_test() -> bool:
+    @classmethod
+    def is_unit_test(cls) -> bool:
         # Check if current mode is unit_test.
-        return AppConfig.Instance()._test_mode == AppTestMode.UNIT_TEST
+        return cls._test_mode == AppConfigMode.UNIT_TEST
     
-    @staticmethod
-    def is_client_test() -> bool:
+    @classmethod
+    def is_client_test(cls) -> bool:
         # Check if current mode is client_test.
-        return AppConfig.Instance()._test_mode == AppTestMode.CLIENT_TEST
+        return cls._test_mode == AppConfigMode.CLIENT_TEST
 
-    @staticmethod
-    def is_production() -> bool:
+    @classmethod
+    def is_production(cls) -> bool:
         # Check if current mode is production.
-        return AppConfig.Instance()._test_mode == AppTestMode.PRODUCTION
+        return cls._test_mode == AppConfigMode.PRODUCTION
     
     @staticmethod
     def get_db_url() -> str:
         # Get the database URL based on the current test mode.
         inst = AppConfig.Instance()
-        if inst._test_mode == AppTestMode.UNIT_TEST:
+        print(f"get_db_url:{inst}")
+        if inst._test_mode == AppConfigMode.UNIT_TEST:
             return "sqlite:///unit_test_db.sqlite"  # Separate unit test database file
-        elif inst._test_mode == AppTestMode.CLIENT_TEST:
-            return "sqlite:///test_db.sqlite"  # Separate test database file
+        elif inst._test_mode == AppConfigMode.CLIENT_TEST:
+            return "sqlite:///client_test_db.sqlite"  # Separate test database file
+        elif inst._test_mode == AppConfigMode.INTEGRATION_TEST:
+            return "sqlite:///integration_test.sqlite"  # Separate test database file
         else:  # PRODUCTION
             return "sqlite:///db.sqlite"  # Production database file

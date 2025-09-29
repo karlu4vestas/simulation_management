@@ -123,6 +123,66 @@
       "env": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    {
+      "name": "Debug DB Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_db_unittests.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug API Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_api_unittests.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug Integration Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_integration_test.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug DTOs Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_dtos_unittests.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug All Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_all_unittests.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
     }
   ],
   "compounds": [

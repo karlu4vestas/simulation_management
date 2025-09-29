@@ -2,11 +2,12 @@ import random
 from sqlmodel import Session, select
 from sqlalchemy import Engine
 from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
-from datamodel.db import Database
-from . import vts_create_meta_data
+from db.database import Database
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+
 
 def insert_test_data_in_db(engine: Engine):
-    vts_create_meta_data.insert_vts_metadata_in_db(engine)
+    insert_vts_metadata_in_db(engine)
     insert_root_folders_metadata_in_db(engine)
 
 #-------------------------------------

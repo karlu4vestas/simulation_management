@@ -2,10 +2,10 @@ import pytest
 from sqlmodel import Session, select
 from fastapi.testclient import TestClient
 from app.web_api import app
-from datamodel.db import Database
-from app.config import AppConfig, AppTestMode
-#from datamodel.dtos import RetentionTypeDTO
-#from datamodel.db import Database
+from server.db.database import Database
+from server.app.app_config import AppConfig, AppTestMode
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+from server.testdata.vts_generate_test_data import insert_test_data_in_db
 
 
 @pytest.fixture
@@ -16,8 +16,9 @@ def client():
     if db.is_empty() and AppConfig.is_unit_test():
             db.clear_all_tables_and_schemas()
             db.create_db_and_tables()
-            from server.testdata.vts_generate_test_data import insert_test_data_in_db
-            insert_test_data_in_db(db.get_engine()) 
+            engine = db.get_engine()
+            insert_vts_metadata_in_db(engine)
+            insert_test_data_in_db(engine) 
 
     return TestClient(app)
 
@@ -192,16 +193,4 @@ class TestRootfolder_vs_FoldersNodeAPI:
                 assert not root_folder["folder_id"] == "0" #DB index are >0
                 assert isinstance(folder_nodes, list)
 
-    
-# Example of how future API tests will look:
-"""
-def test_api_error_handling(client):
-    # Test invalid data
-    response = client.post("/api/v1/root-folders", json={"invalid": "data"})
-    assert response.status_code == 422
-    
-def test_api_not_found(client):
-    # Test not found error
-    response = client.get("/api/v1/root-folders/99999")
-    assert response.status_code == 404
-"""
+ 

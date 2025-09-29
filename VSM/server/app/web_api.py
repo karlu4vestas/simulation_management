@@ -1,16 +1,17 @@
 import io
 import csv
-from typing import List, Literal
-from typing import Optional
+from typing import Literal, Optional
 from zstandard import ZstdCompressor
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
-from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO
-from datamodel.db import Database
-from app.config import AppConfig
+from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
+from db.database import Database
+from app.app_config import AppConfig
 from testdata.vts_generate_test_data import insert_test_data_in_db
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
 app = FastAPI()
 
@@ -37,25 +38,18 @@ def on_startup():
     if db.is_empty() and AppConfig.is_client_test():
         db.clear_all_tables_and_schemas()
         db.create_db_and_tables()
-        insert_test_data_in_db(db.get_engine()) 
+        engine = db.get_engine()
+        insert_vts_metadata_in_db(engine)
+        insert_test_data_in_db(engine) 
     
     if db.is_empty():
         db.create_db_and_tables()
 
 
+# Get the current test mode configuration.
 @app.get("/", tags=["root"])
-async def read_root() -> dict:
-    return {
-        "message": "Welcome to your todo list.",
-        "test_mode": AppConfig.get_test_mode().value
-    }
-
-
-@app.get("/config/test-mode", tags=["config"])
 async def get_current_test_mode() -> dict:
-    # Get the current test mode configuration.
     return {
-        "test_mode": AppConfig.get_test_mode().value,
         "is_unit_test": AppConfig.is_unit_test(),
         "is_client_test": AppConfig.is_client_test(),
         "is_production": AppConfig.is_production()
@@ -72,13 +66,6 @@ def read_simulation_domains():
         if not simulation_domains:
             raise HTTPException(status_code=404, detail="SimulationDomain not found")
         return simulation_domains
-"""def read_simulation_domains(domain_name: Optional[str] = Query(default=None)):
-    with Session(Database.get_engine()) as session:
-        simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == domain_name)).first()
-        if not simulation_domain:
-            raise HTTPException(status_code=404, detail="SimulationDomain not found")
-        return simulation_domain
-"""
 #@app.get("/simulationdomains/dict", response_model=dict[str,SimulationDomainDTO]) #disable webapi untill we need it
 def read_simulation_domains_dict():
     return {domain.name.lower(): domain for domain in read_simulation_domains()}
@@ -136,10 +123,10 @@ def read_cleanupfrequency(simulationdomain_id: int):
 #@app.get("/simulationdomain/{simulationdomain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
 def read_cleanupfrequency_name_dict(simulationdomain_id: int):
     return {cleanup.name.lower(): cleanup for cleanup in read_cleanupfrequency(simulationdomain_id)}
-
-
 #-----------------end retrieval of metadata for a simulation domain -------------------
 
+
+#-----------------start maintenance of rootfolders and information under it -------------------
 # we must only allow the webclient to read the RootFolders
 @app.get("/rootfolders/", response_model=list[RootFolderDTO])
 def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(default=None)):
@@ -366,114 +353,7 @@ def delete_path_protection(rootfolder_id: int, protection_id: int):
         session.delete(protection)
         session.commit()
         return {"message": f"Path protection {protection_id} deleted"}
-
-##########################
-from bisect import bisect_left
-from dataclasses import dataclass
-from datetime import date, timedelta
-from datamodel.dtos import Retention 
-from datamodel.dtos import RetentionUpdateDTO, FolderTypeEnum
-from sqlalchemy import func, case
-
-class RetentionCalculator:
-    def __init__(self, numeric_retention_types: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfiguration):
-        if not cleanup_config.cleanup_round_start_date or not numeric_retention_types or not cleanup_config.cycletime or cleanup_config.cycletime <= 0:
-            raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
-        self.retention_id_dict        = {retention.id: retention for retention in numeric_retention_types.values()}
-        self.retention_ids            = [retention.id for retention in numeric_retention_types.values()]
-        self.retention_durations      = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
-        self.cleanup_config           = cleanup_config
-        self.cleanup_round_start_date = cleanup_config.cleanup_round_start_date
-        self.cycletimedelta           = timedelta(days=cleanup_config.cycletime)
-
-    # adjust the expiration_date using the cleanup_configuration and retentiontype 
-    # This is what you what when updating the simulations retentiontype using the webclient
-    #
-    # if non numeric retention then set expiration_date to None
-    # if numeric retention then set expiration_date to cleanup_round_start_date + days_to_cleanup of the retention type
-    def adjust_expiration_date_from_cleanup_configuration_and_retentiontype(self, retention: Retention) -> Retention:
-        retentiontype = self.retention_id_dict.get(retention.retention_id, None)
-        if retentiontype is None: # not a numeric retention
-            retention.expiration_date = None
-        else:
-            retention.expiration_date = self.cleanup_round_start_date + timedelta(days = retentiontype.days_to_cleanup)
-        return retention
-
-
-    # adjust expiration_date before retention_id using the cleanup_configuration and modified_date
-    #   - This is what you what when updating the simulation from a scan of its metadata
-    # if modified_date is None then the expiration_date is only change for non numeric retentions. for numeric retention we adjust the retention_id
-    #
-    # if non numeric retention then set expiration_date to None
-    # if numeric retention then 
-    #   use the modified_date to update expiration_date if it will result in longer retention (expiration_date)
-    #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
-    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date=None) -> Retention:
-        retentiontype = self.retention_id_dict.get(retention.retention_id, None)
-        if retentiontype is None: # not a numeric retention
-            retention.expiration_date = None
-        else:
-            if modified_date is not None:
-                retention.expiration_date = modified_date + self.cycletimedelta if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.cycletimedelta)
-
-            if retention.expiration_date is None:
-                raise ValueError("retention.expiration_date is None in RetentionCalculator adjust_to_cleanup_round")
-            else:
-                days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
-                # find first index where retention_duration[idx] >= days_until_expiration
-                idx = bisect_left(self.retention_durations, days_to_expiration)
-
-                # if days_until_expiration is greater than every threshold, return last index
-                retention.retention_id = self.retention_ids[idx] if idx < len(self.retention_durations) else self.retention_ids[len(self.retention_durations) - 1]
-        return retention
-
-    # adjust numeric retention_type to the new cleanup_configuration
-    #   - This is what you what when starting a new cleanup round
-    #
-    # if non numeric retention then set expiration_date to None
-    # if numeric retention then update numeric retention_id to the expiration_date and the cleanup_configuration
-    def adjust_retentions_from_cleanup_configuration(self, retention:Retention) -> Retention:
-        return self.adjust_from_cleanup_configuration_and_modified_date(retention)
-
-class path_protection_engine:
-    sorted_protections:list[tuple[str, int]]
-    def __init__(self, protections: List[PathProtectionDTO], path_retention_id:int, default_path_protection_id: int = 0):
-        #self.match_prefix_id = make_prefix_id_matcher(protections)
-        self.sorted_protections = [(dto.path.lower().replace('\\', '/').rstrip('/'), dto.id) for dto in protections]
-        self.path_retention_id = path_retention_id
-        self.default_protection_id = default_path_protection_id
-
-        self.sorted_protections: list[tuple[str, int]] = sorted(
-            self.sorted_protections,
-            key=lambda item: item[0].count('/'),
-            reverse=True
-        )
-
-    # returns: Retention(retention_id, pathprotection_id) or None if not found
-    def match(self, path:str) -> Optional[Retention]:
-        """
-        Returns a function that, given a path, returns the id of the longest
-        protection that is a prefix of the path (with '/' boundary) or None.
-        """
-        path = (path or "").rstrip('/').lower().replace('\\', '/')
-        for pat, pid in self.sorted_protections:  # short-circuits on first (longest) match
-            if path == pat or path.startswith(pat + "/"):  # avoids "R1" matching "R10/..."
-                return Retention( self.path_retention_id, pid)
-        return None
     
-@dataclass    
-class FileInfo:
-    filepath: str
-    modified_date: date
-    id: int = None   # will be used during updates
-    retention_id: int | None = None
-    nodetype_id: int =0
-
-
-# -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
-# The consistency of these calculations is highly critical to the system working correctly
-
-
 # The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanupfrequency and rootfolder.cycletime msut be set
 # it will adjust the expiration dates to the user selected retention categories in the webclient
 #   the expiration date for non-numeric retentions is set to None
@@ -516,6 +396,29 @@ def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
         
         print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
         return {"message": f"Updated rootfolder {rootfolder_id} with {len(retentions)} retentions"}
+
+
+#-----------------end maintenance of rootfolders and information under it -------------------
+from dataclasses import dataclass
+from datetime import date
+from datamodel.dtos import Retention 
+from datamodel.dtos import FolderTypeEnum
+from datamodel.retention_validators import RetentionCalculator, PathProtectionEngine
+from sqlalchemy import func, case
+
+@dataclass
+class FileInfo:
+    filepath: str
+    modified_date: date
+    id: int = None   # will be used during updates
+    retention_id: int | None = None
+    nodetype_id: int =0
+
+
+# -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
+# The consistency of these calculations is highly critical to the system working correctly
+
+
 
 
 # The following is called by the scheduler (or webclient through update_rootfolder_cleanup_configuration at present) to starts a new cleanup round
@@ -653,7 +556,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
     path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder.id)
     if path_retention_dict.get("path", None) is None:
         raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=vts_simulation for {rootfolder.id}")
-    path_matcher:path_protection_engine = path_protection_engine(read_pathprotections(rootfolder.id), path_retention_dict.get("path", None).id)
+    path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict.get("path", None).id)
 
     # do we have a cleanup configuration that allows start of cleanup
     can_start_cleanup:bool = rootfolder.get_cleanup_configuration().can_start_cleanup()
@@ -874,4 +777,4 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Database error creating node '{segment}': {str(e)}")
     
-    return current_parent_id  # Return the ID of the leaf node        
+    return current_parent_id  # Return the ID of the leaf node

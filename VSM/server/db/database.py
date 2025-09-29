@@ -1,8 +1,8 @@
 from sqlmodel import SQLModel, create_engine, Session, select
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine
 from typing import Optional
-from .dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
-from app.config import AppConfig
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
+from app.app_config import AppConfig
 
 class Database:
     _instance: Optional["Database"] = None

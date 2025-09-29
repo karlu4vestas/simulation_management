@@ -40,17 +40,18 @@
                         </ChildContent>
                     </TemplateColumn>
 
+                    <TemplateColumn Title="Cycle time" Width="160px">
+                        <ChildContent Context="folder">
+                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.CycleTime)}")
+                        </ChildContent>
+                    </TemplateColumn>
+
                     <TemplateColumn Title="Cleanup frequency" Width="160px">
                         <ChildContent Context="folder">
                             @($"{frequencyConverter.GetName(folder.CleanupConfiguration.CleanupFrequency)}")
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Cycle time" Width="160px">
-                        <ChildContent Context="folder">
-                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.CycleTime)}")
-                        </ChildContent>
-                    </TemplateColumn>
                     <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
                             @if (folder.CleanupConfiguration.CanStartCleanup)
@@ -177,7 +178,8 @@
 
             if (cleanup_config.CanStartCleanup)
             {
-                UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Library.Instance.SelectedRootFolder, cleanup_config);
+                UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Library.Instance.SelectedRootFolder,
+                cleanup_config);
                 await cmd.Apply();
                 StateHasChanged();
                 Console.WriteLine($"new cleanupfrequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");

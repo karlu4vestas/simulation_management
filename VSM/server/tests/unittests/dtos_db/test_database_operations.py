@@ -1,7 +1,7 @@
 import pytest
 from sqlmodel import Session, select
 from datamodel.dtos import FolderTypeEnum, RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
-from datamodel.db import Database
+from server.db.database import Database
 
 
 class TestDatabaseOperations:
