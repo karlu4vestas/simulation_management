@@ -1,10 +1,4 @@
-using System;
-using System.Diagnostics.Contracts;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
-using Microsoft.FluentUI.AspNetCore.Components;
 using VSM.Client.Datamodel;
 
 namespace VSM.Client.Pages
@@ -87,7 +81,7 @@ namespace VSM.Client.Pages
                 {
                     isProcessing = true;
                     await InvokeAsync(StateHasChanged);
-    
+
                     //start by verifying if we need to change the list of pathprotections
                     if (new_retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
@@ -99,36 +93,24 @@ namespace VSM.Client.Pages
                         }
 
                         AddPathProtectionCmd cmd = new AddPathProtectionCmd(rootFolder, selected_cell.Node);
-                        if (false == await cmd.Apply() )
-                        {
-                            Console.WriteLine($"Error: Failed to create path protection for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
+                        if (false == await cmd.ExecuteAsync())
                             return;
-                        }
-                        Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString} and path retention {cmd.pathProtection?.Path}");
                     }
                     else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
                     {
                         //remove existing path protection.
-                        RemovePathProtectionCmd cmd = new RemovePathProtectionCmd(rootFolder, selected_cell.Node, new_retention_key.Id);  
-                        if ( false == await cmd.Apply() ){
-                            Console.WriteLine($"OnRetentionChangedAsync: failed to remove patprotection for {selected_cell.retention_key.Id}");
+                        RemovePathProtectionCmd cmd = new RemovePathProtectionCmd(rootFolder, selected_cell.Node, new_retention_key.Id);
+                        if (false == await cmd.ExecuteAsync())
                             return;
-                        } else
-                            Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, {(new_retention_key != null ? new_retention_key.Id.ToString() : "null")} count of remove pathprotections {cmd.remove_count}");
                     }
                     else if (new_retention_key != null) // case for change of retention that does not involved pathRetention
                     {
-                        ChangeRetentionId2IdCmd cmd = new ChangeRetentionId2IdCmd(rootFolder, selected_cell.Node, selected_cell.retention_key.Id, new_retention_key.Id);
-                        if (false == await cmd.Apply())
-                        {
-                            Console.WriteLine($"OnRetentionChangedAsync: failed to change retention for {selected_cell.retention_key.Id} to {new_retention_key.Id}");
+                        ChangeRetentionsCmd cmd = new ChangeRetentionsCmd(rootFolder, selected_cell.Node, selected_cell.retention_key.Id, new_retention_key.Id);
+                        if (false == await cmd.ExecuteAsync())
                             return;
-                        } else
-                            Console.WriteLine($"OnRetentionChangedAsync: {selected_cell.retention_key.Id}, to {new_retention_key.Id_AsString}");
                     }
 
-                    // All done for the selected_cell. 
-                    // Now show where the change has gone to by assigning target_retention_cell
+                    // All done for the selected_cell. Now use target_retention_cell to show where the change has gone to
                     if (new_retention_key != null)
                     {
                         selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
@@ -152,7 +134,7 @@ namespace VSM.Client.Pages
 
         private async Task SelectPathRetention(PathProtectionDTO pathprotection)
         {
-            FolderNode? folder = rootFolder == null ? null : await rootFolder.FolderTree.find_by_folder_id(pathprotection.Folder_Id);
+            FolderNode? folder = rootFolder == null ? null : await rootFolder.FolderTree.FindByFolderId(pathprotection.Folder_Id);
             if (rootFolder != null && folder != null && visibleTable.VisibleRootNode != null)
             {
                 //unfolder the VisibleRows to show folder and select the node where the pathprotection is defined

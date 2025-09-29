@@ -129,7 +129,7 @@ namespace VSM.Client.Datamodel
         public Dictionary<int, int> AttributeDict { get; set; } = new();
         public FolderNode? Parent { get; set; } = null; // Default to null, indicating no parent
         public List<FolderNode> Children { get; set; } = new();
-        public async Task<FolderNode> find_by_folder_id(int folder_id)
+        public async Task<FolderNode> FindByFolderId(int folder_id)
         {
             // Iterative DFS to find folder by ID
             var stack = new Stack<FolderNode>();
@@ -246,7 +246,7 @@ namespace VSM.Client.Datamodel
                         {
                             // Leaf node: count its retention value
                             if (currentNode != null)
-                            {   
+                            {
                                 currentNode.AttributeDict[currentNode.Retention.TypeId] = 1;
                             }
                         }

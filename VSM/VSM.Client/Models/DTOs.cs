@@ -107,21 +107,12 @@ namespace VSM.Client.Datamodel
         public byte DisplayRank { get; set; } = 0;
     }
 
-    public class RetentionType : RetentionTypeDTO { }
     public class PathProtectionDTO
     {
         public int Id { get; set; }
         public int Rootfolder_Id { get; set; }
         public int Folder_Id { get; set; }
         public string Path { get; set; } = "";
-    }
-    public class PathProtection
-    {
-        public PathProtectionDTO dto;
-        public PathProtection(PathProtectionDTO dto)
-        {
-            this.dto = dto;
-        }
     }
     public class RetentionTypesDTO
     {

@@ -8,217 +8,31 @@
 
 <button class="btn btn-primary" @onclick="TestBreakpoint">Test Breakpoint</button><span class="ms-2">@message</span>
 
-        <FluentStack Orientation="Orientation.Vertical">
-        <div style="display:flex">
-            <p>register initials:</p>
-            <FluentTextField @bind-Value="@sharedtestParameters.initials" Placeholder="your initials"></FluentTextField>
-            @*<p>simulation domain:</p>
+<FluentStack Orientation="Orientation.Vertical">
+    <div style="display:flex">
+        <p>register initials:</p>
+        <FluentTextField @bind-Value="@sharedtestParameters.initials" Placeholder="your initials"></FluentTextField>
+        @*<p>simulation domain:</p>
             <FluentTextField @bind-Value="@domain_name" Placeholder="your simulation domain"></FluentTextField>*@
-            @*<FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>*@
-        </div>
-        </FluentStack>
+        @*<FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>*@
+    </div>
+</FluentStack>
 
-        <FluentStack Orientation="Orientation.Vertical">
-            <div class="grid">
-                <FluentDataGrid Items="@endpoint_tests.AsQueryable()" TGridItem="IEndpointTest"
-                    ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
-                    GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
+<FluentStack Orientation="Orientation.Vertical">
+    <div class="grid">
+        <FluentDataGrid Items="@endpoint_tests.AsQueryable()" TGridItem="IEndpointTest" ShowHover="true"
+            DisplayMode="DataGridDisplayMode.Table" GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
 
-                    <TemplateColumn Title="TestActivations" Width="300px">
-                        <ChildContent Context="endpoint">
-                            <FluentButton Appearance="Appearance.Accent" @onclick="@(() => endpoint.ActivateAsync())"> 
-                                 @endpoint.TestName 
-                            </FluentButton>
-                        </ChildContent>
-                    </TemplateColumn>
+            <TemplateColumn Title="TestActivations" Width="300px">
+                <ChildContent Context="endpoint">
+                    <FluentButton Appearance="Appearance.Accent" @onclick="@(() => endpoint.ActivateAsync())"
+                        Disabled=!endpoint.Enabled>
+                        @endpoint.TestName
+                    </FluentButton>
+                </ChildContent>
+            </TemplateColumn>
 
-                    <PropertyColumn Title="testmessage" Property="@(endpoint => endpoint.TestMessage)" Width="400px" />
-                </FluentDataGrid>
-            </div>
-        </FluentStack>
-
-
-@code {
-    public class SharedParameters{
-        public string initials = "";
-        public string domain_name = "vts";
-        public SimulationDomainDTO? vts_simulationDomain = null;
-        public RootFolder? rootfolder = null;
-    }
-    
-    public static class EndpointTestRegistry
-    {
-        private static readonly Dictionary<string, IEndpointTest> _tests = new();
-        private static SharedParameters? _sharedParameters;
-        
-        public static void Initialize(SharedParameters sharedParameters)
-        {
-            _sharedParameters = sharedParameters;
-        }
-        
-        public static SharedParameters SharedParams => _sharedParameters ?? throw new InvalidOperationException("Registry not initialized");
-        
-        public static void Register(IEndpointTest test)
-        {
-            _tests[test.TestId] = test;
-        }
-        
-        public static IEndpointTest? GetTest(string testId)
-        {
-            return _tests.TryGetValue(testId, out var test) ? test : null;
-        }
-        
-        public static IEnumerable<IEndpointTest> GetAllTests()
-        {
-            return _tests.Values;
-        }
-    }
-
-    public interface IEndpointTest
-    {
-        string TestId { get; }
-        string TestName { get; }
-        string TestMessage { get; }
-        Task ActivateAsync();
-    }
-
-    public abstract class EndpointTest<T> : IEndpointTest
-    {
-        public string TestId { get; private set; }
-        public string TestName { get; set; } = "test";
-        public string TestMessage { get; set; } = "";
-        
-        protected SharedParameters shared_params => EndpointTestRegistry.SharedParams;
-        
-        protected EndpointTest()
-        {
-            // Generate test ID and name from class name
-            var className = GetType().Name;
-            TestId = className;
-            
-            if (className.EndsWith("Test"))
-                className = className.Substring(0, className.Length - 4);
-            
-            TestName = System.Text.RegularExpressions.Regex.Replace(className, "([a-z])([A-Z])", "$1 $2") + " Test";
-            
-            // Register this test
-            EndpointTestRegistry.Register(this);
-        }
-
-        public async Task ActivateAsync()
-        {
-            try
-            {
-                var result = await GetDataAsync();
-                TestMessage = FormatResult(result);
-            }
-            catch (Exception ex)
-            {
-                TestMessage = "Failed";
-                Console.WriteLine($"Error in {GetType().Name}: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
-            }
-        }
-
-        protected abstract Task<T> GetDataAsync();
-        protected virtual string FormatResult(T result) => result?.ToString() ?? "No data";
-    }
-
-    public class VtsSimulationdomainsTest : EndpointTest<SimulationDomainDTO?>
-    {
-        protected override async Task<SimulationDomainDTO?> GetDataAsync()  {
-            SimulationDomainDTO? domain = await API.Instance.GetSimulationDomainByName(shared_params.domain_name);
-            shared_params.vts_simulationDomain = domain != null ? domain : null;
-            //sharedtestParameters.vts_simulationDomain = simulationDomains.FirstOrDefault(d => d.Name.ToLower().Contains("vts"));
-            return domain;
-        }
-        protected override string FormatResult(SimulationDomainDTO? result) => result != null ? $"domain retrieved: {result.Name}" : "No domain retrieved";
-    }
-    public class RootFolderTest : EndpointTest<List<RootFolderDTO>>
-    {
-        protected override async Task<List<RootFolderDTO>> GetDataAsync() {
-            if(shared_params.vts_simulationDomain == null || shared_params.initials == "")
-                throw new Exception("Simulation domain not set. Run SimulationdomainsTest first.");
-            else {    
-                List<RootFolderDTO> rootFolders = await API.Instance.RootFoldersByDomainUser(shared_params.vts_simulationDomain.Id, shared_params.initials);
-                shared_params.rootfolder = rootFolders.Count>0 ? new RootFolder(rootFolders.First()) : null;
-
-                return rootFolders;
-            }
-        }
-        protected override string FormatResult(List<RootFolderDTO> result) => $"Number of root folders retrieved: {result.Count}";
-    }
-    public class CleanupFrequenciesTest : EndpointTest<List<CleanupFrequencyDTO>>
-    {
-        protected override async Task<List<CleanupFrequencyDTO>> GetDataAsync()
-        {
-            if (shared_params.vts_simulationDomain == null)
-                throw new Exception("Simulation domain not set. Run SimulationdomainsTest first.");
-            return await API.Instance.GetCleanupFrequencies(shared_params.vts_simulationDomain.Id);
-        }
-        protected override string FormatResult(List<CleanupFrequencyDTO> result) => $"Number of cleanup frequencies retrieved: {result.Count}";
-    }
-    public class CycleTimesTest : EndpointTest<List<CycleTimeDTO>>
-    {
-        protected override async Task<List<CycleTimeDTO>> GetDataAsync()
-        {
-            if (shared_params.vts_simulationDomain == null)
-                throw new Exception("Simulation domain not set. Run SimulationdomainsTest first.");
-            return await API.Instance.GetCycleTimes(shared_params.vts_simulationDomain.Id);
-        }
-        protected override string FormatResult(List<CycleTimeDTO> result) => $"Number of cycle times retrieved: {result.Count}";
-    }
-
-    public class RetentionTypesTest : EndpointTest<RetentionTypesDTO>
-    {
-        protected override async Task<RetentionTypesDTO> GetDataAsync()
-        {
-            if (shared_params.rootfolder == null)
-                throw new Exception("Root folder not set. Run RootFolderTest first.");
-            return await API.Instance.GetRootfolderRetentionTypes(shared_params.rootfolder);
-        }
-        protected override string FormatResult(RetentionTypesDTO result) => $"Number of retention types retrieved: {result.All_retentions.Count}";
-    }
-
-
-    public class CleanupConfigurationTest : EndpointTest<CleanupConfigurationDTO?>
-    {
-        protected override async Task<CleanupConfigurationDTO?> GetDataAsync()
-        {
-            await Task.Delay(10); // Simulate async work
-            if(shared_params.rootfolder != null)
-                return shared_params.rootfolder.CleanupConfiguration;
-            else 
-                return null;
-        }
-        
-        protected override string FormatResult(CleanupConfigurationDTO? result) => result != null ? $"Cleanup configurations. Cycletime {result.CycleTime} days, CleanupFrequency {result.CleanupFrequency} days" : "No cleanup configuration retrieved";
-    }
-
-    private string message = "Click the button to test breakpoint";
-    private static SharedParameters sharedtestParameters = new SharedParameters();
-    
-    List<IEndpointTest> endpoint_tests = new List<IEndpointTest>();
-    
-    protected override void OnInitialized()
-    {
-        // Initialize the registry with shared parameters
-        EndpointTestRegistry.Initialize(sharedtestParameters);
-        
-        // Create tests without constructor parameters
-        endpoint_tests = new List<IEndpointTest> { 
-            new VtsSimulationdomainsTest(), 
-            new CleanupFrequenciesTest(),
-            new CycleTimesTest(),
-            new RootFolderTest(),
-            new RetentionTypesTest(),
-            new CleanupConfigurationTest()
-        };
-    }
-
-    private void TestBreakpoint()
-    {
-        // Set a breakpoint on this line
-        message = $"Debugger.IsAttached:{Debugger.IsAttached}";
-    }
-}
+            <PropertyColumn Title="testmessage" Property="@(endpoint => endpoint.TestMessage)" Width="400px" />
+        </FluentDataGrid>
+    </div>
+</FluentStack>
