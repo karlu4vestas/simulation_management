@@ -50,6 +50,12 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Handle favicon requests to avoid 404 logs
+@app.get("/favicon.ico")
+async def favicon():
+    from fastapi.responses import Response
+    return Response(status_code=204)
+
 # Get the current test mode configuration.
 @app.get("/", tags=["root"])
 async def get_current_test_mode() -> dict:
