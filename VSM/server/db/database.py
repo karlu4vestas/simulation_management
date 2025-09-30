@@ -1,7 +1,7 @@
 from sqlmodel import SQLModel, create_engine, Session, select
 from sqlalchemy import Engine
 from typing import Optional
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO
 from app.app_config import AppConfig
 
 class Database:
@@ -45,8 +45,8 @@ class Database:
         if self._engine is None:
             return True
             
-        # List of all table models that should be checked
-        table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO]
+        # List of all table models that should be checked (including metadata tables)
+        table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO]
         
         try:
             with Session(self._engine) as session:

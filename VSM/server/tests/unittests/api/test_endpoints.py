@@ -4,8 +4,7 @@ from db.database import Database
 from fastapi.testclient import TestClient
 from app.web_api import app
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from testdata.vts_generate_test_data import insert_test_data_in_db
-
+from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db 
 
 @pytest.fixture
 def client():
@@ -17,7 +16,7 @@ def client():
             db.create_db_and_tables()
             engine = db.get_engine()
             insert_vts_metadata_in_db(engine)
-            insert_test_data_in_db(engine) 
+            insert_test_folder_hierarchy_in_db(engine) 
 
     return TestClient(app)
 
@@ -49,8 +48,8 @@ class TestRetentionAPI:
     # Test API endpoints for Retention operations
 
     def test_get_retention(self, client):
-        # Test GET /simulationdomains/{simulationdomain_id}/retentiontypes/ endpoint
-        response = client.get("/simulationdomains/1/retentiontypes/")
+        # Test GET /v1/simulationdomains/{simulationdomain_id}/retentiontypes/ endpoint
+        response = client.get("/v1/simulationdomains/1/retentiontypes/")
             
         # Verify the response
         assert response.status_code == 200
@@ -71,9 +70,9 @@ class TestRetentionAPI:
         assert isinstance(first_item["id"], int)
 
     def test_get_rootfolder_retentions(self, client):
-        # Test GET /rootfolders/{id}/retentiontypes endpoint
+        # Test GET /v1/rootfolders/{id}/retentiontypes endpoint
         # First get a root folder
-        root_folders_response = client.get("/rootfolders/?simulationdomain_id=1&initials=jajac")
+        root_folders_response = client.get("/v1/rootfolders/?simulationdomain_id=1&initials=jajac")
         assert root_folders_response.status_code == 200
         
         root_folders = root_folders_response.json()
@@ -81,10 +80,10 @@ class TestRetentionAPI:
             rootfolder_id = root_folders[0]["id"]
             
             # Test both with and without trailing slash
-            response1 = client.get(f"/rootfolders/{rootfolder_id}/retentiontypes")
+            response1 = client.get(f"/v1/rootfolders/{rootfolder_id}/retentiontypes")
             assert response1.status_code == 200
             
-            response2 = client.get(f"/rootfolders/{rootfolder_id}/retentiontypes/")
+            response2 = client.get(f"/v1/rootfolders/{rootfolder_id}/retentiontypes/")
             assert response2.status_code == 200
             
             # Both should return the same data
@@ -103,15 +102,15 @@ class TestRootFolderAPI:
     # Test API endpoints for RootFolder operations
 
     def test_get_root_folders(self, client):
-        # Test GET /rootfolders endpoint - requires parameters
-        response = client.get("/rootfolders/?simulationdomain_id=1&initials=jajac")
+        # Test GET /v1/rootfolders endpoint - requires parameters
+        response = client.get("/v1/rootfolders/?simulationdomain_id=1&initials=jajac")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
 
     def test_query_root_folders(self, client):
-        # Test GET /rootfolders endpoint with initials query
+        # Test GET /v1/rootfolders endpoint with initials query
         initials = "jajac"
-        response = client.get(f"/rootfolders/?simulationdomain_id=1&initials={initials}")
+        response = client.get(f"/v1/rootfolders/?simulationdomain_id=1&initials={initials}")
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
         root_folders = response.json()
@@ -122,8 +121,8 @@ class TestFolderNodeAPI:
     # Test API endpoints for FolderNode operations
 
     def test_get_folder_nodes(self, client):
-        # Test GET /rootfolders/{rootfolder_id}/folders/ endpoint
-        response = client.get("/rootfolders/1/folders/")  
+        # Test GET /v1/rootfolders/{rootfolder_id}/folders/ endpoint
+        response = client.get("/v1/rootfolders/1/folders/")  
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/json"
 
@@ -132,7 +131,7 @@ class TestRootfolder_vs_FoldersNodeAPI:
     
     def test_query_folder_nodes_by_rootfolder(self, client):
         # First retrieve root folders with required parameters
-        root_folders_response = client.get("/rootfolders/?simulationdomain_id=1&initials=jajac")
+        root_folders_response = client.get("/v1/rootfolders/?simulationdomain_id=1&initials=jajac")
         assert root_folders_response.status_code == 200
         assert root_folders_response.headers["content-type"] == "application/json"
         
@@ -146,7 +145,7 @@ class TestRootfolder_vs_FoldersNodeAPI:
             root_folder_id = root_folder["id"]
             
             # Get folder nodes for this root folder using correct endpoint
-            response = client.get(f"/rootfolders/{root_folder_id}/folders/")  
+            response = client.get(f"/v1/rootfolders/{root_folder_id}/folders/")  
             assert response.status_code == 200
             assert response.headers["content-type"] == "application/json"
             

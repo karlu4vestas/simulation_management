@@ -5,11 +5,6 @@ from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO
 from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
-
-def insert_test_data_in_db(engine: Engine):
-    insert_vts_metadata_in_db(engine)
-    insert_root_folders_metadata_in_db(engine)
-
 #-------------------------------------
 # helper to generate random retenttype except for the "Path" retention. 
 class RandomRetention:
@@ -67,7 +62,7 @@ def generate_root_folder(engine: Engine, domain_id:int, owner:str, approvers:str
         root_folder.folder_id = generate_folder_tree(engine, root_folder.id, path, levels)
         session.commit()
 
-def insert_root_folders_metadata_in_db(engine):
+def insert_test_folder_hierarchy_in_db(engine):
     from app.web_api import read_cleanupfrequency_name_dict
     with Session(engine) as session:
         vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()

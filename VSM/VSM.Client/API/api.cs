@@ -14,7 +14,7 @@ namespace VSM.Client.SharedAPI
 
         public async Task<List<SimulationDomainDTO>> GetSimulationDomains()
         {
-            List<SimulationDomainDTO> all_domains = await httpClient.GetFromJsonAsync<List<SimulationDomainDTO>>("http://127.0.0.1:5173/simulationdomains/", new JsonSerializerOptions
+            List<SimulationDomainDTO> all_domains = await httpClient.GetFromJsonAsync<List<SimulationDomainDTO>>("http://127.0.0.1:5173/v1/simulationdomains/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             }) ?? new List<SimulationDomainDTO>();
@@ -22,12 +22,12 @@ namespace VSM.Client.SharedAPI
             return all_domains;
         }
         /// <summary>
-        /// call fastapi @app.get("/simulationdomains/{domain_name}", response_model=SimulationDomainDTO)
+        /// call fastapi @app.get("/v1/simulationdomains/{domain_name}", response_model=SimulationDomainDTO)
         ///def read_simulation_domain_by_name(domain_name: str):
         /// </summary>
         public async Task<SimulationDomainDTO?> GetSimulationDomainByName(string domain_name)
         {
-            SimulationDomainDTO? domain = await httpClient.GetFromJsonAsync<SimulationDomainDTO>($"http://127.0.0.1:5173/simulationdomains/{Uri.EscapeDataString(domain_name)}", new JsonSerializerOptions
+            SimulationDomainDTO? domain = await httpClient.GetFromJsonAsync<SimulationDomainDTO>($"http://127.0.0.1:5173/v1/simulationdomains/{Uri.EscapeDataString(domain_name)}", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -37,7 +37,7 @@ namespace VSM.Client.SharedAPI
 
         public async Task<RetentionTypesDTO> GetRootfolderRetentionTypes(RootFolder rootfolder)
         {
-            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>($"http://127.0.0.1:5173/rootfolders/{rootfolder.Id}/retentiontypes", new JsonSerializerOptions
+            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>($"http://127.0.0.1:5173/v1/rootfolders/{rootfolder.Id}/retentiontypes", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -47,7 +47,7 @@ namespace VSM.Client.SharedAPI
         }
         public async Task<List<CleanupFrequencyDTO>> GetCleanupFrequencies(int simulationDomainId)
         {
-            List<CleanupFrequencyDTO> all_frequencies = await httpClient.GetFromJsonAsync<List<CleanupFrequencyDTO>>($"http://127.0.0.1:5173/simulationdomains/{simulationDomainId}/cleanupfrequencies/", new JsonSerializerOptions
+            List<CleanupFrequencyDTO> all_frequencies = await httpClient.GetFromJsonAsync<List<CleanupFrequencyDTO>>($"http://127.0.0.1:5173/v1/simulationdomains/{simulationDomainId}/cleanupfrequencies/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -57,7 +57,7 @@ namespace VSM.Client.SharedAPI
         }
         public async Task<List<CycleTimeDTO>> GetCycleTimes(int simulationDomainId)
         {
-            List<CycleTimeDTO> all_cycle_times = await httpClient.GetFromJsonAsync<List<CycleTimeDTO>>($"http://127.0.0.1:5173/simulationdomains/{simulationDomainId}/cycletimes/", new JsonSerializerOptions
+            List<CycleTimeDTO> all_cycle_times = await httpClient.GetFromJsonAsync<List<CycleTimeDTO>>($"http://127.0.0.1:5173/v1/simulationdomains/{simulationDomainId}/cycletimes/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -69,7 +69,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                string requestUrl = $"http://127.0.0.1:5173/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
+                string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
 
                 List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(requestUrl, new JsonSerializerOptions
                 {
@@ -94,7 +94,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                string requestUrl = $"http://127.0.0.1:5173/rootfolders/{rootFolder.Id}/folders";
+                string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/{rootFolder.Id}/folders";
                 List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>(requestUrl, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -114,7 +114,7 @@ namespace VSM.Client.SharedAPI
             try
             {
                 var updateData = new { cleanupfrequency = cleanup_configuration.CleanupFrequency, cycletime = cleanup_configuration.CycleTime };
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -130,7 +130,7 @@ namespace VSM.Client.SharedAPI
         }
         public async Task<List<PathProtectionDTO>> GetPathProtectionsByRootFolderId(int rootFolderId)
         {
-            List<PathProtectionDTO> pathProtections = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/pathprotections", new JsonSerializerOptions
+            List<PathProtectionDTO> pathProtections = await httpClient.GetFromJsonAsync<List<PathProtectionDTO>>($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/pathprotections", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -142,7 +142,7 @@ namespace VSM.Client.SharedAPI
             try
             {
                 var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{pathProtection.Rootfolder_Id}/pathprotection", pathProtection, jsonOptions);
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{pathProtection.Rootfolder_Id}/pathprotection", pathProtection, jsonOptions);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -181,7 +181,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                var response = await httpClient.DeleteAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/pathprotection?protection_id={pathProtectionId}");
+                var response = await httpClient.DeleteAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/pathprotection?protection_id={pathProtectionId}");
 
                 return response.IsSuccessStatusCode;
             }
@@ -196,7 +196,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/rootfolders/{rootFolderId}/retentions", retentionUpdates, new JsonSerializerOptions
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/retentions", retentionUpdates, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
