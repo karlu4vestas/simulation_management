@@ -183,6 +183,18 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}/server"
       }
+    },
+    {
+      "name": "Generate In memory folders",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/tests/integration/generate_import_data.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server/tests/integration/",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
     }
   ],
   "compounds": [
