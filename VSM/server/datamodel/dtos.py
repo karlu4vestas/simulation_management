@@ -1,65 +1,64 @@
 from sqlmodel import Field, SQLModel
 from typing import Optional
 from datetime import date
-from typing import NamedTuple, Literal, Optional
+from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
 
 
-
 # see values in vts_create_meta_data
 class SimulationDomainDTO(SQLModel, table=True):
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(default="")
+    id: int | None  = Field(default=None, primary_key=True)
+    name: str       = Field(default="")
 
 class FolderTypeEnum(str, Enum):
-    """
-    Enumeration of legal folder type names for simulation domains.
-    'innernode' must exist for all domains and will be applied to all folders that are not simulations.
-    """
-    INNERNODE = "innernode"
-    VTS_SIMULATION = "vts_simulation"
-
+    #Enumeration of legal folder type names for simulation domains.
+    #'innernode' must exist for all domains and will be applied to all folders that are not simulations.
+    INNERNODE       = "innernode"
+    VTS_SIMULATION  = "vts_simulation"
 
 # see values in vts_create_meta_data
 # FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
 class FolderTypeBase(SQLModel):
-    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str | None = None
+    simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
+    name: str                       = Field(default="")
 
 class FolderTypeDTO(FolderTypeBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None                  = Field(default=None, primary_key=True)
+
 
 # see values in vts_create_meta_data
 class RetentionTypeBase(SQLModel):
-    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str = Field(default="")
-    days_to_cleanup: Optional[int] = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
-    is_system_managed: bool = Field(default=False)
-    display_rank: int = Field(default=0)
+    simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
+    name: str                       = Field(default="")
+    days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
+    is_system_managed: bool         = Field(default=False)
+    display_rank: int               = Field(default=0)
 
 #retention types must be order by increasing days_to_cleanup and then by display_rank
 class RetentionTypeDTO(RetentionTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
+
 # time from initialization of the simulation til cleanup of the simulation
 class CleanupFrequencyBase(SQLModel):
-    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str | None = None
-    days: int = Field(default=0)
+    simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
+    name: str                 = Field(default="")
+    days: int                 = Field(default=0)
 
 class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None            = Field(default=None, primary_key=True)
+
 
 # how long time does the engineer require to analyse a simulation before it expires and can be cleaned
 # see values in vts_create_meta_data
 class CycleTimeBase(SQLModel):
-    simulationdomain_id: int | None = Field(default=None, foreign_key="simulationdomaindto.id") 
-    name: str | None = None
-    days: int = Field(default=0)
+    simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
+    name: str                 = Field(default="")
+    days: int                 = Field(default=0)
 
 class CycleTimeDTO(CycleTimeBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None            = Field(default=None, primary_key=True)
 
 
 # The configuration can be used as follow:
@@ -68,8 +67,8 @@ class CycleTimeDTO(CycleTimeBase, table=True):
 #   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
 @dataclass # these parameters are needed together often
 class CleanupConfiguration:
-    cycletime: int | None                        # days from initialization of the simulations til it can be cleaned
-    cleanupfrequency: int | None                # number of days between cleanup rounds
+    cycletime: int                               # days from initialization of the simulations til it can be cleaned
+    cleanupfrequency: int                        # number of days between cleanup rounds
     cleanup_round_start_date: date | None = None # at what date did the current cleanup round start. If not set then we assume today
     def is_valid(self):
         # if cleanupfrequency is set then cycletime must also be set
@@ -82,14 +81,14 @@ class CleanupConfiguration:
         return self.is_valid()[0] and (self.cleanupfrequency is not None)
 
 class RootFolderBase(SQLModel):
-    simulationdomain_id: int | None      = Field(default=None, foreign_key="simulationdomaindto.id") 
+    simulationdomain_id: int              = Field(foreign_key="simulationdomaindto.id") 
     folder_id: int | None                 = Field(default=None, foreign_key="foldernodedto.id") 
-    owner: str | None                     = None
-    approvers: str | None                 = Field(default=None)  # comma separated approvers
-    path: str | None                      = None   # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
-    cycletime: int                        = 0      # from initialization of the simulations til it can be cleaned. 0 means not set
-    cleanupfrequency: int                = 0      # number of days between cleanup rounds. 0 means not set
-    cleanup_round_start_date: date | None = None   # at what date did the current cleanup round start
+    owner: str                            = Field(default="")
+    approvers: str                        = Field(default="")     # comma separated approvers
+    path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
+    cycletime: int                        = Field(default=0)      # from initialization of the simulations til it can be cleaned. 0 means not set
+    cleanupfrequency: int                 = Field(default=0)      # number of days between cleanup rounds. 0 means not set
+    cleanup_round_start_date: date | None = Field(default=None)   # at what date did the current cleanup round start
     def get_cleanup_configuration(self) -> CleanupConfiguration:
         return CleanupConfiguration(self.cycletime, self.cleanupfrequency, self.cleanup_round_start_date)
     def set_cleanup_configuration(self, cleanup: CleanupConfiguration):
@@ -109,17 +108,17 @@ class Retention:
     expiration_date: date = None
 
 class FolderNodeBase(SQLModel):
-    rootfolder_id: int                    = Field(default=None, foreign_key="rootfolderdto.id")
+    rootfolder_id: int                    = Field(foreign_key="rootfolderdto.id")
     parent_id: int                        = Field(default=0)  # 0 means no parent
     name: str                             = Field(default="")
     path: str                             = Field(default="")  # full path
     path_ids: str                         = Field(default="")  # full path represented as 0/1/2/3 where each number is the folder id and 0 means root
-    nodetype_id: int | None               = Field(default=None, foreign_key="foldertypedto.id")
-    modified_date: str | None             = None
+    nodetype_id: int                      = Field(foreign_key="foldertypedto.id")
+    modified_date: date | None            = None # must actually be mandatory but lets wait until the test data is fixed 
     retention_id: int | None              = Field(default=None, foreign_key="retentiontypedto.id")
     pathprotection_id: int | None         = Field(default=None, foreign_key="pathprotectiondto.id")
-    expiration_date: str | None           = None
-    
+    expiration_date: date | None          = None
+
     # we should gravitate towards using the Retention dataclass to enforce consistency between retention_id and pathprotection_id nad possibly expiration_date
     def get_retention(self) -> Retention:
         return Retention(self.retention_id, self.pathprotection_id, self.expiration_date)
@@ -136,18 +135,18 @@ class FolderNodeDTO(FolderNodeBase, table=True):
 # path protection for a specific path in a rootfolder
 # the question is whether we need a foreigne key to the folder id 
 class PathProtectionBase(SQLModel):
-    rootfolder_id: int   = Field(default=None, foreign_key="rootfolderdto.id")
-    folder_id: int       = Field(default=None, foreign_key="foldernodedto.id")
+    rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
+    folder_id: int       = Field(foreign_key="foldernodedto.id")
     path: str            = Field(default="")
 
 class PathProtectionDTO(PathProtectionBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
+    id: int | None       = Field(default=None, primary_key=True)
 
 
 class RetentionUpdateDTO(SQLModel):
-    folder_id: int                  = Field(default=None, foreign_key="foldernodedto.id")
-    retention_id: int | None        = Field(default=None, foreign_key="retentiontypedto.id")
-    pathprotection_id: int | None   = Field(default=None, foreign_key="pathprotectiondto.id")
+    folder_id: int                  = Field(foreign_key="foldernodedto.id")
+    retention_id: int               = Field(foreign_key="retentiontypedto.id")
+    pathprotection_id: int          = Field(default=0, foreign_key="pathprotectiondto.id")
     expiration_date: date | None    = None  # calculated expiration date for this folder
     def get_retention(self) -> Retention:
         return Retention(self.retention_id, self.pathprotection_id, self.expiration_date)

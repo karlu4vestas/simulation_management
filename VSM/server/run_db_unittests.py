@@ -11,7 +11,7 @@ import pytest
 # Add the server directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.app_config import AppConfig, AppConfigMode
+from app.app_config import AppConfig, AppConfig
 
 def cleanup_test_databases():
     """Clean up any existing test database files before starting tests"""
@@ -34,7 +34,7 @@ def main():
     cleanup_test_databases()
     
     # Set test mode to unit test
-    AppConfig.set_test_mode(AppConfigMode.UNIT_TEST)
+    AppConfig.set_test_mode(AppConfig.Mode.UNIT_TEST)
     print(f"Test mode set to: {AppConfig.get_test_mode()}")
     
     # Run database unit tests

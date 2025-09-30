@@ -11,14 +11,14 @@ import pytest
 # Add the server directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app.app_config import AppConfig, AppConfigMode
+from app.app_config import AppConfig, AppConfig
 
 def main():
     """Run all unit tests with proper configuration."""
     print("Starting all unit tests...")
     
     # Set test mode to unit test
-    AppConfig.set_test_mode(AppConfigMode.UNIT_TEST)
+    AppConfig.set_test_mode(AppConfig.Mode.UNIT_TEST)
     print(f"Test mode set to: {AppConfig.get_test_mode()}")
     
     # Run all unit tests

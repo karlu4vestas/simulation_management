@@ -123,9 +123,100 @@ def sample_folder_node_with_attributes_data():
 
 
 @pytest.fixture(scope="function")
-def sample_retention_data():
-    """Sample data for RetentionDTO testing"""
+def sample_root_folder_data():
+    """Sample data for RootFolderDTO testing"""
     return {
+        "simulationdomain_id": 1,
+        "folder_id": 1,
+        "path": "/test/folder",
+        "owner": "JD",
+        "approvers": "AB,CD",
+        "cycletime": 30,
+        "cleanupfrequency": 7
+    }
+
+
+@pytest.fixture(scope="function")
+def sample_folder_node_data(test_session):
+    """Sample data for FolderNodeDTO testing"""
+    # Create prerequisites first
+    from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
+    
+    # Create simulation domain
+    domain = SimulationDomainDTO(name="TestDomain")
+    test_session.add(domain)
+    test_session.commit()
+    test_session.refresh(domain)
+    
+    # Create folder type
+    folder_type = FolderTypeDTO(simulationdomain_id=domain.id, name="innernode")
+    test_session.add(folder_type)
+    test_session.commit()
+    test_session.refresh(folder_type)
+    
+    # Create root folder
+    root_folder = RootFolderDTO(
+        simulationdomain_id=domain.id,
+        folder_id=1,
+        path="/test/folder",
+        owner="TestUser",
+        approvers="TestApprover",
+        cycletime=30,
+        cleanupfrequency=7
+    )
+    test_session.add(root_folder)
+    test_session.commit()
+    test_session.refresh(root_folder)
+    
+    return {
+        "rootfolder_id": root_folder.id,
+        "parent_id": 0,
+        "name": "TestFolder",
+        "nodetype_id": folder_type.id,
+        "path": "",
+        "path_ids": ""
+    }
+
+
+@pytest.fixture(scope="function")
+def test_root_folder(test_session):
+    """Create a root folder for tests that need it"""
+    from datamodel.dtos import RootFolderDTO, SimulationDomainDTO
+    
+    # Create simulation domain first
+    domain = SimulationDomainDTO(name="TestDomain")
+    test_session.add(domain)
+    test_session.commit()
+    test_session.refresh(domain)
+    
+    root_folder = RootFolderDTO(
+        simulationdomain_id=domain.id,
+        folder_id=1,
+        path="/test/folder",
+        owner="TestUser",
+        approvers="TestApprover",
+        cycletime=30,
+        cleanupfrequency=7
+    )
+    test_session.add(root_folder)
+    test_session.commit()
+    test_session.refresh(root_folder)
+    return root_folder
+
+
+@pytest.fixture(scope="function")
+def sample_retention_data(test_session):
+    """Sample data for RetentionDTO testing"""
+    from datamodel.dtos import SimulationDomainDTO
+    
+    # Create simulation domain first
+    domain = SimulationDomainDTO(name="TestDomain")
+    test_session.add(domain)
+    test_session.commit()
+    test_session.refresh(domain)
+    
+    return {
+        "simulationdomain_id": domain.id,
         "name": "30 days",
         "is_system_managed": False,
         "display_rank": 1

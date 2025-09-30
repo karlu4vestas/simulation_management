@@ -84,9 +84,11 @@ class TestDatabase:
         # Add some data to make database non-empty
         with Session(db.get_engine()) as session:
             root_folder = RootFolderDTO(
+                simulationdomain_id=1,  # Required field
+                folder_id=1,           # Required field  
                 path="/test/folder",
                 owner="testuser",
-                cleanupfrequency="daily"  # Added missing cleanupfrequency field
+                cleanupfrequency=7     # 7 days (int, not string)
             )
             session.add(root_folder)
             session.commit()
