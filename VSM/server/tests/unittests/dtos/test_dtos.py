@@ -104,6 +104,26 @@ class TestRootFolderDTO:
         assert len(owner1_folders) == 1
         assert owner1_folders[0].folder_id == 1
 
+    def test_create_and_retrieve_root_folder(self, test_session, sample_root_folder_data):
+        """Test creating and retrieving a RootFolderDTO from database"""
+
+        # Create and save
+        folder = RootFolderDTO(**sample_root_folder_data)
+        test_session.add(folder)
+        test_session.commit()
+        test_session.refresh(folder)
+            
+        # Verify it was saved with an ID
+        assert folder.id is not None
+        saved_id = folder.id
+            
+        # Retrieve and verify
+        statement = select(RootFolderDTO).where(RootFolderDTO.id == saved_id)
+        retrieved_folder = test_session.exec(statement).first()
+            
+        assert retrieved_folder is not None
+        assert retrieved_folder.path == "/test/folder"
+        assert retrieved_folder.owner == "JD"
 
 class TestFolderNodeDTO:
     """Test FolderNodeDTO database operations"""

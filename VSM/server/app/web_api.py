@@ -1,5 +1,6 @@
 import io
 import csv
+from contextlib import asynccontextmanager
 from typing import Literal, Optional
 from zstandard import ZstdCompressor
 from fastapi import FastAPI, Query, HTTPException
@@ -13,7 +14,25 @@ from app.app_config import AppConfig
 from testdata.vts_generate_test_data import insert_test_data_in_db
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    db = Database.get_db()
+
+    if db.is_empty() and AppConfig.is_client_test():
+        db.clear_all_tables_and_schemas()
+        db.create_db_and_tables()
+        engine = db.get_engine()
+        insert_vts_metadata_in_db(engine)
+        insert_test_data_in_db(engine) 
+    
+    if db.is_empty():
+        db.create_db_and_tables()
+    
+    yield
+    # Shutdown (if needed in the future)
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "http://localhost:5173",
@@ -30,21 +49,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
-@app.on_event("startup")
-def on_startup():
-    db = Database.get_db()
-
-    if db.is_empty() and AppConfig.is_client_test():
-        db.clear_all_tables_and_schemas()
-        db.create_db_and_tables()
-        engine = db.get_engine()
-        insert_vts_metadata_in_db(engine)
-        insert_test_data_in_db(engine) 
-    
-    if db.is_empty():
-        db.create_db_and_tables()
-
 
 # Get the current test mode configuration.
 @app.get("/", tags=["root"])
