@@ -71,7 +71,7 @@ def generate_node_name(
                    parent: Optional[InMemoryFolderNode],
                    parent_name: str,
                    sibling_counter: int
-                 ) -> Optional[InMemoryFolderNode]:
+                 ) -> InMemoryFolderNode:
     if is_leaf:
         name = f"VTS_{parent_name}_{sibling_counter + 1}" if parent is not None else f"VTS_{parent_name}"
     else:
@@ -87,7 +87,7 @@ def generate_node_name(
     
     return child
 
-def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> Optional[InMemoryFolderNode]:
+def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InMemoryFolderNode:
     rand: random.Random = random.Random(42)
     
     print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
@@ -140,6 +140,48 @@ def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> Opt
     print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}, maxLevel = {max_level}")
     return root
 
+def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
+    """Collect all nodes in the tree by traversing recursively"""
+    all_nodes = [root]
+    
+    for child in root.children:
+        all_nodes.extend(collect_all_nodes(child))
+    
+    return all_nodes
+
+def flatten_folder_structure(rootfolder_tuple: tuple[RootFolderDTO, InMemoryFolderNode]) -> list[tuple[RootFolderDTO, InMemoryFolderNode]]:
+    """Flatten a folder structure by pairing the root folder DTO with each individual node in the tree
+    
+    Args:
+        rootfolder_tuple: Tuple containing a RootFolderDTO and the root InMemoryFolderNode of the tree
+        
+    Returns:
+        List of tuples where each tuple contains the same RootFolderDTO paired with each individual node from the tree
+    """
+    root_folder_dto, root_node = rootfolder_tuple
+    
+    # Collect all nodes in the tree (including root)
+    all_nodes = collect_all_nodes(root_node)
+    
+    # Create a list of tuples pairing the root folder DTO with each node
+    flattened_list = [(root_folder_dto, node) for node in all_nodes]
+    
+    return flattened_list
+
+def flatten_multiple_folder_structures(rootfolder_tuples: list[tuple[RootFolderDTO, InMemoryFolderNode]]) -> list[tuple[RootFolderDTO, InMemoryFolderNode]]:
+    """Flatten multiple folder structures by pairing each root folder DTO with its individual nodes
+
+    Args:
+        rootfolder_tuples: List of tuples containing RootFolderDTO and InMemoryFolderNode for each root folder
+
+    Returns:
+        List of tuples where each tuple contains a RootFolderDTO paired with each individual node from its tree
+    """
+    flattened_list = []
+    for rootfolder_tuple in rootfolder_tuples:
+        flattened_list.extend(flatten_folder_structure(rootfolder_tuple))
+    return flattened_list
+
 def print_folder_tree(node: InMemoryFolderNode, indent: str = "", max_levels: Optional[int] = None, current_level: int = 0):
     """Print the folder tree structure recursively using pointer relationships
     
@@ -157,15 +199,6 @@ def print_folder_tree(node: InMemoryFolderNode, indent: str = "", max_levels: Op
         # Recursively print children using pointer relationships
         for child in node.children:
             print_folder_tree(child, indent + "  ", max_levels, current_level + 1)
-
-def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
-    """Collect all nodes in the tree by traversing recursively"""
-    all_nodes = [root]
-    
-    for child in root.children:
-        all_nodes.extend(collect_all_nodes(child))
-    
-    return all_nodes
 
 def export_folder_tree_to_csv(root: InMemoryFolderNode, root_folder: RootFolderDTO, filename: str = "folder_tree.csv"):
     """Export the folder tree to CSV format with root folder info, isLeaf and path components as columns
@@ -214,7 +247,7 @@ def export_folder_tree_to_csv(root: InMemoryFolderNode, root_folder: RootFolderD
     print(f"   -> CSV columns: {', '.join(headers)}")
     print(f"   -> Total rows: {len(rows)} (including {len([r for r in rows if r[3]])} leaf nodes)")
 
-def export_all_folders_to_csv(rootfolders: list[tuple[RootFolderDTO, Optional[InMemoryFolderNode]]], filename: str = "all_folder_trees.csv"):
+def export_all_folders_to_csv(rootfolders: list[tuple[RootFolderDTO, InMemoryFolderNode]], filename: str = "all_folder_trees.csv"):
     """Export all folder trees to a single CSV file with semicolon separator
     
     Args:
@@ -254,7 +287,7 @@ def export_all_folders_to_csv(rootfolders: list[tuple[RootFolderDTO, Optional[In
     print(f"   -> CSV columns: {', '.join(headers)}")
     print(f"   -> Total rows: {len(all_rows)} (including {len([r for r in all_rows if r[3]])} leaf nodes)")
 
-def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int) -> tuple[RootFolderDTO, Optional[InMemoryFolderNode]]:
+def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int) -> tuple[RootFolderDTO, InMemoryFolderNode]:
     
     root_folder = RootFolderDTO(
             owner=owner,
@@ -266,8 +299,8 @@ def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int
     folder = generate_folder_tree_names(path, levels)
     return root_folder, folder
 
-def generate_in_memory_rootfolders_and_folder_hierarchy() -> list[tuple[RootFolderDTO, Optional[InMemoryFolderNode]]]:
-    root_folders: list[tuple[RootFolderDTO, Optional[InMemoryFolderNode]]] = []
+def generate_in_memory_rootfolders_and_folder_hierarchy() -> list[tuple[RootFolderDTO, list[InMemoryFolderNode]]]:
+    root_folders: list[tuple[RootFolderDTO, list[InMemoryFolderNode]]] = []
 
     root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R1",2))
     root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R2",3))

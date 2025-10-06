@@ -614,7 +614,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
 
 # Helper functions for hierarchical insert
-def normalize_and_split_path(filepath: str) -> list[str]:
+def normalize_path(filepath: str) -> list[str]:
     """
     Normalize path to forward slashes and split into segments.
     Handles edge cases like empty paths, root paths, trailing slashes.
@@ -630,7 +630,10 @@ def normalize_and_split_path(filepath: str) -> list[str]:
     
     # Normalize to forward slashes
     normalized = filepath.replace("\\", "/")
+    return normalized
     
+def normalize_and_split_path(filepath: str) -> list[str]:
+    normalized:str = normalize_path(filepath)
     # Remove leading and trailing slashes, then split
     segments = [segment for segment in normalized.strip("/").split("/") if segment.strip()]
     
