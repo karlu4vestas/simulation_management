@@ -188,7 +188,7 @@
       "name": "Generate In memory folders",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/server/tests/integration/generate_import_data.py",
+      "program": "${workspaceFolder}/server/tests/integration/testdata_for_import.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/integration/",
       "justMyCode": false,
