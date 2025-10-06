@@ -1,4 +1,5 @@
 import random
+import csv
 from sqlmodel import Session, select
 from sqlalchemy import Engine
 from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
@@ -139,14 +140,23 @@ def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> Opt
     print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}, maxLevel = {max_level}")
     return root
 
-def print_folder_tree(node: InMemoryFolderNode, indent: str = ""):
-    """Print the folder tree structure recursively using pointer relationships"""
+def print_folder_tree(node: InMemoryFolderNode, indent: str = "", max_levels: Optional[int] = None, current_level: int = 0):
+    """Print the folder tree structure recursively using pointer relationships
+    
+    Args:
+        node: The current node to print
+        indent: String for indentation
+        max_levels: Maximum number of levels to print (None for all levels)
+        current_level: Current depth level (internal use)
+    """
     leaf_indicator = " [LEAF]" if node.is_leaf else ""
     print(f"{indent}- {node.name} (Path: {node.path}){leaf_indicator}")
     
-    # Recursively print children using pointer relationships
-    for child in node.children:
-        print_folder_tree(child, indent + "  ")
+    # Check if we should continue printing deeper levels
+    if max_levels is None or current_level < max_levels - 1:
+        # Recursively print children using pointer relationships
+        for child in node.children:
+            print_folder_tree(child, indent + "  ", max_levels, current_level + 1)
 
 def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
     """Collect all nodes in the tree by traversing recursively"""
@@ -156,6 +166,93 @@ def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
         all_nodes.extend(collect_all_nodes(child))
     
     return all_nodes
+
+def export_folder_tree_to_csv(root: InMemoryFolderNode, root_folder: RootFolderDTO, filename: str = "folder_tree.csv"):
+    """Export the folder tree to CSV format with root folder info, isLeaf and path components as columns
+    
+    Args:
+        root: Root node of the tree
+        root_folder: Root folder DTO containing owner, approvers, path info
+        filename: Output CSV filename
+    """
+    import csv
+    
+    # Collect all nodes
+    all_nodes = collect_all_nodes(root)
+    
+    # Find the maximum depth to determine number of columns needed
+    max_depth = 0
+    for node in all_nodes:
+        path_parts = node.path.split('/') if node.path else []
+        max_depth = max(max_depth, len(path_parts))
+    
+    # Create column headers
+    headers = ['RootPath', 'Owner', 'Approvers', 'IsLeaf'] + [f'F{i+1}' for i in range(max_depth)]
+    
+    # Prepare data rows
+    rows = []
+    for node in all_nodes:
+        row = [root_folder.path, root_folder.owner, root_folder.approvers, node.is_leaf]  # Root folder info + IsLeaf
+        path_parts = node.path.split('/') if node.path else []
+        
+        # Add path components to columns F1, F2, F3, etc.
+        for i in range(max_depth):
+            if i < len(path_parts):
+                row.append(path_parts[i])
+            else:
+                row.append('')  # Empty string for missing path components
+        
+        rows.append(row)
+    
+    # Write to CSV file
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile, delimiter=';')
+        writer.writerow(headers)
+        writer.writerows(rows)
+    
+    print(f"   -> Exported tree structure to {filename}")
+    print(f"   -> CSV columns: {', '.join(headers)}")
+    print(f"   -> Total rows: {len(rows)} (including {len([r for r in rows if r[3]])} leaf nodes)")
+
+def export_all_folders_to_csv(rootfolders: list[tuple[RootFolderDTO, Optional[InMemoryFolderNode]]], filename: str = "all_folder_trees.csv"):
+    """Export all folder trees to a single CSV file with semicolon separator
+    
+    Args:
+        rootfolders: List of root folder DTOs and their corresponding in-memory trees
+        filename: Output CSV filename
+    """
+    import csv
+    
+    all_rows = []
+    max_depth = 0
+    
+    # Collect all nodes from all root folders and find maximum depth
+    for rf, folder in rootfolders:
+        if folder is not None:
+            all_nodes = collect_all_nodes(folder)
+            for node in all_nodes:
+                path_parts = node.path.split('/') if node.path else []
+                max_depth = max(max_depth, len(path_parts))
+                
+                # Create row with root folder info, IsLeaf and path components
+                row = [rf.path, rf.owner, rf.approvers, node.is_leaf] + path_parts + [''] * (max_depth - len(path_parts))
+                all_rows.append(row)
+    
+    # Adjust all rows to have the same number of columns
+    headers = ['RootPath', 'Owner', 'Approvers', 'IsLeaf'] + [f'F{i+1}' for i in range(max_depth)]
+    for row in all_rows:
+        while len(row) < len(headers):
+            row.append('')
+    
+    # Write to CSV file
+    with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile, delimiter=';')
+        writer.writerow(headers)
+        writer.writerows(all_rows)
+    
+    print(f"\n   -> Exported ALL folder trees to {filename}")
+    print(f"   -> CSV columns: {', '.join(headers)}")
+    print(f"   -> Total rows: {len(all_rows)} (including {len([r for r in all_rows if r[3]])} leaf nodes)")
 
 def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int) -> tuple[RootFolderDTO, Optional[InMemoryFolderNode]]:
     
@@ -186,18 +283,30 @@ def generate_in_memory_rootfolders_and_folder_hierarchy() -> list[tuple[RootFold
 
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     rootfolders = generate_in_memory_rootfolders_and_folder_hierarchy()
-    for rf, folder in rootfolders:
+    for i, (rf, folder) in enumerate(rootfolders):
         print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}")
         if folder is not None:
             print(f"   -> Folder tree root: {folder.name} Path: {folder.path}")
-            print("   -> Full tree structure:")
-            print_folder_tree(folder, "      ")
+            
+            # Show limited tree structure (top 2 levels)
+            print("   -> Tree structure (top 2 levels):")
+            print_folder_tree(folder, "      ", max_levels=2)
+            
+            # Show full tree structure for first folder only to avoid clutter
+            if i == 0:
+                print("   -> Full tree structure:")
+                print_folder_tree(folder, "      ")
             
             # Count total nodes
             all_nodes = collect_all_nodes(folder)
             print(f"   -> Total nodes in tree: {len(all_nodes)}")
-            print(f"   -> Leaf nodes: {sum(1 for node in all_nodes if node.is_leaf)}")            
+            print(f"   -> Leaf nodes: {sum(1 for node in all_nodes if node.is_leaf)}")
+            
         else:
             print("   -> No folder tree generated")
+        print()  # Add blank line between root folders
+    
+    # Export all folders to a single CSV file
+    export_all_folders_to_csv(rootfolders)
