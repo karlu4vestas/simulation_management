@@ -1,8 +1,10 @@
+import random
 import pytest
 import os
 from sqlmodel import SQLModel, create_engine, Session
 from app.app_config import AppConfig
 from db.database import Database
+from datamodel.dtos import RootFolderDTO
 
 
 @pytest.fixture(scope="function")
@@ -16,8 +18,7 @@ def clean_database():
     test_db_files = [
         "unit_test_db.sqlite",
         "client_test_db.sqlite", 
-        "integration_test.sqlite",
-        "integration_test.db"
+        "integration_test.sqlite"
     ]
     
     for db_file in test_db_files:
@@ -52,27 +53,23 @@ def test_session(clean_database):
 
 @pytest.fixture(scope="function")
 def integration_session(clean_database):
-    """Create a persistent test database session for integration tests"""
-    db_name = "integration_test.db"
-    engine = create_engine(f"sqlite:///{db_name}", echo=False)
-    SQLModel.metadata.create_all(engine)
-    
+    # Create a persistent test database session for integration tests
     # Keep session open for the entire integration test
-    session = Session(engine)
+    # delete the database when the integration test is done 
+    db:Database = Database.get_db()
+    db.create_db_and_tables()
+    session:Session = Session(db.get_engine())
     try:
         yield session
     finally:
         session.close()
-        if os.path.exists(db_name):
-            os.remove(db_name)
-
+        db.delete_db()
 
 @pytest.fixture(scope="function")
 def database_with_tables(clean_database):
     """Create a database instance with tables created but no data"""
-    from db.database import Database
-    
-    db = Database.get_db()
+   
+    db:Database = Database.get_db()
     db.create_db_and_tables()
     return db
 
@@ -222,6 +219,40 @@ def sample_retention_data(test_session):
         "display_rank": 1
     }
 
+from .integration.testdata_for_import import InMemoryFolderNode, flatten_folder_structure, flatten_multiple_folder_structures, generate_in_memory_rootfolder_and_folder_hierarchies
+@pytest.fixture(scope="function")
+def cleanup_scenario_data():
+    """Sample data for cleanup workflow testing"""
+    number_of_rootfolders=2
+    rootfolder_tuples: list[tuple[RootFolderDTO, InMemoryFolderNode]] = generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders)
+    assert len(rootfolder_tuples) > 0
+
+
+    #Split the simulations in three parts:
+    # first part with same rootfolder and all its folders
+    # second and third part with random split of the remaining folders and rootfolders. part 2 and 3 have the same size +-1
+
+    # part one: reserver the first tuple of (rootfolder, InMemoryFolderNode) and flatten it for later updates
+    first_rootfolder_tuple: tuple[RootFolderDTO, InMemoryFolderNode] = rootfolder_tuples[0]
+    del rootfolder_tuples[0]
+
+    # part two and three: make a random split of folders by 
+    # step: create a list of tuple[RootFolderDTO, InMemoryFolderNode] from all folders by iterating top down or breath first through the folder trees
+    items: list[tuple[RootFolderDTO, InMemoryFolderNode]] = flatten_multiple_folder_structures(rootfolder_tuples)
+    assert len(items) > 0           
+    # step: shuffling the list
+    random.shuffle(items)
+    # step: splitting that random list in half
+    mid_index = len(items) // 2
+    second_random_rootfolder_tuples: list[tuple[RootFolderDTO, InMemoryFolderNode]] = items[:mid_index]
+    third_random_rootfolder_tuples:  list[tuple[RootFolderDTO, InMemoryFolderNode]] = items[mid_index:]
+
+    return {
+        "rootfolder_tuples": rootfolder_tuples,
+        "first_rootfolder_tuple": first_rootfolder_tuple,
+        "second_random_rootfolder_tuples": second_random_rootfolder_tuples,
+        "third_random_rootfolder_tuples": third_random_rootfolder_tuples
+    }
 
 # Pytest markers for test organization
 def pytest_configure(config):
@@ -230,3 +261,5 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: marks tests as integration tests") 
     config.addinivalue_line("markers", "cleanup_workflow: marks tests as cleanup workflow scenarios")
     config.addinivalue_line("markers", "slow: marks tests as slow running")
+
+

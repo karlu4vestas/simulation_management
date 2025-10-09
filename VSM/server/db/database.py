@@ -7,6 +7,7 @@ from app.app_config import AppConfig
 class Database:
     _instance: Optional["Database"] = None
     _engine: Optional[Engine] = None
+    sqlite_url: str = ""
 
     def __new__(cls):
         if cls._instance is None:
@@ -15,12 +16,12 @@ class Database:
             config = AppConfig()
             sqlite_url = config.get_db_url()
             cls._instance._initialize(sqlite_url)
-            print(f"create new db instance at: {sqlite_url}")
+            print(f"create new db instance at: {cls._instance.sqlite_url}")
         return cls._instance
 
     def _initialize(self, sqlite_url: str):
         self._engine = create_engine(sqlite_url, echo=False)
-
+        self.sqlite_url = sqlite_url
 
     #only call this if we need to create the tables
     def create_db_and_tables(self):
@@ -76,6 +77,18 @@ class Database:
         except Exception as e:
             print(f"Error clearing tables and schemas: {e}")
             raise
+    def delete_db (self):
+        #delte the db-file
+        import os
+        if self.sqlite_url.startswith("sqlite:///"):
+            db_file = self.sqlite_url.replace("sqlite:///", "")
+            if os.path.exists(db_file):
+                os.remove(db_file)
+                print(f"Database file {db_file} deleted.")
+            else:
+                print(f"Database file {db_file} does not exist.")
+        else:
+            print("Database deletion is only supported for SQLite databases.")
 
 if __name__ == "__main__":
     db:Database = Database.get_db()

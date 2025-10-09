@@ -299,12 +299,13 @@ def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int
     folder = generate_folder_tree_names(path, levels)
     return root_folder, folder
 
-def generate_in_memory_rootfolders_and_folder_hierarchy() -> list[tuple[RootFolderDTO, list[InMemoryFolderNode]]]:
+def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:int) -> list[tuple[RootFolderDTO, list[InMemoryFolderNode]]]:
     root_folders: list[tuple[RootFolderDTO, list[InMemoryFolderNode]]] = []
 
-    root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R1",2))
-    root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R2",3))
-    #root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R3",4))
+    for i in range(1, number_of_rootfolders + 1):
+        root_folders.append(generate_root_folder_name("jajac", "stefw, misve", f"R{i}", i + 1))
+
+    return root_folders
     #root_folders.append(generate_root_folder_name("jajac", "stefw, misve", "R4",5))
     #root_folders.append(generate_root_folder_name("misve", "stefw, arlem", "R5",6))
     #root_folders.append(generate_root_folder_name("karlu", "arlem, caemh", "R6",7))
@@ -317,7 +318,7 @@ def generate_in_memory_rootfolders_and_folder_hierarchy() -> list[tuple[RootFold
 
 
 if __name__ == "__main__":  
-    rootfolders = generate_in_memory_rootfolders_and_folder_hierarchy()
+    rootfolders = generate_in_memory_rootfolder_and_folder_hierarchies(2)
     for i, (rf, folder) in enumerate(rootfolders):
         print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}")
         if folder is not None:

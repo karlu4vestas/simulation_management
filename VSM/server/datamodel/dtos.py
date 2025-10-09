@@ -70,6 +70,14 @@ class CleanupConfiguration:
     cycletime: int                               # days from initialization of the simulations til it can be cleaned
     cleanupfrequency: int                        # number of days between cleanup rounds
     cleanup_round_start_date: date | None = None # at what date did the current cleanup round start. If not set then we assume today
+    
+    def __eq__(self, other):
+        if not isinstance(other, CleanupConfiguration):
+            return False
+        return (self.cycletime == other.cycletime and 
+                self.cleanupfrequency == other.cleanupfrequency and 
+                self.cleanup_round_start_date == other.cleanup_round_start_date)
+    
     def is_valid(self):
         # if cleanupfrequency is set then cycletime must also be set
         is_valid:bool = True if self.cleanupfrequency is None else (self.cycletime is not None and self.cycletime > 0)
@@ -79,6 +87,8 @@ class CleanupConfiguration:
     #return true if cleanup can be started with this configuration
     def can_start_cleanup(self) -> bool:
         return self.is_valid()[0] and (self.cleanupfrequency is not None)
+    
+
 
 class RootFolderBase(SQLModel):
     simulationdomain_id: int              = Field(foreign_key="simulationdomaindto.id") 

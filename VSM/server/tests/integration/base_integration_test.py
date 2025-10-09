@@ -2,30 +2,49 @@ import pytest
 from typing import Dict, List, Any, Optional
 from sqlmodel import Session
 from datetime import datetime, timedelta
-from server.datamodel.dtos import FolderNodeDTO, RootFolderDTO
-from .testdata_for_import import InMemoryFolderNode
+from datamodel.dtos import CleanupConfiguration, FolderNodeDTO, RootFolderDTO
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+from app.web_api import FileInfo, insert_or_update_simulation_in_db, read_folders, read_rootfolders, read_rootfolders_by_domain_and_initials
+from .testdata_for_import import InMemoryFolderNode, generate_in_memory_rootfolder_and_folder_hierarchies
 
 
 class BaseIntegrationTest:
-    def setup_new_db_with_vts_metadata(self, session: Session) -> None:
-        """Step 0: Set up a new database with VTS metadata"""
-        # Implementation must validate that one metadata records are present in the db
+
+    # ---------- helper functions  ----------    
+    def get_marked_for_cleanup(self, session: Session, rootfolder: RootFolderDTO) -> list[tuple[RootFolderDTO, FolderNodeDTO]]:
         pass
 
-    def generate_simulations(self, number_of_rootfolders:int ) -> list[tuple[RootFolderDTO, InMemoryFolderNode]]:
-        """Step 1: Generate simulations in memory using generate_in_memory_rootfolders_and_folder_hierarchy()"""
-        # Implementation would create simulation records
-        pass
-    
-    def insert_simulations(self, session: Session, simulation_data: list[tuple[RootFolderDTO, InMemoryFolderNode]]) -> list[tuple[RootFolderDTO, FolderNodeDTO]]:
-        """Step 2: Insert simulations into database"""
-        # Implementation would create simulation records and return all folders and rootfolders in the database
-        pass
-    
-    def start_cleanup_round(self, session: Session, duration_weeks: int = 4) -> Any:
-        """Step 3: Initialize a multi-week cleanup round"""
+    # ---------- process steps to be implemented in the test ----------    
+    def setup_new_db_with_vts_metadata(self, session: Session) -> None:
+        """Step 1: Set up a new database with VTS metadata"""
+        # Implementation must validate that one metadata records are present in the db
+        insert_vts_metadata_in_db(session)
+
+    def insert_simulations(self, session: Session, simulation_data: list[tuple[RootFolderDTO, FileInfo]]) -> list[tuple[RootFolderDTO, FolderNodeDTO]]:
+        # Step 2.2: Insert simulations into database and return all folders and rootfolders in the database for validation
+
+        #fornow we handle one root folder
+        rootfolder: RootFolderDTO = simulation_data[0][0]        
+        assert rootfolder.id is not None and rootfolder.id > 0
+        simulations: list[FileInfo] = [fileinfo for _, fileinfo in simulation_data]
+        insert_or_update_simulation_in_db(rootfolder.id, simulations)
+        
+        #get all rootfolders and folders in the db for validation
+        rootfolder: List[FolderNodeDTO] = read_rootfolders_by_domain_and_initials(rootfolder.simulationdomain_id)[0]
+        folders: List[FolderNodeDTO] = read_folders(rootfolder.id)
+        return [(rootfolder, folders)]
+
+    def update_cleanup_configuration(self, session: Session, rootfolder: RootFolderDTO, cleanup_configuration: CleanupConfiguration) -> CleanupConfiguration:
+        """Step 3: Update the CleanupConfiguration and return the new configuration for a root folder and return the updated configuration"""
         # Implementation would create cleanup round
         pass
+        return self.get_cleanup_configuration(session, rootfolder)
+
+    def start_cleanup_round(self, session: Session, rootfolder: RootFolderDTO) -> list[tuple[RootFolderDTO, FolderNodeDTO]]:
+        """Step 3: Initialize a multi-week cleanup round and return simulations Marked for cleanup"""
+        # Implementation would create cleanup round
+        pass
+        return self.get_marked_for_cleanup(session, rootfolder)
     
     def update_retention_during_cleanup(self, session: Session, retention_changes: Dict) -> None:
         """Step 4: Update retention policies during active cleanup"""

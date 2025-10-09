@@ -12,7 +12,6 @@ from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, Simu
 from db.database import Database
 from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,8 +23,9 @@ async def lifespan(app: FastAPI):
         db.create_db_and_tables()
 
         if AppConfig.is_client_test():
-            insert_vts_metadata_in_db(engine)
-            insert_test_folder_hierarchy_in_db(engine) 
+            with Session(engine) as session:
+                insert_vts_metadata_in_db(session)
+                insert_test_folder_hierarchy_in_db(session)
     #else:
     #    db.clear_all_tables_and_schemas()
     
@@ -112,44 +112,64 @@ def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/cycletimes/", response_model=list[CycleTimeDTO])
-def read_cycle_time(simulationdomain_id: int):
+def read_cycle_time_by_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
         cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:
             raise HTTPException(status_code=404, detail="CycleTime not found")
         return cycle_time
 #@app.get("/simulationdomain/{simulationdomain_id}/cycletimes/dict", response_model=dict[str,CycleTimeDTO]) # do not expose before needed
-def read_cycle_time_dict(simulationdomain_id: int):
-    return {cycle.name.lower(): cycle for cycle in read_cycle_time(simulationdomain_id)}
+def read_cycle_time_dict_by_domain_id(simulationdomain_id: int):
+    return {cycle.name.lower(): cycle for cycle in read_cycle_time_by_domain_id(simulationdomain_id)}
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
-def read_cleanupfrequency(simulationdomain_id: int):
+def read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
         cleanupfrequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cleanupfrequency or len(cleanupfrequency) == 0:
             raise HTTPException(status_code=404, detail="CleanupFrequency not found")
         return cleanupfrequency
 #@app.get("/simulationdomain/{simulationdomain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
-def read_cleanupfrequency_name_dict(simulationdomain_id: int):
-    return {cleanup.name.lower(): cleanup for cleanup in read_cleanupfrequency(simulationdomain_id)}
+def read_cleanupfrequency_name_dict_by_domain_id(simulationdomain_id: int):
+    return {cleanup.name.lower(): cleanup for cleanup in read_cleanupfrequency_by_domain_id(simulationdomain_id)}
 #-----------------end retrieval of metadata for a simulation domain -------------------
 
 
 #-----------------start maintenance of rootfolders and information under it -------------------
+def insert_rootfolder(rootfolder:RootFolderDTO):
+    if rootfolder.simulationdomain_id is None or rootfolder.simulationdomain_id == 0:
+        raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
+    with Session(Database.get_engine()) as session:
+        session.add(rootfolder)
+        session.commit()
+        session.refresh(rootfolder)
+        return rootfolder
+
 # we must only allow the webclient to read the RootFolders
 @app.get("/v1/rootfolders/", response_model=list[RootFolderDTO])
-def read_root_folders(simulationdomain_id: int, initials: Optional[str] = Query(default=None)):
+def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(default="")):
+    if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
+        raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
+    return read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
+
+def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None):
+    if simulationdomain_id is None or simulationdomain_id == 0:
+        raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
+
     with Session(Database.get_engine()) as session:
-        if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
-            raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
-        else:
-            root_folders = session.exec(
+        if type(initials) == str and initials is not None:
+            rootfolders = session.exec(
                 select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) &
                     ((RootFolderDTO.owner == initials) | (RootFolderDTO.approvers.like(f"%{initials}%")))
                 )
             ).all()
-        return root_folders        
+        else:
+            rootfolders = session.exec(
+                select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) )
+            ).all()
+        return rootfolders        
+
 
 # update a rootfolder's cleanup_configuration
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
@@ -182,6 +202,19 @@ def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configur
             #start_new_cleanup_cycle(rootfolder_id)
 
         return {"message": f"Cleanup configuration updated for rootfolder {rootfolder_id}"}
+
+def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConfiguration:
+    with Session(Database.get_engine()) as session:
+        rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+
+        cleanup_configuration = rootfolder.get_cleanup_configuration()
+        if not cleanup_configuration:
+            raise HTTPException(status_code=404, detail="cleanup_configuration not found")
+
+    return cleanup_configuration
+
 
 @app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
 def read_rootfolder_retentiontypes(rootfolder_id: int):
@@ -420,9 +453,9 @@ from sqlalchemy import func, case
 class FileInfo:
     filepath: str
     modified_date: date
-    id: int = None   # will be used during updates
+    nodetype: FolderTypeEnum
     retention_id: int | None = None
-    nodetype_id: int =0
+    id: int = None   # will be used during updates
 
 
 # -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
@@ -496,8 +529,8 @@ def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: 
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
-        if rootfolder.cycletime is None:
-            raise HTTPException(status_code=400, detail="Missing root_folder.days_to_analyse")
+        #if rootfolder.cycletime is None:
+        #    raise HTTPException(status_code=400, detail="Missing root_folder.days_to_analyse")
 
         # and the filepaths from the list of simulations
         existing_folders_query = session.exec(
@@ -536,25 +569,24 @@ def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: 
 def update_simulation_attributes_in_db_internal(session: Session, rootfolder: RootFolderDTO, simulations: list[FileInfo]):
     # retrieve the simulations in the rootfolder and ensure that the order is the same as in the simulations list 
     # This is important for the subsequent update operation to maintain consistency.
-    query = (
-        select(FolderNodeDTO)
-        .where(
+    lower_case_filepaths = [sim.filepath.lower() for sim in simulations]
+    # Replace the query + ordering block with:
+    rows = session.exec(
+        select(FolderNodeDTO).where(
             (FolderNodeDTO.rootfolder_id == rootfolder.id) &
-            (FolderNodeDTO.path.in_([sim.filepath.lower() for sim in simulations])) # must be wrong because parent folders will also match
-        )
-        .order_by(
-            case(
-                {sim.filepath.lower(): index for index, sim in enumerate(simulations)},
-                value=FolderNodeDTO.path,
-                else_=len(simulations)
-            )
-        )
-    )
+            (func.lower(FolderNodeDTO.path).in_(lower_case_filepaths))
+        ) ).all()
 
     # Execute the ordered query to get results in the same order as simulations
-    existing_folders = session.exec(query).all()
-    if len(existing_folders) != len(simulations):
-        raise HTTPException(status_code=500, detail=f"Mismatch in existing folders ({len(existing_folders)}) and simulations ({len(simulations)}) for rootfolder {rootfolder.id}")
+    if len(rows) != len(simulations):
+        raise HTTPException(status_code=500, detail=f"Mismatch in existing folders ({len(rows)}) and simulations ({len(simulations)}) for rootfolder {rootfolder.id}")
+
+    #order as simulations
+    existing_map = {f.path.lower(): f for f in rows}
+    try:
+        existing_folders = [existing_map[p] for p in lower_case_filepaths]
+    except KeyError:
+            raise HTTPException(status_code=500, detail="Mismatch in existing folders and simulations")
     
     #verify ordering as i am a little uncertain about the behaviour of the query
     equals_ordering = all(folder.path.lower() == sim.filepath.lower() for folder, sim in zip(existing_folders, simulations))
@@ -692,9 +724,9 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
     print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
     nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
-    innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
-    if not innernode_type_id:
-        raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=innernode for {rootfolder.id}")
+    #innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
+    #if not innernode_type_id:
+    #    raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=innernode for {rootfolder.id}")
 
     with Session(Database.get_engine()) as session:
         inserted_count = 0
@@ -703,7 +735,7 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
         for sim in simulations:
             try:
                 # Insert hierarchy for this filepath (creates missing nodes)
-                leaf_node_id = insert_hierarchy_for_one_filepath(session, rootfolder.id, sim, innernode_type_id)
+                leaf_node_id = insert_hierarchy_for_one_filepath(session, rootfolder.id, sim, nodetypes)
                 inserted_count += 1
                 
             except Exception as e:
@@ -720,7 +752,7 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
     return {"inserted_hierarchy_count": inserted_count, "failed_path_count": len(failed_paths), "failed_paths": failed_paths}
 
 
-def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: FileInfo, innernode_type_id: int) -> int:
+def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: FileInfo, nodetypes:dict[str,FolderTypeDTO]) -> int:
     """
     Insert missing hierarchy for a single filepath and return the leaf node ID.
     
@@ -763,19 +795,33 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
             current_parent_path_ids = existing_node.path_ids
         else:
             # Node doesn't exist, create it
-            new_node = FolderNodeDTO(
-                rootfolder_id=rootfolder_id,
-                parent_id=current_parent_id,
-                name=segment,
-                nodetype_id = innernode_type_id if index < len(segments) - 1 else simulation.nodetype_id,  # Use innernode_type_id for intermediate nodes
-                path="/".join(current_path_segments),  # Full path up to this segment
-                path_ids=""  # Will be set after getting the ID
-            )
-            
+            # @TODO need to add modified date to the leafnode
+            if index < len(segments) - 1:
+                new_node = FolderNodeDTO(
+                    rootfolder_id=rootfolder_id,
+                    parent_id=current_parent_id,
+                    name=segment,
+                    #@TODO very vts specifc - must be made generic when other departments are onboarded
+                    nodetype_id = nodetypes[FolderTypeEnum.INNERNODE].id,  
+                    path="/".join(current_path_segments),  # Full path up to this segment
+                    path_ids=""  # Will be set after getting the ID
+                )
+            else:
+                new_node = FolderNodeDTO(
+                    rootfolder_id=rootfolder_id,
+                    parent_id=current_parent_id,
+                    name=segment,
+                    nodetype_id=nodetypes[FolderTypeEnum.VTS_SIMULATION].id,
+                    path="/".join(current_path_segments),  # Full path up to this segment
+                    modified_date=simulation.modified_date,
+                    retention_id=simulation.retention_id,
+                    path_ids=""  # Will be set after getting the ID
+                )            
             try:
                 session.add(new_node)
                 session.flush()  # Flush to get the ID without committing
-                
+                #session.refresh(new_node)  # Refresh to ensure we have the latest state
+
                 # Verify we got an ID
                 if new_node.id is None:
                     raise HTTPException(status_code=500, detail=f"Failed to generate ID for new node: {segment}")

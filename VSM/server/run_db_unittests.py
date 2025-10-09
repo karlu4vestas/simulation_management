@@ -8,30 +8,19 @@ import sys
 import os
 import pytest
 
+from server.tests.conftest import clean_database
+
 # Add the server directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from app.app_config import AppConfig, AppConfig
-
-def cleanup_test_databases():
-    """Clean up any existing test database files before starting tests"""
-    test_db_files = [
-        "unit_test_db.sqlite",
-        "client_test_db.sqlite",
-        "integration_test.sqlite"
-    ]
-    
-    for db_file in test_db_files:
-        if os.path.exists(db_file):
-            print(f"Removing existing test database: {db_file}")
-            os.remove(db_file)
 
 def main():
     """Run database unit tests with proper configuration."""
     print("Starting database unit tests...")
     
     # Clean up any existing test databases first
-    cleanup_test_databases()
+    clean_database()
     
     # Set test mode to unit test
     AppConfig.set_test_mode(AppConfig.Mode.UNIT_TEST)
@@ -47,8 +36,8 @@ def main():
     exit_code = pytest.main(test_args)
     
     # Clean up test databases after tests complete
-    cleanup_test_databases()
-    
+    clean_database()
+
     # Provide feedback based on exit code
     if exit_code == 0:
         print("✅ All database unit tests passed!")

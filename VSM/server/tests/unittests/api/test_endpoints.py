@@ -12,11 +12,11 @@ def client():
     # test client does not call the startup where the db is setup so do it here
     db = Database.get_db()
     if db.is_empty() and AppConfig.is_unit_test():
-            db.clear_all_tables_and_schemas()
-            db.create_db_and_tables()
-            engine = db.get_engine()
-            insert_vts_metadata_in_db(engine)
-            insert_test_folder_hierarchy_in_db(engine) 
+        db.clear_all_tables_and_schemas()
+        db.create_db_and_tables()
+        engine = db.get_engine()
+        insert_vts_metadata_in_db(engine)
+        insert_test_folder_hierarchy_in_db(engine) 
 
     return TestClient(app)
 
