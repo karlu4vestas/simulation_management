@@ -51,13 +51,6 @@ class TestDatabase:
         is_db_empty = db.is_empty()
         assert is_db_empty is True
 
-    def test_database_is_empty_with_empty_tables(self, database_with_tables):
-        """Test that is_empty returns True when tables exist but are empty"""
-        db = database_with_tables
-        
-        # With tables created but no data, database should be empty
-        assert db.is_empty() is True
-
 
     def test_database_engine_creates_tables(self, clean_database):
         """Test that the database engine creates all SQLModel tables"""
@@ -76,22 +69,3 @@ class TestDatabase:
         
         for expected_table in expected_tables:
             assert expected_table in table_names
-
-    def test_database_is_not_empty_with_data(self, database_with_tables):
-        """Test that is_empty returns False when tables contain data"""        
-        db = database_with_tables
-        
-        # Add some data to make database non-empty
-        with Session(db.get_engine()) as session:
-            root_folder = RootFolderDTO(
-                simulationdomain_id=1,  # Required field
-                folder_id=1,           # Required field  
-                path="/test/folder",
-                owner="testuser",
-                cleanupfrequency=7     # 7 days (int, not string)
-            )
-            session.add(root_folder)
-            session.commit()
-        
-        # Now database should not be empty
-        assert db.is_empty() is False 

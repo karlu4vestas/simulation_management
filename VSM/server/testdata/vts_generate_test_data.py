@@ -4,6 +4,7 @@ from sqlalchemy import Engine
 from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+from db.db_api import insert_rootfolder
 
 #-------------------------------------
 # helper to generate random retenttype except for the "Path" retention. 
@@ -51,7 +52,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
         cleanupfrequency=cleanupfrequency,
         path=path
     )
-    root_folder = insert_rootfolder(session, root_folder)
+    root_folder = insert_rootfolder(root_folder)
     #commit in order to initialize the root_folder in the db and get a valid id
     #session.commit()
     #session.refresh(root_folder)

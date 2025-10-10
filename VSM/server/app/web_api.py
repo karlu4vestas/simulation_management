@@ -12,6 +12,7 @@ from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, Simu
 from db.database import Database
 from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -137,14 +138,6 @@ def read_cleanupfrequency_name_dict_by_domain_id(simulationdomain_id: int):
 
 
 #-----------------start maintenance of rootfolders and information under it -------------------
-def insert_rootfolder(rootfolder:RootFolderDTO):
-    if rootfolder.simulationdomain_id is None or rootfolder.simulationdomain_id == 0:
-        raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
-    with Session(Database.get_engine()) as session:
-        session.add(rootfolder)
-        session.commit()
-        session.refresh(rootfolder)
-        return rootfolder
 
 # we must only allow the webclient to read the RootFolders
 @app.get("/v1/rootfolders/", response_model=list[RootFolderDTO])
@@ -153,7 +146,7 @@ def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(d
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
     return read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
 
-def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None):
+def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None)->list[RootFolderDTO]:
     if simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
 
@@ -168,7 +161,7 @@ def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: 
             rootfolders = session.exec(
                 select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) )
             ).all()
-        return rootfolders        
+        return rootfolders if type(rootfolders) == list else ([rootfolders] if rootfolders is not None else [])
 
 
 # update a rootfolder's cleanup_configuration
@@ -543,7 +536,7 @@ def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: 
         # Create a mapping from filepath to existing folder for fast lookup
         existing_folders: set[str]          = set([folder.path.lower() for folder in existing_folders_query])
         insert_simulations: list[FileInfo]  = [sim for sim in simulations if sim.filepath.lower() not in existing_folders]
-        existing_folders                    = None
+        existing_folders                    = None # to preserve memory
 
         insertion_results: dict[str, int]   = insert_simulations_in_db(rootfolder, insert_simulations)
         insert_simulations = None
@@ -746,7 +739,12 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
         
         # Commit all insertions
         session.commit()
-        
+        count = session.exec(select(func.count()).select_from(FolderNodeDTO).where(
+            FolderNodeDTO.rootfolder_id == rootfolder.id
+        )).first()
+        str =f"Total records in DB for rootfolder {rootfolder.id}: {count}"
+        print(str)
+
         print(f"end insert_simulations rootfolder_id {rootfolder.id} - successfully inserted hierarchy for {inserted_count}/{len(simulations)} paths, {len(failed_paths)} failed")
         
     return {"inserted_hierarchy_count": inserted_count, "failed_path_count": len(failed_paths), "failed_paths": failed_paths}
