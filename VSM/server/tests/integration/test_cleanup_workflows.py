@@ -22,6 +22,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         assert len(simulation_domains) > 0
         simulation_domain_id = simulation_domains[0].id
         assert simulation_domain_id is not None and simulation_domain_id > 0
+
         #verify that the domain has the necessary configuration data
         assert len(read_retentiontypes_by_domain_id(simulation_domain_id)) > 0
         assert len(read_folder_types_pr_domain_id(simulation_domain_id)) > 0
@@ -29,138 +30,114 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         assert len(read_cycle_time_by_domain_id(simulation_domain_id)) > 0
 
 
-        #get the data
-        data_set_keys: list[str] = ["first_rootfolder_tuple", "second_random_rootfolder_tuples", "third_random_rootfolder_tuples"]
-        nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(simulation_domain_id)
-        class DataIOSet(NamedTuple):
-            key2scenario_data: str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
-            input_scenarios: list[RootFolderWithMemoryFolders] #input data
-            output: list[RootFolderWithFolderNodeDTOList] #output from db after insertion of simulations
+        # validate that the folder hierarchy is inserted correctly
 
-        str_input_set = [f"key:{key}, path:{input.rootfolder.path}" for key in data_set_keys for input in cleanup_scenario_data[key]]
-        print(f"str_input_set: {str_input_set}")
+        # start by getting the input and the output data for the db simulation for each scenarios before procedding to validation
+        # The input data is in cleanup_scenario_data fixture in conftest.py
+        # The output data is the return from insert_simulations
+        # The input data is three parts:
+        # part one with one root folder and a list of all its subfolders in random order
+        # part two and three with a random split of the second rootfolders list of folders
+        class DataIOSet(NamedTuple):
+            key:    str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
+            input:  RootFolderWithMemoryFolders #input rootfolder
+            output: RootFolderWithFolderNodeDTOList #output rootfolder and folders from db after insertion of simulations
 
         dataio_sets: list[DataIOSet] = []
-        for key in data_set_keys:
-            input_scenarios: list[RootFolderWithMemoryFolders] = cleanup_scenario_data[key]
-            
-            input_list: list[RootFolderWithMemoryFolders]=[]
-            #start by inserting the rootfolders in the db so that we have the ids
-            for input_rootfolder in input_scenarios: 
-                # set the simulation domain, save the rootfolder to the db and then create first_rootfolder_tuple with the rootfolder from the db
-                input_rootfolder.rootfolder.simulationdomain_id = simulation_domain_id
-                rootfolder=insert_rootfolder(input_rootfolder.rootfolder)
-                # create a new tuple with the rootfolder from the db
-                input_list.append(RootFolderWithMemoryFolders( rootfolder=rootfolder,folders=input_rootfolder.folders))
-                
-                #verify that the rootfolder was saved correctly
-                assert rootfolder.id is not None and rootfolder.id > 0
+        for key in ["first_rootfolder", "second_rootfolder_part_one", "second_rootfolder_part_two"]:
+            #insert add the simulation domain to the rootfolder and inser the rootfolder in the db
+            input: RootFolderWithMemoryFolders = cleanup_scenario_data[key]
+            # set the simulation domain, save the rootfolder to the db and then create first_rootfolder_tuple with the rootfolder from the db
+            input.rootfolder.simulationdomain_id = simulation_domain_id
+            input.rootfolder = insert_rootfolder(input.rootfolder)
+            #verify that the rootfolder was saved correctly
+            assert input.rootfolder is not None
+            assert input.rootfolder.id is not None and input.rootfolder.id > 0
+            assert input.rootfolder.path == input.rootfolder.path
 
             # Insert simulations (the leaves). The return will be all folders in the db
-            output_list: list[RootFolderWithFolderNodeDTOList] = self.insert_simulations(integration_session, input_list)
-            str_input_ids = [f"{input.rootfolder.id}" for input in input_list]
-            str_output_ids = [f"{output.rootfolder.id}" for output in output_list]
-            str_summary = f"key:{key}, input rootfolder ids: {str_input_ids}, output rootfolder ids: {str_output_ids}"
+            output: RootFolderWithFolderNodeDTOList = self.insert_simulations(integration_session, input)
+            str_summary = f"key:{key}, input rootfolder ids: {input.rootfolder.id}, output rootfolder ids: {output.rootfolder.id}"
             print(str_summary)
-            dataio_sets.append(DataIOSet(key2scenario_data=key,
-                                        input_scenarios=input_list, 
-                                        output=output_list))
+            dataio_sets.append(DataIOSet(key=key,input=input,output=output))
 
-        str_dataio_sets_ids = [f"{data_set.key2scenario_data}, {input.rootfolder.id} == {output.rootfolder.id}" for data_set in dataio_sets for input, output in zip(data_set.input_scenarios, data_set.output)]
+        str_dataio_sets_ids = [f"{data_set.key}, {data_set.input.rootfolder.id} == {data_set.output.rootfolder.id}   {data_set.input.rootfolder.path} == {data_set.output.rootfolder.path}" for data_set in dataio_sets]
         print(f"Verification of rootfolder ids between input and output: {str_dataio_sets_ids}")
 
         # Step 2 validate the output data
-        for data_set in dataio_sets:     
-            assert len(data_set.input_scenarios) == len(data_set.output)  # should never fail because we just got back what we input to insert_simulations
-            
-            for input, output in zip(data_set.input_scenarios, data_set.output): #iterate over the rootfolders in the scenario
-                assert input.rootfolder.id == output.rootfolder.id  # should never fail because we just got back what we input to insert_simulations
+        leaf_node_type:int = read_folder_type_dict_pr_domain_id(simulation_domain_id)[FolderTypeEnum.VTS_SIMULATION].id
+        for data_set in dataio_sets:
+            assert data_set.input.rootfolder.id == data_set.output.rootfolder.id  # should never fail because we just got back what we input to insert_simulations
 
-                # extract the the list of leaves in input and output so that it is easy to validate them
-                leaf_node_type:int = nodetypes[FolderTypeEnum.VTS_SIMULATION].id
-                input_simulation_folders  = [ folder for folder in input.folders if folder.is_leaf ]
-                output_simulation_folders = [ folder for folder in output.folders if folder.nodetype_id == leaf_node_type ]
+            # extract the the list of leaves in input and output so that it is easy to validate them
+            input_simulation_folders  = [ folder for folder in data_set.input.folders  if folder.is_leaf ]
+            output_simulation_folders = [ folder for folder in data_set.output.folders if folder.nodetype_id == leaf_node_type ]
 
-                match data_set.key2scenario_data:
-                    case "first_rootfolder_tuple":
-                        #part one: consist of the same rootfolder that is not shared with other scenarios
+            match data_set.key:
+                case "first_rootfolder":
+                    #part one: consist of the same rootfolder that is not shared with other scenarios
 
-                        #check that the all leaves (the simulations) were inserted
-                        assert len(input_simulation_folders) == len(output_simulation_folders)
+                    #check that the all leaves (the simulations) were inserted
+                    assert len(input_simulation_folders) == len(output_simulation_folders)
 
-                        # even if "insert_simulations" only insert the leaves the whole foldertree must have be generated from the leaves in the db
-                        assert len(input.folders) == len(output.folders)
+                    # even if "insert_simulations" only insert the leaves the whole foldertree must have be generated from the leaves in the db
+                    assert len(data_set.input.folders) == len(data_set.output.folders)
 
-                        # Check that all the paths are the same. Sort both lists by path because they were inserted in random order
-                        input.folders.sort(key=lambda x: x.path)
-                        output.folders.sort(key=lambda x: x.path)
-                        for input_folder, db_folder in zip(input.folders, output.folders):
-                            assert normalize_path(input_folder.path) == normalize_path(db_folder.path)
-                    
-                    case "second_random_rootfolder_tuples":
-                        # The part two and part 3 are about insertion into the same rootfolders: 
-                        # part 2 was inserted before part 3 
+                    # Check that all the paths are the same. Sort both lists by path because they were inserted in random order
+                    data_set.input.folders.sort(key=lambda x: x.path)
+                    data_set.output.folders.sort(key=lambda x: x.path)
+                    for input_folder, db_folder in zip(data_set.input.folders, data_set.output.folders):
+                        assert normalize_path(input_folder.path) == normalize_path(db_folder.path)
+                
+                case "second_rootfolder_part_one":
+                    # The part two and part 3 are about insertion into the same rootfolders: 
+                    # part 2 was inserted before part 3 
 
-                        # the number of input and output leafs must be the same in part 2
-                        assert len(input_simulation_folders) == len(output_simulation_folders)
+                    # the number of input and output leafs must be the same in part 2
+                    assert len(input_simulation_folders) == len(output_simulation_folders)
 
 
-                        # Number of input folders must be less than or equal to the number of output folders
-                        # because each insert leaf can generate a whole branch of multiple folders
-                        assert len(input.folders) <= len(output.folders)
+                    # Number of input folders must be less than or equal to the number of output folders
+                    # because each insert leaf can generate a whole branch of multiple folders
+                    assert len(data_set.input.folders) <= len(data_set.output.folders)
 
-                        # Verify all input folders exist in output
-                        input_paths = {normalize_path(f.path) for f in input_simulation_folders}
-                        output_paths = {normalize_path(f.path) for f in output_simulation_folders}
-                        assert input_paths.issubset(output_paths)
-                    
-                    case "third_random_rootfolder_tuples":
-                        # The part 2 and part 3 are about insertion into the same rootfolders: 
-                        # Part 2 was inserted before part 3 
+                    # Verify all input folders exist in output
+                    input_paths = {normalize_path(f.path) for f in data_set.input.folders}
+                    output_paths = {normalize_path(f.path) for f in data_set.output.folders}
+                    assert input_paths.issubset(output_paths)
+                
+                case "second_rootfolder_part_two":
+                    # The part 2 and part 3 are about insertion into the same rootfolders: 
+                    # Part 2 was inserted before part 3 
 
-                        # the number of input leafs must therefore be smaller or equal to the number of output leafs
-                        # equality can happen if the split between part 2 and 3 allocated all leafs to part 3
-                        assert len(input_simulation_folders) <= len(output_simulation_folders)
-                        # Verify all input leaves exist in output
-                        input_paths = {normalize_path(f.path) for f in input_simulation_folders}
-                        output_paths = {normalize_path(f.path) for f in output_simulation_folders}
-                        assert input_paths.issubset(output_paths)
-
-
-                        # Number of input folders must be less than or equal to the number of output folders
-                        # because each insert leaf can generate a whole branch of multiple folders
-                        assert len(input.folders) <= len(output.folders)
-
-                        # Number of input folders must be less than or equal to the number of output folders                    
-                        # Verify all input folder exist in output
-                        input_paths = {normalize_path(f.path) for f in input.folders}
-                        output_paths = {normalize_path(f.path) for f in output.folders}
-                        assert input_paths.issubset(output_paths)
-                    
-                    case _:
-                        raise ValueError(f"Unknown scenario data key: {data_set.key2scenario_data}")
+                    # the number of input leafs must therefore be smaller or equal to the number of output leafs
+                    # equality can happen if the split between part 2 and 3 allocated all leafs to part 3
+                    assert len(input_simulation_folders) <= len(output_simulation_folders)
+                    # Verify all input leaves exist in output
+                    input_paths = {normalize_path(f.path) for f in input_simulation_folders}
+                    output_paths = {normalize_path(f.path) for f in output_simulation_folders}
+                    assert input_paths.issubset(output_paths)
 
 
+                    # Number of input folders must be less than or equal to the number of output folders
+                    # because each insert leaf can generate a whole branch of multiple folders
+                    assert len(data_set.input.folders) <= len(data_set.output.folders)
+
+                    # Number of input folders must be less than or equal to the number of output folders                    
+                    # Verify all input folder exist in output
+                    input_paths = {normalize_path(f.path) for f in data_set.input.folders}
+                    output_paths = {normalize_path(f.path) for f in data_set.output.folders}
+                    assert input_paths.issubset(output_paths)
+                
+                case _:
+                    raise ValueError(f"Unknown scenario data key: {data_set.key}")
 
 
-        """
-        # part two and three: are random splits of the remaining rootfolder, folders
-        #second_random_rootfolder_tuples: list[(RootFolderDTO, InMemoryFolderNode]] = cleanup_scenario_data["second_random_rootfolder_tuples"]
-        #third_random_rootfolder_tuples:  list[(RootFolderDTO, InMemoryFolderNode]] = cleanup_scenario_data["third_random_rootfolder_tuples"]
+        #verify that the default cleanup configuration cannot start a cleanup round
+        #for data_set in dataio_sets:
+        #    assert data_set.output.rootfolder.get_cleanup_configuration().can_start_cleanup() is False
 
-        # Step 2: Insert simulations
-
-        #assert that  
-        # the defualt cleanup configuration is set correctly so that it can not be used to start a cleanup round
-        # no simulation is marked for cleanup before we set a cleanup configuration that can start a cleanup round
-        part_one_rootfolder: RootFolderDTO = part_one_leaves[0]
-        cleanup_configuration: CleanupConfiguration = get_cleanup_configuration_by_rootfolder_id(part_one_rootfolder.id)
-        assert cleanup_configuration.can_start_cleanup() is False
-
-        marked_for_cleanup: list[(RootFolderDTO, FolderNodeDTO]] = self.get_marked_for_cleanup(integration_session, part_one_rootfolder)
-        assert len(marked_for_cleanup) == 0
-
-        """
+        #validate the modified dates are set correctly
 
         """
         #set the cleanup configuration before starting a cleanup round on the root folder

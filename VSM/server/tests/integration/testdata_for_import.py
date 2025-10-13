@@ -1,12 +1,13 @@
+from datetime import timedelta, datetime
+from typing import Optional
 import random
 import csv
 from typing import NamedTuple
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from typing import Optional
 
 class InMemoryFolderNode:
     """In-memory representation of a folder node using pointers for parent-child relationships"""
@@ -16,6 +17,7 @@ class InMemoryFolderNode:
         self.is_leaf = is_leaf
         self.parent: Optional['InMemoryFolderNode'] = None
         self.children: list['InMemoryFolderNode'] = []
+        self.modified_date: Optional[datetime] = None  # Add modified_date field
     
     def add_child(self, child: 'InMemoryFolderNode'):
         """Add a child node and set up parent-child relationship"""
@@ -150,15 +152,17 @@ def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
     
     return all_nodes
 
-class RootFolderWithMemoryFolders(NamedTuple):
+class RootFolderWithMemoryFolders:
     """Named tuple for a root folder and its flattened list of folder nodes"""
-    rootfolder: RootFolderDTO
-    folders: list[InMemoryFolderNode]
+    def __init__(self, rootfolder: RootFolderDTO, folders: list[InMemoryFolderNode]):
+        self.rootfolder = rootfolder
+        self.folders = folders
 
-class RootFolderWithMemoryFolderTree(NamedTuple):
+class RootFolderWithMemoryFolderTree:
     """Named tuple for a root folder and its hierarchical tree structure"""
-    rootfolder: RootFolderDTO
-    folder_tree: InMemoryFolderNode
+    def __init__(self, rootfolder: RootFolderDTO, folder_tree: InMemoryFolderNode):
+        self.rootfolder = rootfolder
+        self.folder_tree = folder_tree
 
 def flatten_folder_structure(rootfolder_tuple: RootFolderWithMemoryFolderTree) -> RootFolderWithMemoryFolders:
     #Flatten the hierarchical InMemoryFolderNode folder root and return a named tuple with the rootfolder and its list of folders
@@ -297,7 +301,56 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     
     return root_folders
 
+def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: list[InMemoryFolderNode]):
+    """Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
+    - before_leafs:       retention period starts and ends before the cleanup round start
+                          => modified date = from "cleanup_start_date - retention_period - random_interval - 1"
+                             modified date+retention_period to "cleanup_start_date - random_interval - 1"
 
+    - before_after_leafs: retention period starts before and ends after the cleanup
+                          => modified date = from "cleanup_start_date - retention_period/2 - random_interval" 
+                             modified date+retention_period to "cleanup_start_date - random_interval - 1"
+
+    - after_leafs:        retention period starts after the cleanup round
+                          => modified date = from "cleanup_start_date + 1 + random_interval" onwards
+                          modified date + retention_period to  "cleanup_start_date + retention_period + 1 + random_interval"
+    """
+    leafs = [folder for folder in folders if folder.is_leaf]
+    
+    # Divide leafs into three equal groups
+    total_leafs = len(leafs)
+    group_size = total_leafs // 3
+    before_leafs = leafs[:group_size]
+    before_after_leafs = leafs[group_size:2*group_size]
+    after_leafs = leafs[2*group_size:]
+    
+    cleanup_configuration: CleanupConfiguration = rootfolder.get_cleanup_configuration()
+    rand: random.Random = random.Random(42)
+    ran_interval_days = 10
+    retention_period_days = cleanup_configuration.cycletime
+    cleanup_start_date = cleanup_configuration.cleanup_round_start_date
+
+    # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
+    # Date range: [cleanup_start - retention - random_days - 1] to [cleanup_start - random_days - 1]
+    for leaf in before_leafs:
+        random_interval = rand.randint(1, ran_interval_days)  # Random interval between 1-30 days
+        # Calculate earliest possible date
+        leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days + rand.randint(1, ran_interval_days)  + 1)
+    
+    # Group 2: before_after_leafs - retention spans across cleanup (partially in retention)
+    # Date range: [cleanup_start - retention/2 - random_days] to [cleanup_start - random_days - 1]
+    for leaf in before_after_leafs:
+        leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days // 2 + rand.randint(1, ran_interval_days) )
+    
+    # Group 3: after_leafs - modified dates after cleanup starts (will NOT be cleaned up)
+    # Date range: [cleanup_start + 1 + random_days] onwards (up to +60 days)
+    for leaf in after_leafs:
+        leaf.modified_date = cleanup_start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
+    
+    print(f"Randomized modified dates for {len(leafs)} leaf folders:")
+    print(f"  - before_leafs: {len(before_leafs)} folders (will be deleted)")
+    print(f"  - before_after_leafs: {len(before_after_leafs)} folders (retention spans cleanup)")
+    print(f"  - after_leafs: {len(after_leafs)} folders (will NOT be deleted)")
 
 if __name__ == "__main__":  
     rootfolders = generate_in_memory_rootfolder_and_folder_hierarchies(2)

@@ -5,12 +5,7 @@ from datetime import date, datetime, timedelta
 from datamodel.dtos import CleanupConfiguration, FolderNodeDTO, FolderTypeEnum, RootFolderDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from app.web_api import FileInfo, insert_or_update_simulation_in_db, read_folders, read_rootfolders, read_rootfolders_by_domain_and_initials
-from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders, generate_in_memory_rootfolder_and_folder_hierarchies
-
-class RootFolderWithFolderInfoList(NamedTuple):
-    """Named tuple for a root folder and its flattened list of folder nodes"""
-    rootfolder: RootFolderDTO
-    folderinfolist: list[FileInfo]
+from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders
 
 class RootFolderWithFolderNodeDTOList(NamedTuple):
     """Named tuple for a root folder and its flattened list of folder nodes"""
@@ -31,7 +26,7 @@ class BaseIntegrationTest:
         insert_vts_metadata_in_db(session)
 
         
-    def insert_simulations(self, session: Session, rootfolder_with_folders_list: list[RootFolderWithMemoryFolders]) -> list[RootFolderWithFolderNodeDTOList]:
+    def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders) -> RootFolderWithFolderNodeDTOList:
         """Step 2.2: Insert simulations into database and return all folders and rootfolders in the database for validation
         
         Args:
@@ -41,33 +36,24 @@ class BaseIntegrationTest:
         Returns:
             List of RootFolderWithFolderList with the inserted folders from database
         """
-        results: list[RootFolderWithFolderNodeDTOList] = []
-        # for now we handle one root folder
-        i: int = 0
-        for rootfolder_with_folders in rootfolder_with_folders_list:
+        rootfolder:RootFolderDTO=rootfolder_with_folders.rootfolder
+        assert rootfolder.id is not None and rootfolder.id > 0
 
-            # extract and convert the leaves to FileInfo (the leaves  are the simulations) 
-            from app.web_api import FileInfo
-            file_info_list = [ FileInfo( filepath=folder.path, modified_date=date.today(), nodetype=FolderTypeEnum.VTS_SIMULATION, retention_id=None) 
-                            for folder in rootfolder_with_folders.folders if folder.is_leaf ]
-            leafs :RootFolderWithFolderInfoList = RootFolderWithFolderInfoList(rootfolder=rootfolder_with_folders.rootfolder, folderinfolist=file_info_list)
+        # extract and convert the leaves to FileInfo (the leaves  are the simulations) 
+        from app.web_api import FileInfo
+        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=date.today(), nodetype=FolderTypeEnum.VTS_SIMULATION, retention_id=None) 
+                                            for folder in rootfolder_with_folders.folders if folder.is_leaf ]
+       
+        insert_or_update_simulation_in_db(rootfolder.id, file_info_list)
 
-            assert leafs.rootfolder.id is not None and leafs.rootfolder.id > 0
-            
-            # Convert InMemoryFolderNodes to FileInfo for insertion
-            file_infos: list[FileInfo] = []  # Implementation would convert folder_nodes to FileInfo
-            insert_or_update_simulation_in_db(leafs.rootfolder.id, leafs.folderinfolist)
+        # get all rootfolders and folders in the db for validation
+        rootfolders: List[RootFolderDTO] = read_rootfolders_by_domain_and_initials(rootfolder.simulationdomain_id)
+        rootfolders = [r for r in rootfolders if r.id == rootfolder.id] 
+        assert len(rootfolders) == 1
+        rootfolder: RootFolderDTO = rootfolders[0]
 
-            # get all rootfolders and folders in the db for validation
-            rootfolders: List[RootFolderDTO] = read_rootfolders_by_domain_and_initials(leafs.rootfolder.simulationdomain_id)
-            assert len([r for r in rootfolders if r.id == leafs.rootfolder.id]) == 1
-            rootfolder: RootFolderDTO = rootfolders[0]
-
-
-            folders: List[FolderNodeDTO] = read_folders(rootfolder.id)
-            results.append(RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=folders))
-
-        return results
+        folders: List[FolderNodeDTO] = read_folders(rootfolder.id)
+        return RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=folders)
 
     def update_cleanup_configuration(self, session: Session, rootfolder: RootFolderDTO, cleanup_configuration: CleanupConfiguration) -> CleanupConfiguration:
         """Step 3: Update the CleanupConfiguration and return the new configuration for a root folder and return the updated configuration"""

@@ -818,7 +818,6 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
             try:
                 session.add(new_node)
                 session.flush()  # Flush to get the ID without committing
-                #session.refresh(new_node)  # Refresh to ensure we have the latest state
 
                 # Verify we got an ID
                 if new_node.id is None:

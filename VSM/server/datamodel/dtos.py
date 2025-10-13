@@ -96,9 +96,9 @@ class RootFolderBase(SQLModel):
     owner: str                            = Field(default="")
     approvers: str                        = Field(default="")     # comma separated approvers
     path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
-    cycletime: int                        = Field(default=0)      # from initialization of the simulations til it can be cleaned. 0 means not set
+    cycletime: int                        = Field(default=0)      # cycletime for a simulation: from last modified data til initialization of the simulations til it can be cleaned. 0 means not set
     cleanupfrequency: int                 = Field(default=0)      # number of days between cleanup rounds. 0 means not set
-    cleanup_round_start_date: date | None = Field(default=None)   # at what date did the current cleanup round start
+    cleanup_round_start_date: date | None = Field(default=None)   # at what date have the user set the cleanup to start start. Can be set into the furture
     def get_cleanup_configuration(self) -> CleanupConfiguration:
         return CleanupConfiguration(self.cycletime, self.cleanupfrequency, self.cleanup_round_start_date)
     def set_cleanup_configuration(self, cleanup: CleanupConfiguration):

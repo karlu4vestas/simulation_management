@@ -1,10 +1,13 @@
+from collections import deque
 import random
 import pytest
 from sqlmodel import Session
 import os
+from datetime import date
 from app.app_config import AppConfig
 from db.database import Database
-from .integration.testdata_for_import import RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders, flatten_folder_structure, flatten_multiple_folder_structures, generate_in_memory_rootfolder_and_folder_hierarchies
+from datamodel.dtos import CleanupConfiguration
+from .integration.testdata_for_import import RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders, flatten_folder_structure, flatten_multiple_folder_structures, generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
 
 
 @pytest.fixture(scope="function")
@@ -215,40 +218,43 @@ def sample_retention_data(test_session):
 
 @pytest.fixture(scope="function")
 def cleanup_scenario_data():
-    # Sample data for cleanup workflow testing with 1 parts 
-    # part one with one root folder and a list of all its subfolders in random order
-    # part two and three with a random split of each of the remaining rootfolders list of subfolders
+    # Sample data with 3 datasets for 2 root folders:
+    #  - part one with the first root folder and a list of all its subfolders in random order
+    #  - part two and three with a random split of each of the second rootfolders list of subfolders
+    # The root folder's cleanup configuration is not initialised means that assumes default values
 
     number_of_rootfolders = 2
-    rootfolder_tuples: list[RootFolderWithMemoryFolderTree] = generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders)
-    assert len(rootfolder_tuples) > 0
+    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_round_start_date=date(2000, 1, 1))
+    random_days:int = 10
+    rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
+    assert len(rootfolders) > 0
 
+    #Split the two root folder in three parts:
+    # first rootfolder with all its folders randomized
+    first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
+    first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
+    randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, first_rootfolder.folders)
 
-    #Split the simulations in three parts:
-    # part one: reserver the first tuple of (rootfolder, InMemoryFolderNode) and flatten it for later updates
-    first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolder_tuples[0])
     random.shuffle(first_rootfolder.folders)
-    del rootfolder_tuples[0]
-    first_rootfolder_scenario:list[RootFolderWithMemoryFolders] = [first_rootfolder]
+    #first_rootfolder.folders
 
-    # part two and three: make a random split of folders in the remaining rootfolder tuples
-    second_random_rootfolder_scenarios: list[RootFolderWithMemoryFolders] = []
-    third_random_rootfolder_scenarios:  list[RootFolderWithMemoryFolders] = []
-    # step: create a list of RootFolderWithFolderList for the all remaining rootfolder tuples and split them randomly in two parts for each rootfolder
-    items: list[RootFolderWithMemoryFolders] = flatten_multiple_folder_structures(rootfolder_tuples)
-    # step: the folder list in each tuple
-    for item in items:
-        random.shuffle(item.folders)
-        # step: splitting that random list in half
-        mid_index = len(item.folders) // 2
-        second_random_rootfolder_scenarios.append(RootFolderWithMemoryFolders(rootfolder=item.rootfolder, folders=item.folders[:mid_index]))
-        third_random_rootfolder_scenarios.append(RootFolderWithMemoryFolders(rootfolder=item.rootfolder, folders=item.folders[mid_index:]))
+    # second RootFolders is split into two datasets for the same rootfolder with an "equal" number of the folders drawn in random order from the second rootfolder
+    second_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
+    random.shuffle(second_rootfolder.folders)
+    mid_index = len(second_rootfolder.folders) // 2
+    second_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
+    
+    second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, second_rootfolder_part_one.folders)
+
+    second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, second_rootfolder_part_two.folders)
 
     return {
-        "rootfolder_tuples": rootfolder_tuples,
-        "first_rootfolder_tuple": first_rootfolder_scenario,
-        "second_random_rootfolder_tuples": second_random_rootfolder_scenarios,
-        "third_random_rootfolder_tuples": third_random_rootfolder_scenarios
+        "rootfolder_tuples": rootfolders,
+        "first_rootfolder": first_rootfolder,
+        "second_rootfolder_part_one": second_rootfolder_part_one,
+        "second_rootfolder_part_two": second_rootfolder_part_two
     }
 
 # Pytest markers for test organization
