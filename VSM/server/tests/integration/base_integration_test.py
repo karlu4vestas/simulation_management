@@ -13,8 +13,7 @@ class RootFolderWithFolderNodeDTOList(NamedTuple):
     folders: list[FolderNodeDTO]
 
 class BaseIntegrationTest:
-
-    # ---------- helper functions  ----------    
+    # --------- helper functions  ----------    
     def get_marked_for_cleanup(self, session: Session, rootfolder: RootFolderDTO) -> RootFolderWithMemoryFolders:
         """Get folders marked for cleanup for a given root folder"""
         pass
@@ -27,21 +26,14 @@ class BaseIntegrationTest:
 
         
     def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders) -> RootFolderWithFolderNodeDTOList:
-        """Step 2.2: Insert simulations into database and return all folders and rootfolders in the database for validation
+        #Step 2.2: Insert simulations into database and return all the rootfolder database folders for validation
         
-        Args:
-            session: Database session
-            simulation_data: List of tuples containing root folders and their file info
-            
-        Returns:
-            List of RootFolderWithFolderList with the inserted folders from database
-        """
         rootfolder:RootFolderDTO=rootfolder_with_folders.rootfolder
         assert rootfolder.id is not None and rootfolder.id > 0
 
         # extract and convert the leaves to FileInfo (the leaves  are the simulations) 
         from app.web_api import FileInfo
-        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=date.today(), nodetype=FolderTypeEnum.VTS_SIMULATION, retention_id=None) 
+        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=folder.modified_date, nodetype=FolderTypeEnum.VTS_SIMULATION, retention_id=None) 
                                             for folder in rootfolder_with_folders.folders if folder.is_leaf ]
        
         insert_or_update_simulation_in_db(rootfolder.id, file_info_list)
@@ -54,14 +46,15 @@ class BaseIntegrationTest:
 
         folders: List[FolderNodeDTO] = read_folders(rootfolder.id)
         return RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=folders)
-
+    
+    """
     def update_cleanup_configuration(self, session: Session, rootfolder: RootFolderDTO, cleanup_configuration: CleanupConfiguration) -> CleanupConfiguration:
-        """Step 3: Update the CleanupConfiguration and return the new configuration for a root folder and return the updated configuration"""
+        #Step 3: Update the CleanupConfiguration and return the new configuration for a root folder and return the updated configuration
         # Implementation would create cleanup round
         pass
         return self.get_cleanup_configuration(session, rootfolder)
-
-    def start_cleanup_round(self, session: Session, rootfolder: RootFolderDTO) -> RootFolderWithMemoryFolders:
+    """
+    def test_start_cleanup_round(self, session: Session, rootfolder: RootFolderDTO) -> RootFolderWithMemoryFolders:
         """Step 3: Initialize a multi-week cleanup round and return simulations marked for cleanup
         
         Args:

@@ -6,8 +6,8 @@ import os
 from datetime import date
 from app.app_config import AppConfig
 from db.database import Database
-from datamodel.dtos import CleanupConfiguration
-from .integration.testdata_for_import import RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders, flatten_folder_structure, flatten_multiple_folder_structures, generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
+from datamodel.dtos import CleanupConfiguration, RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
+from .integration.testdata_for_import import RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders, flatten_folder_structure, generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
 
 
 @pytest.fixture(scope="function")
@@ -134,7 +134,6 @@ def sample_root_folder_data():
 def sample_folder_node_data(test_session):
     """Sample data for FolderNodeDTO testing"""
     # Create prerequisites first
-    from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
     
     # Create simulation domain
     domain = SimulationDomainDTO(name="TestDomain")

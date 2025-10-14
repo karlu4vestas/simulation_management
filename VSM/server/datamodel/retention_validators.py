@@ -4,17 +4,34 @@ from datetime import date, timedelta
 from datamodel.dtos import Retention 
 from datamodel.dtos import CleanupConfiguration, RetentionTypeDTO, PathProtectionDTO
 
-#ensure consiustency of all but path retention updates
+#ensure consistency of retentions
+#  
 class RetentionCalculator:
-    def __init__(self, numeric_retention_types: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfiguration):
-        if not cleanup_config.cleanup_round_start_date or not numeric_retention_types or not cleanup_config.cycletime or cleanup_config.cycletime <= 0:
+    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfiguration):
+        if not retention_type_dict or not cleanup_config.cleanup_round_start_date or not cleanup_config.cycletime or cleanup_config.cycletime <= 0:
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
-        self.retention_id_dict        = {retention.id: retention for retention in numeric_retention_types.values()}
-        self.retention_ids            = [retention.id for retention in numeric_retention_types.values()]
-        self.retention_durations      = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
-        self.cleanup_config           = cleanup_config
-        self.cleanup_round_start_date = cleanup_config.cleanup_round_start_date
-        self.cycletimedelta           = timedelta(days=cleanup_config.cycletime)
+
+        numeric_retention_types          = {key:retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None}
+        self.all_retention_types         = retention_type_dict
+        self.numeric_retention_id_dict   = {retention.id: retention for retention in numeric_retention_types.values()}
+        self.numeric_retention_ids       = [retention.id for retention in numeric_retention_types.values()]
+        self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
+        self.cleanup_config              = cleanup_config
+        self.cleanup_round_start_date    = cleanup_config.cleanup_round_start_date
+        self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
+
+    def is_numeric(self, retention_id:int) -> bool:
+        return retention_id in self.numeric_retention_id_dict   
+
+    def is_valid(self, retention:Retention) -> bool:
+        if retention.retention_id is None or self.all_retention_types.get(retention.retention_id, None) is None:
+            #the retention_id is not defined or is invalid
+            return False
+        elif self.is_numeric(retention.retention_id):
+            return retention.expiration_date is not None
+        else:
+            return True
+
 
     # adjust the expiration_date using the cleanup_configuration and retentiontype 
     # This is what you what when updating the simulations retentiontype using the webclient
@@ -22,7 +39,7 @@ class RetentionCalculator:
     # if non numeric retention then set expiration_date to None
     # if numeric retention then set expiration_date to cleanup_round_start_date + days_to_cleanup of the retention type
     def adjust_expiration_date_from_cleanup_configuration_and_retentiontype(self, retention: Retention) -> Retention:
-        retentiontype = self.retention_id_dict.get(retention.retention_id, None)
+        retentiontype = self.numeric_retention_id_dict.get(retention.retention_id, None)
         if retentiontype is None: # not a numeric retention
             retention.expiration_date = None
         else:
@@ -39,8 +56,10 @@ class RetentionCalculator:
     #   use the modified_date to update expiration_date if it will result in longer retention (expiration_date)
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
     def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date=None) -> Retention:
-        retentiontype = self.retention_id_dict.get(retention.retention_id, None)
+
+        retentiontype = self.all_retention_types.get(retention.retention_id, None)
         if retentiontype is None: # not a numeric retention
+            #no retention assigned so 
             retention.expiration_date = None
         else:
             if modified_date is not None:
@@ -51,10 +70,10 @@ class RetentionCalculator:
             else:
                 days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
                 # find first index where retention_duration[idx] >= days_until_expiration
-                idx = bisect_left(self.retention_durations, days_to_expiration)
+                idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
 
                 # if days_until_expiration is greater than every threshold, return last index
-                retention.retention_id = self.retention_ids[idx] if idx < len(self.retention_durations) else self.retention_ids[len(self.retention_durations) - 1]
+                retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
         return retention
 
     # adjust numeric retention_type to the new cleanup_configuration

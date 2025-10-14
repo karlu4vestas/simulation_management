@@ -17,6 +17,11 @@ class FolderTypeEnum(str, Enum):
     INNERNODE       = "innernode"
     VTS_SIMULATION  = "vts_simulation"
 
+class ExternalRetentionEnum(str, Enum):
+    Issue = "Issue"
+    Clean = "Clean"
+    Missing = "Missing"
+
 # see values in vts_create_meta_data
 # FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
 class FolderTypeBase(SQLModel):

@@ -211,7 +211,7 @@ def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConf
 
 @app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
 def read_rootfolder_retentiontypes(rootfolder_id: int):
-    retention_types:list[RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder_id).values()
+    retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retention_type_dict(rootfolder_id).values())
     return retention_types
 #@app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO]) #do not expose untill needed
 def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, RetentionTypeDTO]:
@@ -226,6 +226,9 @@ def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, Retentio
         
         if not retention_types.get("+next",None):
             raise HTTPException(status_code=404, detail="retentiontypes does not contain 'next' retention type")
+
+        if not retention_types.get("path", None):
+            raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=vts_simulation for {rootfolder.id}")
         
         return retention_types
 
@@ -502,7 +505,7 @@ def start_new_cleanup_cycle(rootfolder_id: int):
 
 # This function will insert new simulations and update existing simulations
 #  - I can be called with all simulations modified or not since last scan, because the list of simulations will be reduced to simulations that have changed or are new
-#  - in all cases the caller's change to modify, retention_id (not None retention_id) will be applied and path protection will be applied and takes priority if any
+#  - in all cases the caller's change to modify, retention_id (not None retention_id) will be applied and path protection will be applied and takes priority
 #  - the expiration date and numeric retentions will:
 #       if cleanup is active then recalculate them 
 #       if cleanup is inactive then ignore them 
@@ -589,9 +592,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
     # prepare the path_protection_engine. it returns the id to the PathProtectionDTO and prioritizes the most specific path (most segments) if any.
     path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder.id)
-    if path_retention_dict.get("path", None) is None:
-        raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=vts_simulation for {rootfolder.id}")
-    path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict.get("path", None).id)
+    path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict["path"].id)
 
     # do we have a cleanup configuration that allows start of cleanup
     can_start_cleanup:bool = rootfolder.get_cleanup_configuration().can_start_cleanup()
@@ -602,34 +603,35 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
     # Prepare bulk update data for existing folders
     bulk_updates = []
-    for folder, sim in zip(existing_folders, simulations):
-        modified_date:date       = folder.modified_date
-        retention:Retention      = folder.get_retention()
-        path_retention:Retention = path_matcher.match(folder.path)
+    for db_folder, sim in zip(existing_folders, simulations):
+        db_modified_date:date    = db_folder.modified_date   # initialise with existing
+        db_retention:Retention   = db_folder.get_retention() # initialise with existing
         sim_retention:Retention  = Retention(sim.retention_id) if sim.retention_id is not None else None
+        path_retention:Retention = path_matcher.match(db_folder.path)
 
         # step 1: set changes to non numeric retentions with path protection having priority
         if not path_retention is None:
-            retention = path_retention
+            db_retention = path_retention
         elif not sim_retention is None: #retention that the caller want to set. Could be #retention_id for "clean" or "issue"
-            retention = sim_retention
-        elif modified_date != sim.modified_date: 
-            modified_date = sim.modified_date
+            db_retention = sim_retention
+        elif db_modified_date != sim.modified_date: 
+            db_modified_date = sim.modified_date
+            
             #step 2: if the modified date changed we need to update the retention because it might be numeric
             if retention_calculator is not None: #is cleanup active then retention_calculator is exist
-                retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(retention, sim.modified_date)
+                db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
         else: 
-            # all new simulation are created with modified_date=None in insert_simulations_in_db and are therefore handled above 
+            # all new simulation are created with modified_date=None (default) in insert_simulations_in_db and are therefore handled above 
             # ANYWAY lets process this case just to be sure. we can optimise later
             if retention_calculator is not None:
-                retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(retention, modified_date)
+                db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
             
         bulk_updates.append({
-            "id": folder.id,
-            "modified_date": sim.modified_date,
-            "expiration_date": retention.expiration_date,
-            "retention_id": retention.retention_id,
-            "pathprotection_id": retention.pathprotection_id
+            "id": db_folder.id,
+            "modified_date": db_modified_date,
+            "expiration_date": db_retention.expiration_date,
+            "retention_id": db_retention.retention_id,
+            "pathprotection_id": db_retention.pathprotection_id
         })
     
     # Execute bulk update
@@ -751,21 +753,7 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
 
 
 def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: FileInfo, nodetypes:dict[str,FolderTypeDTO]) -> int:
-    """
-    Insert missing hierarchy for a single filepath and return the leaf node ID.
-    
-    Args:
-        session: Database session
-        rootfolder_id: ID of the root folder
-        filepath: The complete file path to ensure exists
-        innernode_type_id: The nodetype_id to use for inner nodes where as the node for the full simulation filepath will use simulation.nodetype_id
-    Returns:
-        ID of the leaf node (final segment in the path)
-    
-    Raises:
-        ValueError: If filepath is invalid or empty
-        HTTPException: If database constraints are violated
-    """
+    #    Insert missing hierarchy for a single filepath and return the leaf node ID.
     if rootfolder_id is None or rootfolder_id <= 0:
         raise ValueError(f"Invalid rootfolder_id: {rootfolder_id}")
 
@@ -798,11 +786,9 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
                 new_node = FolderNodeDTO(
                     rootfolder_id=rootfolder_id,
                     parent_id=current_parent_id,
-                    name=segment,
-                    #@TODO very vts specifc - must be made generic when other departments are onboarded
-                    nodetype_id = nodetypes[FolderTypeEnum.INNERNODE].id,  
+                    name=segment,                  
+                    nodetype_id = nodetypes[FolderTypeEnum.INNERNODE].id,   #@TODO very vts specifc - must be made generic when other departments are onboarded
                     path="/".join(current_path_segments),  # Full path up to this segment
-                    path_ids=""  # Will be set after getting the ID
                 )
             else:
                 new_node = FolderNodeDTO(
@@ -811,9 +797,6 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
                     name=segment,
                     nodetype_id=nodetypes[FolderTypeEnum.VTS_SIMULATION].id,
                     path="/".join(current_path_segments),  # Full path up to this segment
-                    modified_date=simulation.modified_date,
-                    retention_id=simulation.retention_id,
-                    path_ids=""  # Will be set after getting the ID
                 )            
             try:
                 session.add(new_node)

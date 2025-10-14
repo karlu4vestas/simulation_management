@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 from typing import Optional
 import random
-import csv
+from enum import Enum
 from typing import NamedTuple
 from sqlmodel import Session, select
 from sqlalchemy import Engine
@@ -9,7 +9,13 @@ from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, FolderType
 from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
+
 class InMemoryFolderNode:
+    class TestCaseEnum(str, Enum):
+        BEFORE = "start_end_before_cleanup_start"
+        BEFORE_AFTER = "start_before_end_after_cleanup_start"
+        AFTER = "start_end_after_cleanup_start"
+
     """In-memory representation of a folder node using pointers for parent-child relationships"""
     def __init__(self, name: str, is_leaf: bool = False):
         self.name = name
@@ -18,6 +24,8 @@ class InMemoryFolderNode:
         self.parent: Optional['InMemoryFolderNode'] = None
         self.children: list['InMemoryFolderNode'] = []
         self.modified_date: Optional[datetime] = None  # Add modified_date field
+        self.testcase_dict:dict[str, str] = {}
+        self.retention: ExternalRetentionEnum = None
     
     def add_child(self, child: 'InMemoryFolderNode'):
         """Add a child node and set up parent-child relationship"""
@@ -301,6 +309,7 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     
     return root_folders
 
+
 def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: list[InMemoryFolderNode]):
     """Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
     - before_leafs:       retention period starts and ends before the cleanup round start
@@ -333,25 +342,21 @@ def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: 
     # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
     # Date range: [cleanup_start - retention - random_days - 1] to [cleanup_start - random_days - 1]
     for leaf in before_leafs:
-        random_interval = rand.randint(1, ran_interval_days)  # Random interval between 1-30 days
-        # Calculate earliest possible date
         leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days + rand.randint(1, ran_interval_days)  + 1)
+        leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE
     
     # Group 2: before_after_leafs - retention spans across cleanup (partially in retention)
     # Date range: [cleanup_start - retention/2 - random_days] to [cleanup_start - random_days - 1]
     for leaf in before_after_leafs:
         leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days // 2 + rand.randint(1, ran_interval_days) )
-    
+        leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE_AFTER
+
     # Group 3: after_leafs - modified dates after cleanup starts (will NOT be cleaned up)
     # Date range: [cleanup_start + 1 + random_days] onwards (up to +60 days)
     for leaf in after_leafs:
         leaf.modified_date = cleanup_start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
+        leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.AFTER
     
-    print(f"Randomized modified dates for {len(leafs)} leaf folders:")
-    print(f"  - before_leafs: {len(before_leafs)} folders (will be deleted)")
-    print(f"  - before_after_leafs: {len(before_after_leafs)} folders (retention spans cleanup)")
-    print(f"  - after_leafs: {len(after_leafs)} folders (will NOT be deleted)")
-
 if __name__ == "__main__":  
     rootfolders = generate_in_memory_rootfolder_and_folder_hierarchies(2)
     for i, root_folder_with_tree in enumerate(rootfolders):
