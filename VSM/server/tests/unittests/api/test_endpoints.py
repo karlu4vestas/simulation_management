@@ -5,20 +5,34 @@ from fastapi.testclient import TestClient
 from app.web_api import app
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db 
+from sqlmodel import Session
 
 @pytest.fixture
 def client():
     AppConfig.set_test_mode(AppConfig.Mode.UNIT_TEST)
-    # test client does not call the startup where the db is setup so do it here
+    
+    # Reset the Database singleton to ensure fresh engine
+    Database._instance = None
+    Database._engine = None
+    
+    # Create a fresh database with test data
     db = Database.get_db()
-    if db.is_empty() and AppConfig.is_unit_test():
-        db.clear_all_tables_and_schemas()
-        db.create_db_and_tables()
-        engine = db.get_engine()
-        insert_vts_metadata_in_db(engine)
-        insert_test_folder_hierarchy_in_db(engine) 
-
-    return TestClient(app)
+    db.delete_db()
+    db.create_db_and_tables()
+    
+    session = Session(db.get_engine())
+    try:
+        insert_vts_metadata_in_db(session)
+        insert_test_folder_hierarchy_in_db(session)
+        session.close()
+        
+        # Yield the test client
+        yield TestClient(app)
+    finally:
+        # Cleanup after test
+        db.delete_db()
+        Database._instance = None
+        Database._engine = None
 
 class TestRootEndpoint:
     #Test cases for the root endpoint

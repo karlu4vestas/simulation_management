@@ -7,8 +7,7 @@ Sets the application to unit test mode and executes database test suite.
 import sys
 import os
 import pytest
-
-from server.tests.conftest import clean_database
+from db.database import Database
 
 # Add the server directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -18,12 +17,14 @@ from app.app_config import AppConfig, AppConfig
 def main():
     """Run database unit tests with proper configuration."""
     print("Starting database unit tests...")
-    
-    # Clean up any existing test databases first
-    clean_database()
-    
-    # Set test mode to unit test
+
     AppConfig.set_test_mode(AppConfig.Mode.UNIT_TEST)
+
+    db:Database = Database.get_db()
+    db.delete_db()
+    db.create_db_and_tables()
+ 
+    # Set test mode to unit test
     print(f"Test mode set to: {AppConfig.get_test_mode()}")
     
     # Run database unit tests
@@ -36,7 +37,7 @@ def main():
     exit_code = pytest.main(test_args)
     
     # Clean up test databases after tests complete
-    clean_database()
+    db.delete_db()
 
     # Provide feedback based on exit code
     if exit_code == 0:

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import date
 from typing import NamedTuple
 import pytest
@@ -10,14 +11,16 @@ from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNode
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders
 
 """Integration tests for complete cleanup workflows"""
+@dataclass
 class DataIOSet:
     key:    str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
     input:  RootFolderWithMemoryFolders #input rootfolder
     output: RootFolderWithFolderNodeDTOList #output rootfolder and folders from db after insertion of simulations
-    input_leafs: list[InMemoryFolderNode] = [] # input leafs (the simulations) extracted from input 
-    output_for_input_leafs: list[FolderNodeDTO] = [] # output leafs (the simulations) extracted from output and ordered as input leafs
+    input_leafs: list[InMemoryFolderNode] = None # input leafs (the simulations) extracted from input 
+    output_for_input_leafs: list[FolderNodeDTO] = None # output leafs (the simulations) extracted from output and ordered as input leafs
     retention_calculator: RetentionCalculator = None # retention calculator for the rootfolder  
     path_retention: RetentionTypeDTO = None # the path retention for the rootfolder
+    leaf_node_type: int = None # the folder type id for leaf nodes (simulations)
 
 
 @pytest.mark.integration
@@ -67,6 +70,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             output: RootFolderWithFolderNodeDTOList = self.insert_simulations(integration_session, input)
             str_summary = f"key:{key}, input rootfolder ids: {input.rootfolder.id}, output rootfolder ids: {output.rootfolder.id}"
             print(str_summary)
+
             dataio_sets.append(DataIOSet(key=key,input=input,output=output))
 
         str_dataio_sets_ids = [f"{data_set.key}, {data_set.input.rootfolder.id} == {data_set.output.rootfolder.id}   {data_set.input.rootfolder.path} == {data_set.output.rootfolder.path}" for data_set in dataio_sets]
@@ -155,11 +159,11 @@ class TestCleanupWorkflows(BaseIntegrationTest):
 
             # extract the the list of leaf in input and output so that it is easy to validate them. Leafs are the vts simulations
             data_set.input_leafs  = sorted( [ folder for folder in data_set.input.folders  if folder.is_leaf ], key=lambda f: normalize_path(f.path) )
-            output_leafs = sorted( [ folder for folder in data_set.output.folders if folder.nodetype_id == leaf_node_type ], key=lambda f: normalize_path(f.path) )
+            output_leafs = sorted( [ folder for folder in data_set.output.folders if folder.nodetype_id == data_set.leaf_node_type ], key=lambda f: normalize_path(f.path) )
 
             #select and order output simulations so that they match the order of input
             output_leaf_path_dict:dict[str,InMemoryFolderNode] = {normalize_path(f.path): f for f in output_leafs}
-            data_set.output_for_input_leafs = [output_leaf_path_dict[ normalize_path(p.path) ] for p in input_leafs]
+            data_set.output_for_input_leafs = [output_leaf_path_dict[ normalize_path(p.path) ] for p in data_set.input_leafs]
 
 
         return dataio_sets
@@ -173,7 +177,6 @@ class TestCleanupWorkflows(BaseIntegrationTest):
 
             # the testdata defines a cleanup configuration 
             assert data_set.output.rootfolder.get_cleanup_configuration().can_start_cleanup()
-
 
             for sim_folder, db_folder in zip(data_set.input_leafs, data_set.output_for_input_leafs):
                 assert db_folder.modified_date == sim_folder.modified_date
@@ -202,11 +205,11 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             #step 4: verify that the correct simulations are marked for cleanup
 
             #step 5: finalize cleanup round by cleaning marked simulations
-
             #step 6: Launch scan for new simulations
-
+            #step 6: Launch scan for new simulations
     def test_insert_simulations_into_active_cleanup_round(self, integration_session, cleanup_scenario_data):
+        #pass_insert_simulations_into_active_cleanup_round(self, integration_session, cleanup_scenario_data):
         pass
-
     def test_stop_and_resumption_of_cleanup_round(self, integration_session, cleanup_scenario_data):
+        #ass_stop_and_resumption_of_cleanup_round(self, integration_session, cleanup_scenario_data):
         pass

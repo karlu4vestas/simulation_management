@@ -12,39 +12,27 @@ from .integration.testdata_for_import import RootFolderWithMemoryFolderTree, Roo
 
 @pytest.fixture(scope="function")
 def clean_database():
-    pass
-    """
-        # eset the database singleton for each test
-        # Clear the singleton instance before each test
-        Database._instance = None
-        Database._engine = None
-        
-        # Clean up any existing test database files
-        test_db_files = [
-            "unit_test_db.sqlite",
-            "client_test_db.sqlite", 
-            "integration_test.sqlite"
-        ]
-        
-        for db_file in test_db_files:
-            if os.path.exists(db_file):
-                os.remove(db_file)
-        
-        yield
-        
-        # Clean up after test
-        Database._instance = None
-        Database._engine = None
-        
-        # Clean up any database files created during test
-        for db_file in test_db_files:
-            if os.path.exists(db_file):
-                os.remove(db_file)
-    """
+    """Reset the database singleton for each test to ensure test isolation"""
+    # Clear the singleton instance before each test
+    Database._instance = None
+    Database._engine = None
+    
+    yield
+    
+    # Clean up after test
+    if Database._instance is not None:
+        db = Database.get_db()
+        db.delete_db()
+    Database._instance = None
+    Database._engine = None
 
 @pytest.fixture(scope="function")
-def test_session(clean_database):
+def test_session():
     """Create a test database session with clean tables using appropriate DB name"""
+    # Reset the Database singleton to ensure fresh engine
+    Database._instance = None
+    Database._engine = None
+    
     db:Database = Database.get_db()
     db.delete_db()
     db.create_db_and_tables()
@@ -54,13 +42,21 @@ def test_session(clean_database):
     finally:
         session.close()
         db.delete_db()
+        # Reset singleton after cleanup
+        Database._instance = None
+        Database._engine = None
 
 
 @pytest.fixture(scope="function")
-def integration_session(clean_database):
+def integration_session():
     # Create a persistent test database session for integration tests
     # Keep session open for the entire integration test
     # delete the database when the integration test is done 
+    
+    # Reset the Database singleton to ensure fresh engine
+    Database._instance = None
+    Database._engine = None
+    
     db:Database = Database.get_db()
     db.delete_db()
     db.create_db_and_tables()
@@ -70,6 +66,9 @@ def integration_session(clean_database):
     finally:
         session.close()
         db.delete_db()
+        # Reset singleton after cleanup
+        Database._instance = None
+        Database._engine = None
 
 @pytest.fixture
 def sample_data():

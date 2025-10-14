@@ -7,7 +7,6 @@ from sqlmodel import Session, select
 from sqlalchemy import Engine
 from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
-from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
 
 class InMemoryFolderNode:

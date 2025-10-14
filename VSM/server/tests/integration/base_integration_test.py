@@ -54,7 +54,7 @@ class BaseIntegrationTest:
         pass
         return self.get_cleanup_configuration(session, rootfolder)
     """
-    def test_start_cleanup_round(self, session: Session, rootfolder: RootFolderDTO) -> RootFolderWithMemoryFolders:
+    def start_cleanup_round(self, session: Session, rootfolder: RootFolderDTO) -> RootFolderWithMemoryFolders:
         """Step 3: Initialize a multi-week cleanup round and return simulations marked for cleanup
         
         Args:
