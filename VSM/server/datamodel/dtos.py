@@ -17,7 +17,8 @@ class FolderTypeEnum(str, Enum):
     INNERNODE       = "innernode"
     VTS_SIMULATION  = "vts_simulation"
 
-class ExternalRetentionEnum(str, Enum):
+class ExternalRetentionTypes(str, Enum):
+    Unknown = None
     Issue = "Issue"
     Clean = "Clean"
     Missing = "Missing"
@@ -37,7 +38,7 @@ class RetentionTypeBase(SQLModel):
     simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
     name: str                       = Field(default="")
     days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
-    is_system_managed: bool         = Field(default=False)
+    is_endstage: bool               = Field(default=False) #end stage is clean, issue or missing
     display_rank: int               = Field(default=0)
 
 #retention types must be order by increasing days_to_cleanup and then by display_rank
@@ -119,8 +120,8 @@ class RootFolderDTO(RootFolderBase, table=True):
 @dataclass # these parameters must always be in sync
 class Retention:
     retention_id: int
-    pathprotection_id: int = 0
-    expiration_date: date = None
+    pathprotection_id: int | None = None
+    expiration_date: date | None = None
 
 class FolderNodeBase(SQLModel):
     rootfolder_id: int                    = Field(foreign_key="rootfolderdto.id")

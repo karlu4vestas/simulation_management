@@ -149,18 +149,6 @@
       }
     },
     {
-      "name": "Debug Integration Tests",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/server/run_integration_test.py",
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server",
-      "justMyCode": false,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
-      }
-    },
-    {
       "name": "Debug DTOs Unit Tests",
       "type": "debugpy",
       "request": "launch",
@@ -177,6 +165,18 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_all_unittests.py",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug Integration Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_integration_test.py",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,

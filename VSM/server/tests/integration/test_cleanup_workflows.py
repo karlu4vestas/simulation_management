@@ -2,15 +2,15 @@ from dataclasses import dataclass
 from datetime import date
 from typing import NamedTuple
 import pytest
-from datamodel.retention_validators import RetentionCalculator
+from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
 from datamodel.dtos import CleanupConfiguration, FolderNodeDTO, FolderTypeDTO, FolderTypeEnum, RetentionTypeDTO, RootFolderDTO
-from app.web_api import normalize_path, read_retentiontypes_by_domain_id, read_rootfolder_retention_type_dict, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id 
+from app.web_api import normalize_path, read_retentiontypes_by_domain_id, read_retentiontypes_dict_by_domain_id, read_rootfolder_retention_type_dict, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id 
 from app.web_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id 
 from db.db_api import insert_rootfolder
 from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNodeDTOList
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders
 
-"""Integration tests for complete cleanup workflows"""
+# DataIOSet structure is setup in initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy for reuse in other tests
 @dataclass
 class DataIOSet:
     key:    str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
@@ -28,6 +28,9 @@ class DataIOSet:
 @pytest.mark.slow
 class TestCleanupWorkflows(BaseIntegrationTest):
 
+    # initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy is in it self a comprehensive test focused on testing
+    # whether the simulations are properly imported and the folder structure in the db is built correctly. It does however not test the simulation attributes
+    # Other tests can do that by starting to call initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy and then use list[DataIOSet] for further testing
     def initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy(self, integration_session, cleanup_scenario_data) -> list[DataIOSet]:
         """Test intialization of the workflow"""
 
@@ -151,9 +154,9 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         #test the attrubutes of the inserted simulations
         for data_set in dataio_sets:
 
-            data_set.leaf_node_type = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+            data_set.leaf_node_type       = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
             data_set.retention_calculator = RetentionCalculator(read_rootfolder_retention_type_dict(data_set.output.rootfolder.id), data_set.output.rootfolder.get_cleanup_configuration()) 
-            data_set.path_retention = data_set.retention_calculator.all_retention_types["path"]
+            data_set.path_retention       = data_set.retention_calculator.retention_type_str_dict["path"]
 
             assert data_set.input.rootfolder.id == data_set.output.rootfolder.id  # should never fail because we just got back what we input to insert_simulations
 
@@ -171,23 +174,40 @@ class TestCleanupWorkflows(BaseIntegrationTest):
     def test_initialization_with_import_of_simulations(self, integration_session, cleanup_scenario_data):
         #initialize the db and then verify attributes of the inserted simulations
         data_io_sets:list[DataIOSet] = self.initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy(integration_session, cleanup_scenario_data)
-
-        #test the attrubutes of the inserted simulations
+        #test the attributes of the inserted simulations
         for data_set in data_io_sets:
+            externalToInternalRetentionTypeConverter:ExternalToInternalRetentionTypeConverter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retention_type_dict(data_set.output.rootfolder.id))
 
-            # the testdata defines a cleanup configuration 
+            # the testdata defines a cleanup configuration that can be started 
             assert data_set.output.rootfolder.get_cleanup_configuration().can_start_cleanup()
 
             for sim_folder, db_folder in zip(data_set.input_leafs, data_set.output_for_input_leafs):
+                # verify that modiffied date was set correctly
                 assert db_folder.modified_date == sim_folder.modified_date
                 #assert retention_calculator.is_valid( db_folder.get_retention() ) #retention must be valid from the moment that the cleanup cycle starts
 
-                #ensure that the external retention was applied unless it is path retention
-                if sim_folder.retention is not None :
-                    sim_folder_retention:RetentionTypeDTO = data_set.retention_calculator.all_retention_types[sim_folder.retention]
-                    assert db_folder.retention_id == data_set.path_retention.id or db_folder.retention_id == sim_folder_retention.id  
+                # verify that the folder type is correct
+                assert db_folder.nodetype_id == data_set.leaf_node_type
 
-    def test_start_cleanup_round_without_new_insertions(self, integration_session, cleanup_scenario_data):
+                # verify that the retention is correct
+                # Notice that there is no active cleanup round and the simulation have just been inserted 
+                # Therefore, external retentions should just be converted to an internal retention and assigned to the db_folder unless
+                #   - the db folder is under a path retention
+                #   - the user have previously define a retention. This is not the case now because we just imported the simulations
+                if sim_folder.retention is not None:
+                    if db_folder.retention_id == data_set.path_retention.id:
+                        assert db_folder.pathprotection_id is not None
+                    else:    
+                        assert db_folder.pathprotection_id is None
+
+                        sim_retention_type:RetentionTypeDTO = externalToInternalRetentionTypeConverter.to_internal(sim_folder.retention)
+                        if sim_retention_type is None:
+                            assert data_set.retention_calculator.is_numeric(db_folder.retention_id)
+                        else:
+                            assert db_folder.retention_id == sim_retention_type.id
+
+
+    """def test_start_cleanup_round_for_new_insertions(self, integration_session, cleanup_scenario_data):
         #initialize the db and then verify attributes of the inserted simulations
         data_io_sets:list[DataIOSet] = self.initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy(integration_session, cleanup_scenario_data)
 
@@ -207,9 +227,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             #step 5: finalize cleanup round by cleaning marked simulations
             #step 6: Launch scan for new simulations
             #step 6: Launch scan for new simulations
-    def test_insert_simulations_into_active_cleanup_round(self, integration_session, cleanup_scenario_data):
-        #pass_insert_simulations_into_active_cleanup_round(self, integration_session, cleanup_scenario_data):
-        pass
-    def test_stop_and_resumption_of_cleanup_round(self, integration_session, cleanup_scenario_data):
-        #ass_stop_and_resumption_of_cleanup_round(self, integration_session, cleanup_scenario_data):
-        pass
+    """
+    #def test_insert_simulations_into_active_cleanup_round(self, integration_session, cleanup_scenario_data):
+    #    pass
+    #def test_stop_and_resumption_of_cleanup_round(self, integration_session, cleanup_scenario_data):

@@ -7,7 +7,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
-from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
+from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, ExternalRetentionTypes, RetentionTypeDTO, FolderTypeDTO
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
 from db.database import Database
 from app.app_config import AppConfig
@@ -97,7 +97,7 @@ def read_retentiontypes_by_domain_id(simulationdomain_id: int):
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         return retention_types
 #@app.get("/simulationdomain/{simulationdomain_id}/retentiontypes/dict", response_model=dict[str,RetentionTypeDTO]) do not expose before needed
-def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int):
+def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str, RetentionTypeDTO]:
     return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/foldertypes/", response_model=list[FolderTypeDTO])
@@ -444,7 +444,7 @@ from dataclasses import dataclass
 from datetime import date
 from datamodel.dtos import Retention 
 from datamodel.dtos import FolderTypeEnum
-from datamodel.retention_validators import RetentionCalculator, PathProtectionEngine
+from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
 from sqlalchemy import func, case
 
 @dataclass
@@ -452,7 +452,7 @@ class FileInfo:
     filepath: str
     modified_date: date
     nodetype: FolderTypeEnum
-    retention_id: int | None = None
+    external_retention: ExternalRetentionTypes
     id: int = None   # will be used during updates
 
 
@@ -600,33 +600,37 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
     can_start_cleanup:bool = rootfolder.get_cleanup_configuration().can_start_cleanup()
 
     #Prepare calculation of numeric retention_id.  
-    retention_calculator = RetentionCalculator( read_rootfolder_numeric_retentiontypes_dict(rootfolder.id), rootfolder.get_cleanup_configuration() ) if can_start_cleanup else None
-
+    retention_calculator = RetentionCalculator( read_rootfolder_retention_type_dict(rootfolder.id), rootfolder.get_cleanup_configuration() ) if can_start_cleanup else None
+    external_to_internal_retention_converter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retention_type_dict(rootfolder.id))
 
     # Prepare bulk update data for existing folders
     bulk_updates = []
     for db_folder, sim in zip(existing_folders, simulations):
         db_modified_date:date    = db_folder.modified_date   # initialise with existing
         db_retention:Retention   = db_folder.get_retention() # initialise with existing
-        sim_retention:Retention  = Retention(sim.retention_id) if sim.retention_id is not None else None
+        sim_retention:RetentionTypeDTO  = external_to_internal_retention_converter.to_internal(sim.external_retention)
         path_retention:Retention = path_matcher.match(db_folder.path)
 
-        # step 1: set changes to non numeric retentions with path protection having priority
-        if not path_retention is None:
+        # path retention takes priority over other retentions
+        if path_retention is not None:
             db_retention = path_retention
-        elif not sim_retention is None: #retention that the caller want to set. Could be #retention_id for "clean" or "issue"
-            db_retention = sim_retention
-        elif db_modified_date != sim.modified_date: 
+        elif sim_retention is not None: #then it must be an endstage retention (clean, issue or missing) so we apply it
+            db_retention = Retention(sim_retention.id)
+        elif db_retention.retention_id is not None and retention_calculator.is_endstage(db_retention.retention_id): 
+            # The retention (possibly set by the user) must not overwrite unless the db_retention is in endstage
+
+            # sim_retention is None here which means that the simulation must be in another stage than endstage. 
+            # We must therefore reset it to None so that the retention_calculator can calculate the correct retention if cleanup is active 
+            db_retention = Retention(retention_id=None) 
+        else:
+            pass # keep existing retention
+
+        if db_modified_date != sim.modified_date:
             db_modified_date = sim.modified_date
-            
-            #step 2: if the modified date changed we need to update the retention because it might be numeric
-            if retention_calculator is not None: #is cleanup active then retention_calculator is exist
-                db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-        else: 
-            # all new simulation are created with modified_date=None (default) in insert_simulations_in_db and are therefore handled above 
-            # ANYWAY lets process this case just to be sure. we can optimise later
-            if retention_calculator is not None:
-                db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+
+        # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
+        if retention_calculator is not None: 
+            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
             
         bulk_updates.append({
             "id": db_folder.id,

@@ -445,7 +445,7 @@ class TestRetentionDTO:
         assert retrieved_retention is not None
         assert retrieved_retention.id == original_retention.id
         assert retrieved_retention.name == original_retention.name
-        assert retrieved_retention.is_system_managed == original_retention.is_system_managed
+        assert retrieved_retention.is_endstage == original_retention.is_endstage
         assert retrieved_retention.display_rank == original_retention.display_rank
 
     def test_retention_with_defaults_create_and_retrieve(self, test_session):
@@ -464,7 +464,7 @@ class TestRetentionDTO:
         
         # Verify defaults
         assert original_retention.name == ""          # Default value
-        assert original_retention.is_system_managed == False  # Default value
+        assert original_retention.is_endstage == False  # Default value
         assert original_retention.display_rank == 0   # Default value
 
     def test_retention_system_managed_create_and_retrieve(self, test_session):
@@ -479,7 +479,7 @@ class TestRetentionDTO:
         original_retention = RetentionTypeDTO(
             simulationdomain_id=domain.id,
             name="System Retention",
-            is_system_managed=True,
+            is_endstage=True,
             days_to_cleanup=90,
             display_rank=10
         )
@@ -488,7 +488,7 @@ class TestRetentionDTO:
         test_session.refresh(original_retention)
         
         # Verify attributes
-        assert original_retention.is_system_managed == True
+        assert original_retention.is_endstage == True
         assert original_retention.days_to_cleanup == 90
 
     def test_retention_query_by_display_rank(self, test_session):
@@ -589,7 +589,7 @@ class TestDTODatabaseIntegration:
         expected_retention = RetentionTypeDTO(
             simulationdomain_id=domain.id,
             name="Very long retention policy name with special characters ñü",
-            is_system_managed=True,
+            is_endstage=True,
             display_rank=2147483647  # Max int value
         )
 
@@ -608,7 +608,7 @@ class TestDTODatabaseIntegration:
         retention = RetentionTypeDTO(
             simulationdomain_id=expected_retention.simulationdomain_id,
             name=expected_retention.name,
-            is_system_managed=expected_retention.is_system_managed,
+            is_endstage=expected_retention.is_endstage,
             display_rank=expected_retention.display_rank
         )
 
@@ -638,5 +638,5 @@ class TestDTODatabaseIntegration:
         assert retrieved_node.modified_date == expected_folder_node.modified_date
 
         assert retrieved_retention.name == expected_retention.name
-        assert retrieved_retention.is_system_managed == expected_retention.is_system_managed
+        assert retrieved_retention.is_endstage == expected_retention.is_endstage
         assert retrieved_retention.display_rank == expected_retention.display_rank

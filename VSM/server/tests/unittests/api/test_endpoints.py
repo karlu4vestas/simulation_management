@@ -4,7 +4,7 @@ from db.database import Database
 from fastapi.testclient import TestClient
 from app.web_api import app
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db 
+from testdata.vts_generate_test_data import insert_minimal_test_data_for_unit_tests 
 from sqlmodel import Session
 
 @pytest.fixture
@@ -23,7 +23,8 @@ def client():
     session = Session(db.get_engine())
     try:
         insert_vts_metadata_in_db(session)
-        insert_test_folder_hierarchy_in_db(session)
+        # Use minimal test data for unit tests instead of the massive hierarchy
+        insert_minimal_test_data_for_unit_tests(session)
         session.close()
         
         # Yield the test client

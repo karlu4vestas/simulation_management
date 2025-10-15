@@ -33,7 +33,7 @@ class BaseIntegrationTest:
 
         # extract and convert the leaves to FileInfo (the leaves  are the simulations) 
         from app.web_api import FileInfo
-        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=folder.modified_date, nodetype=FolderTypeEnum.VTS_SIMULATION, retention_id=None) 
+        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=folder.modified_date, nodetype=FolderTypeEnum.VTS_SIMULATION, external_retention=folder.retention) 
                                             for folder in rootfolder_with_folders.folders if folder.is_leaf ]
        
         insert_or_update_simulation_in_db(rootfolder.id, file_info_list)

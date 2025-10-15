@@ -104,7 +104,7 @@ namespace VSM.Client.Datamodel
     {
         public byte Id { get; set; }
         public string Name { get; set; } = "";
-        public bool IsSystemManaged { get; set; } = false;
+        public bool IsEndStage { get; set; } = false;
         public byte DisplayRank { get; set; } = 0;
     }
 

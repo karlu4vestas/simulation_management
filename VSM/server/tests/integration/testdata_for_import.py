@@ -5,7 +5,7 @@ from enum import Enum
 from typing import NamedTuple
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import CleanupConfiguration, ExternalRetentionTypes, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 
 
@@ -16,7 +16,7 @@ class InMemoryFolderNode:
         AFTER = "start_end_after_cleanup_start"
 
     """In-memory representation of a folder node using pointers for parent-child relationships"""
-    def __init__(self, name: str, is_leaf: bool = False):
+    def __init__(self, name: str, is_leaf: bool, external_retentiontype: ExternalRetentionTypes):
         self.name = name
         self.path = ""
         self.is_leaf = is_leaf
@@ -24,7 +24,7 @@ class InMemoryFolderNode:
         self.children: list['InMemoryFolderNode'] = []
         self.modified_date: Optional[datetime] = None  # Add modified_date field
         self.testcase_dict:dict[str, str] = {}
-        self.retention: ExternalRetentionEnum = None
+        self.retention: ExternalRetentionTypes = external_retentiontype
     
     def add_child(self, child: 'InMemoryFolderNode'):
         """Add a child node and set up parent-child relationship"""
@@ -45,11 +45,11 @@ class InMemoryFolderNode:
         )
 
 #-------------------------------------
-# helper to generate random retenttype except for the "Path" retention. 
-class RandomRetentionNames:
-    def __init__(self, retention_types: list[str], seed:int):
+# helper to select and generate random ExternalRetentionEnum .
+class RandomInternalRetentionType:
+    def __init__(self, seed:int):
         self.rand_int_generator = random.Random(seed)
-        self.retention_types = retention_types
+        self.retention_types = [ ExternalRetentionTypes.Unknown, ExternalRetentionTypes.Issue, ExternalRetentionTypes.Clean]
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]
@@ -80,15 +80,19 @@ def generate_node_name(
                    is_leaf: bool,
                    parent: Optional[InMemoryFolderNode],
                    parent_name: str,
-                   sibling_counter: int
+                   sibling_counter: int,
+                   random_internal_retention: RandomInternalRetentionType
                  ) -> InMemoryFolderNode:
+
+    external_retentiontype: ExternalRetentionTypes = ExternalRetentionTypes.Unknown # default retention is None for inner nodes and can be None for leaf nodes
     if is_leaf:
         name = f"VTS_{parent_name}_{sibling_counter + 1}" if parent is not None else f"VTS_{parent_name}"
+        external_retentiontype = random_internal_retention.next()
     else:
         name = f"{parent_name}_{sibling_counter + 1}" if parent is not None else f"{parent_name}"
-    
-    child = InMemoryFolderNode(name=name, is_leaf=is_leaf)
-    
+
+    child = InMemoryFolderNode(name=name, is_leaf=is_leaf, external_retentiontype=external_retentiontype)
+
     # Set the path - this will be updated when added to parent
     if parent is not None:
         parent.add_child(child)
@@ -99,7 +103,7 @@ def generate_node_name(
 
 def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InMemoryFolderNode:
     rand: random.Random = random.Random(42)
-    
+    random_retentiontype: RandomInternalRetentionType = RandomInternalRetentionType(42)
     print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
 
     # Generate the root node
@@ -108,7 +112,8 @@ def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InM
         is_leaf=False,
         parent=None,
         parent_name=current_parent_name,
-        sibling_counter=0
+        sibling_counter=0,
+        random_internal_retention=random_retentiontype
     )
 
     if root is not None:
@@ -137,7 +142,8 @@ def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InM
                         is_leaf=is_leaf,
                         parent=current_parent,
                         parent_name=current_parent_name,
-                        sibling_counter=i_sibling
+                        sibling_counter=i_sibling,
+                        random_internal_retention=random_retentiontype
                     )
                     
                     if child is not None:

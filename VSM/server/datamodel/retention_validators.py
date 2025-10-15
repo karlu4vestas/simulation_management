@@ -1,7 +1,7 @@
 from bisect import bisect_left
 from typing import Optional
 from datetime import date, timedelta
-from datamodel.dtos import Retention 
+from datamodel.dtos import ExternalRetentionTypes, Retention 
 from datamodel.dtos import CleanupConfiguration, RetentionTypeDTO, PathProtectionDTO
 
 #ensure consistency of retentions
@@ -12,25 +12,31 @@ class RetentionCalculator:
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
 
         numeric_retention_types          = {key:retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None}
-        self.all_retention_types         = retention_type_dict
+        self.retention_type_str_dict     = retention_type_dict
+        self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
         self.numeric_retention_id_dict   = {retention.id: retention for retention in numeric_retention_types.values()}
         self.numeric_retention_ids       = [retention.id for retention in numeric_retention_types.values()]
         self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
         self.cleanup_config              = cleanup_config
         self.cleanup_round_start_date    = cleanup_config.cleanup_round_start_date
         self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
+        self.path_retention_id           = self.retention_type_str_dict["path"].id if self.retention_type_str_dict.get("path", None) is not None else 0  
 
     def is_numeric(self, retention_id:int) -> bool:
         return retention_id in self.numeric_retention_id_dict   
 
     def is_valid(self, retention:Retention) -> bool:
-        if retention.retention_id is None or self.all_retention_types.get(retention.retention_id, None) is None:
+        if retention.retention_id is None or self.retention_type_str_dict.get(retention.retention_id, None) is None:
             #the retention_id is not defined or is invalid
             return False
         elif self.is_numeric(retention.retention_id):
             return retention.expiration_date is not None
         else:
             return True
+
+    def is_endstage(self, retention_id:int) -> bool:
+        retentiontype:RetentionTypeDTO = self.retention_type_id_dict.get(retention_id, None)
+        return retentiontype is not None and retentiontype.is_endstage 
 
 
     # adjust the expiration_date using the cleanup_configuration and retentiontype 
@@ -57,9 +63,9 @@ class RetentionCalculator:
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
     def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date=None) -> Retention:
 
-        retentiontype = self.all_retention_types.get(retention.retention_id, None)
-        if retentiontype is None: # not a numeric retention
-            #no retention assigned so 
+        retentiontype:RetentionTypeDTO = self.retention_type_id_dict.get(retention.retention_id, None)
+        if retentiontype is not None and (retentiontype.id == self.path_retention_id or retentiontype.is_endstage): 
+            # path retention has priority so we do not change it
             retention.expiration_date = None
         else:
             if modified_date is not None:
@@ -110,3 +116,22 @@ class PathProtectionEngine:
             if path == pat or path.startswith(pat + "/"):  # avoids "R1" matching "R10/..."
                 return Retention( self.path_retention_id, pid)
         return None
+
+class ExternalToInternalRetentionTypeConverter:
+    retention_type_dict: dict[str, RetentionTypeDTO]
+
+    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO]):
+        if not retention_type_dict :
+            raise ValueError("missing retentention_type_dict for ExternalRetentionTypeConverter")
+
+        valid_values = [e.value.lower() for e in ExternalRetentionTypes if e.value is not None]
+        self.retention_type_dict = { key: retentiontype for key, retentiontype in retention_type_dict.items() if key in valid_values }
+
+    def to_internal(self, external_retention: ExternalRetentionTypes) -> RetentionTypeDTO:
+        internal_retention:RetentionTypeDTO = None
+        if external_retention is not None and external_retention != ExternalRetentionTypes.Unknown:
+            internal_retention = self.retention_type_dict.get(external_retention.value.lower(), None)
+            if internal_retention is None:
+                raise ValueError(f"cannot map external retention type '{external_retention}' to any internal retention type")
+
+        return internal_retention

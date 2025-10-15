@@ -206,3 +206,28 @@ def generate_folder_tree(session:Session, root_folder_id:int, root_folder_name:s
 
     print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {id_counter}, maxLevel = {max_level}")
     return root_id
+
+
+def insert_minimal_test_data_for_unit_tests(session: Session):
+    """
+    Insert minimal test data for unit tests - only creates 2 small root folders
+    to avoid the massive data generation that slows down unit tests.
+    """
+    from app.web_api import read_cleanupfrequency_name_dict_by_domain_id
+
+    vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
+    if not vts_simulation_domain or not vts_simulation_domain.id:
+        raise ValueError("vts simulation domain not found")
+    
+    domain_id = vts_simulation_domain.id
+    frequency_name_dict: dict[str, CleanupFrequencyDTO] = read_cleanupfrequency_name_dict_by_domain_id(domain_id)
+    cycle_time: int = 0  # days
+    
+    # Only create 2 small root folders with minimal depth for unit testing
+    generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["1 week"].days, cycle_time, "R1", 2)
+    generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["inactive"].days, cycle_time, "R2", 2)
+    
+    root_folders = session.exec(select(RootFolderDTO)).all()
+    print("Minimal test data for unit tests inserted successfully:")
+    for rf in root_folders:
+        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanupfrequency} Folder id: {rf.folder_id}")
