@@ -11,16 +11,23 @@ class RetentionCalculator:
         if not retention_type_dict or not cleanup_config.cleanup_round_start_date or not cleanup_config.cycletime or cleanup_config.cycletime <= 0:
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
 
-        numeric_retention_types          = {key:retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None}
         self.retention_type_str_dict     = retention_type_dict
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
-        self.numeric_retention_id_dict   = {retention.id: retention for retention in numeric_retention_types.values()}
-        self.numeric_retention_ids       = [retention.id for retention in numeric_retention_types.values()]
-        self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
         self.cleanup_config              = cleanup_config
         self.cleanup_round_start_date    = cleanup_config.cleanup_round_start_date
         self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
         self.path_retention_id           = self.retention_type_str_dict["path"].id if self.retention_type_str_dict.get("path", None) is not None else 0  
+        self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
+        self.is_clean_round_active       = cleanup_config.is_clean_round_active
+
+        # create numeric retention values. notice that we exclude the "marked" retentiontype if the cleanup round is inactive
+        numeric_retention_types          = {key:retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None }
+        if not self.is_clean_round_active:
+            numeric_retention_types      = {key:retention for key,retention in numeric_retention_types.items() if retention.id != self.marked_retention_id}
+            
+        self.numeric_retention_id_dict   = {retention.id: retention for retention in numeric_retention_types.values() }
+        self.numeric_retention_ids       = [retention.id for retention in numeric_retention_types.values()]
+        self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
 
     def is_numeric(self, retention_id:int) -> bool:
         return retention_id in self.numeric_retention_id_dict   

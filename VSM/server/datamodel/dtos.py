@@ -76,6 +76,7 @@ class CleanupConfiguration:
     cycletime: int                               # days from initialization of the simulations til it can be cleaned
     cleanupfrequency: int                        # number of days between cleanup rounds
     cleanup_round_start_date: date | None = None # at what date did the current cleanup round start. If not set then we assume today
+    is_clean_round_active: bool = False          # true if a cleanup round is active. This is not stored in the db but calculated based on the other parameters
     
     def __eq__(self, other):
         if not isinstance(other, CleanupConfiguration):
