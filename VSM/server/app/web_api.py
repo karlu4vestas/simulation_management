@@ -144,7 +144,8 @@ def read_cleanupfrequency_name_dict_by_domain_id(simulationdomain_id: int):
 def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(default="")):
     if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
-    return read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
+    rootfolders = read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
+    return rootfolders
 
 def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None)->list[RootFolderDTO]:
     if simulationdomain_id is None or simulationdomain_id == 0:
@@ -161,7 +162,8 @@ def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: 
             rootfolders = session.exec(
                 select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) )
             ).all()
-        return rootfolders if type(rootfolders) == list else ([rootfolders] if rootfolders is not None else [])
+
+        return rootfolders
 
 
 # update a rootfolder's cleanup_configuration

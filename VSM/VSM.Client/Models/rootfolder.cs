@@ -17,14 +17,14 @@ namespace VSM.Client.Datamodel
             {
                 return new CleanupConfigurationDTO
                 {
-                    CleanupFrequency = dto.CleanupFrequency,
-                    CycleTime = dto.CycleTime
+                    CleanupFrequency = dto.Cleanupfrequency,
+                    CycleTime = dto.Cycletime
                 };
             }
             set
             {
-                dto.CleanupFrequency = value.CleanupFrequency;
-                dto.CycleTime = value.CycleTime;
+                dto.Cleanupfrequency = value.CleanupFrequency;
+                dto.Cycletime = value.CycleTime;
             }
         }
 

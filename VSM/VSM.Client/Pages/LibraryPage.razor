@@ -41,13 +41,13 @@
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Cycle time" Width="160px">
+                    <TemplateColumn Title="Retention period" Width="180px">
                         <ChildContent Context="folder">
                             @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.CycleTime)}")
                         </ChildContent>
                     </TemplateColumn>
 
-                    <TemplateColumn Title="Cleanup frequency" Width="160px">
+                    <TemplateColumn Title="Cleanup frequency" Width="190px">
                         <ChildContent Context="folder">
                             @($"{frequencyConverter.GetName(folder.CleanupConfiguration.CleanupFrequency)}")
                         </ChildContent>
@@ -78,7 +78,7 @@
                 string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Owners & approvers:</span>
                     @ownerstring</div>
-                <div style="display:flex"><span style="width: 170px; display: inline-block;">Cycle time:</span>
+                <div style="display:flex"><span style="width: 170px; display: inline-block;">Retention period:</span>
                     <FluentCombobox Autofocus="true" Items="@cycleTimeConverter?.Names()" @bind-Value="@cycle_time_name"
                         @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
                         ImmediateDelay="100" />

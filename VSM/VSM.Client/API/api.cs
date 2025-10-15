@@ -67,28 +67,15 @@ namespace VSM.Client.SharedAPI
         }
         public async Task<List<RootFolderDTO>> RootFoldersByDomainUser(int simulationdomain_id, string user)
         {
-            try
-            {
-                string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
+            string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/?simulationdomain_id={simulationdomain_id}&initials={Uri.EscapeDataString(user)}";
 
-                List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(requestUrl, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    //PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                }) ?? new List<RootFolderDTO>();
-                return rootFolderDTOs;
-            }
-            catch (JsonException jsonEx)
+            List<RootFolderDTO> rootFolderDTOs = await httpClient.GetFromJsonAsync<List<RootFolderDTO>>(requestUrl, new JsonSerializerOptions
             {
-                Console.WriteLine($"JSON deserialization error: {jsonEx.Message}");
-                Console.WriteLine($"JSON Path: {jsonEx.Path}");
-                return new List<RootFolderDTO>();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error fetching root folders: {ex.Message}");
-                return new List<RootFolderDTO>();
-            }
+                PropertyNameCaseInsensitive = true,
+                //PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+            }) ?? new List<RootFolderDTO>();
+
+            return rootFolderDTOs;
         }
         public async Task<List<FolderNodeDTO>> GetFoldersByRootFolderId(RootFolder rootFolder)
         {

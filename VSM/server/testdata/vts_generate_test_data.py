@@ -58,6 +58,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     #session.refresh(root_folder)
     print(f"Root folder created. id={root_folder.id} path={root_folder.path}")
     root_folder.folder_id = generate_folder_tree(session, root_folder.id, path, levels)
+    session.add(root_folder)
     session.commit()
 
 def insert_test_folder_hierarchy_in_db(session:Session):

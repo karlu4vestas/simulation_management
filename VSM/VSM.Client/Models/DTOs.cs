@@ -83,13 +83,14 @@ namespace VSM.Client.Datamodel
     public class RootFolderDTO
     {
         public int Id { get; set; } //ID of this DTO
-        public int SimulationDomain_Id { get; set; } //Id of the simulation domain this rootfolder belongs to
+        public int Simulationdomain_Id { get; set; } //Id of the simulation domain this rootfolder belongs to
         public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public int CycleTime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
-        public int CleanupFrequency { get; set; } = 0; // number of days between cleanup rounds
+        public int Cycletime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
+        public int Cleanupfrequency { get; set; } = 0; // number of days between cleanup rounds
+        public DateTime? Cleanup_Round_Start_Date { get; set; } = null; // at what date have the user set the cleanup to start
     }
     // so far we know: 
     // InnerNode, 
