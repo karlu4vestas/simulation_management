@@ -482,7 +482,7 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
-        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration()
+        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         if not cleanup_config.can_start_cleanup():
             return {"message": f"Cannot start cleanup for rootfolder {rootfolder_id} due to invalid cleanup configuration {cleanup_config}"}
         elif cleanup_config.cleanup_start_date is None:
@@ -505,10 +505,12 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         folders = session.exec( select(FolderNodeDTO).where( FolderNodeDTO.rootfolder_id == rootfolder_id) ).all()
 
 
-        # Update retentions 
+        # Update retentions for leafs (the vts-simulations) 
+        nodetype_leaf_id        = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
         for folder in folders:
-            folder.set_retention( retention_calculator.adjust_retentions_from_cleanup_configuration( folder.get_retention()) )
-            session.add(folder)
+            if folder.nodetype_id==nodetype_leaf_id:
+                folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
+                session.add(folder)
 
         #@TODO  must we make a bulk commit here to save the modified retention ids ?
         session.commit()

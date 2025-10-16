@@ -13,15 +13,7 @@ from db.database import Database
 
 # In-memory dataclass for test data setup - not persisted to database
 # Used by test fixtures to configure cleanup settings before database insertion
-# The configuration can be used as follow:
-#   a) deactivating cleanup is done by setting cleanupfrequency to None
-#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
-#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
-#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
-#      - inactive
-#      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
-#      - cleaning: this is the last phase in which the actual cleaning happens
-#      - finished: the cleanup round is finished and we wait for the next round
+
 @dataclass
 class CleanupConfiguration:
     """In-memory cleanup configuration for test data setup."""

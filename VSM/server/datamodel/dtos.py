@@ -30,15 +30,22 @@ class CleanupProgressEnum(str, Enum):
     CLEANING = "cleaning"    # Actual cleaning is happening
     FINISHED = "finished"    # Cleanup round is complete, waiting for next round
 
-
+# The configuration can be used as follow:
+#   a) deactivating cleanup is done by setting cleanupfrequency to None
+#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
+#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
+#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
+#      - inactive
+#      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
+#      - cleaning: this is the last phase in which the actual cleaning happens
+#      - finished: the cleanup round is finished and we wait for the next round
 class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
-    rootfolder_id: int = Field(default=None, foreign_key="rootfolderdto.id")
-    cycletime: int = Field(default=0)
-    cleanupfrequency: int = Field(default=0)
+    rootfolder_id: int              = Field(default=None, foreign_key="rootfolderdto.id")
+    cycletime: int                  = Field(default=0)
+    cleanupfrequency: int           = Field(default=0)
     cleanup_start_date: date | None = Field(default=None)
-    cleanup_progress: str = Field(default=CleanupProgressEnum.INACTIVE.value)
-
+    cleanup_progress: str           = Field(default=CleanupProgressEnum.INACTIVE.value)
 
 class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     """Cleanup configuration as separate table."""
@@ -217,13 +224,6 @@ class RootFolderBase(SQLModel):
     approvers: str                        = Field(default="")     # comma separated approvers
     path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
     cleanup_config_id: int | None         = Field(default=None, foreign_key="cleanupconfigurationdto.id") 
-    #cycletime: int                        = Field(default=0)      # cycletime for a simulation: from last modified data til initialization of the simulations til it can be cleaned. 0 means not set
-    #cleanupfrequency: int                 = Field(default=0)      # number of days between cleanup rounds. 0 means not set
-    #cleanup_round_start_date: date | None = Field(default=None)   # at what date have the user set the cleanup to start start. Can be set into the furture
-    #cleanup_progress: str                 = Field(default=CleanupProgressEnum.INACTIVE.value)  # current state of the cleanup round
-
-    #def set_cleanup_configuration(self, cleanup: CleanupConfigurationDTO):
-    #    self.cleanup_config_id = cleanup.id
 
     def get_cleanup_configuration(self, session: Session) -> CleanupConfigurationDTO:
         """Get or create cleanup configuration."""
@@ -242,21 +242,6 @@ class RootFolderBase(SQLModel):
         session.commit()
         return new_cleanup
 
-    """    
-    def get_cleanup_configuration(self) -> CleanupConfiguration:
-        return CleanupConfiguration(
-            self.cycletime, 
-            self.cleanupfrequency, 
-            self.cleanup_round_start_date,
-            CleanupProgressEnum(self.cleanup_progress)
-        )
-    
-    def set_cleanup_configuration(self, cleanup: CleanupConfiguration):
-        self.cycletime = cleanup.cycletime
-        self.cleanupfrequency = cleanup.cleanupfrequency
-        self.cleanup_round_start_date = cleanup.cleanup_start_date
-        self.cleanup_progress = cleanup.cleanup_progress.value
-    """
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     

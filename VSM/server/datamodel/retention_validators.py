@@ -45,6 +45,8 @@ class RetentionCalculator:
         retentiontype:RetentionTypeDTO = self.retention_type_id_dict.get(retention_id, None)
         return retentiontype is not None and retentiontype.is_endstage 
 
+    def get_endstage_retentions(self) -> list[RetentionTypeDTO]:
+        return [retentiontype for retentiontype in self.retention_type_id_dict.values() if retentiontype.is_endstage]
 
     # adjust the expiration_date using the cleanup_configuration and retentiontype 
     # This is what you what when updating the simulations retentiontype using the webclient
@@ -68,7 +70,7 @@ class RetentionCalculator:
     # if numeric retention then 
     #   use the modified_date to update expiration_date if it will result in longer retention (expiration_date)
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
-    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date=None) -> Retention:
+    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date) -> Retention:
 
         retentiontype:RetentionTypeDTO = self.retention_type_id_dict.get(retention.retention_id, None)
         if retentiontype is not None and (retentiontype.id == self.path_retention_id or retentiontype.is_endstage): 
@@ -94,8 +96,8 @@ class RetentionCalculator:
     #
     # if non numeric retention then set expiration_date to None
     # if numeric retention then update numeric retention_id to the expiration_date and the cleanup_configuration
-    def adjust_retentions_from_cleanup_configuration(self, retention:Retention) -> Retention:
-        return self.adjust_from_cleanup_configuration_and_modified_date(retention)
+    #def adjust_retentions_from_cleanup_configuration(self, retention:Retention) -> Retention:
+    #    return self.adjust_from_cleanup_configuration_and_modified_date(retention)
 
 #ensure consistency of path retentions
 class PathProtectionEngine:
