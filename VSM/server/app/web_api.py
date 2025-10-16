@@ -176,10 +176,10 @@ def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configur
     # if we are to start cleanup then set the cleanup_round_start_date to today if required
     # else set it to None to avoid a scenario where a scheduler tries to start a cleanup round based on an old date
     if cleanup_configuration.can_start_cleanup():
-        if cleanup_configuration.cleanup_round_start_date is None:
-            cleanup_configuration.cleanup_round_start_date = func.current_date()
+        if cleanup_configuration.cleanup_start_date is None:
+            cleanup_configuration.cleanup_start_date = func.current_date()
     else:
-        cleanup_configuration.cleanup_round_start_date = None
+        cleanup_configuration.cleanup_start_date = None
 
     #now the configuration is consistent
     with Session(Database.get_engine()) as session:
@@ -477,8 +477,8 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         cleanup_config: CleanupConfiguration = rootfolder.get_cleanup_configuration()
         if not cleanup_config.can_start_cleanup():
             return {"message": f"Cannot start cleanup for rootfolder {rootfolder_id} due to invalid cleanup configuration {cleanup_config}"}
-        elif cleanup_config.cleanup_round_start_date is None:
-            cleanup_config.cleanup_round_start_date = func.current_date()
+        elif cleanup_config.cleanup_start_date is None:
+            cleanup_config.cleanup_start_date = func.current_date()
             rootfolder.set_cleanup_configuration(cleanup_config)
 
         # Update the cleanup_round_start_date to current date

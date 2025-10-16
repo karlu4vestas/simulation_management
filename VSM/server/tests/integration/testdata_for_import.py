@@ -342,7 +342,7 @@ def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: 
     rand: random.Random = random.Random(42)
     ran_interval_days = 10
     retention_period_days = cleanup_configuration.cycletime
-    cleanup_start_date = cleanup_configuration.cleanup_round_start_date
+    cleanup_start_date = cleanup_configuration.cleanup_start_date
 
     # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
     # Date range: [cleanup_start - retention - random_days - 1] to [cleanup_start - random_days - 1]

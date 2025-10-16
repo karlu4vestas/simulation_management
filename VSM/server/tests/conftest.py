@@ -223,7 +223,7 @@ def cleanup_scenario_data():
     # The root folder's cleanup configuration is not initialised means that assumes default values
 
     number_of_rootfolders = 2
-    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_round_start_date=date(2000, 1, 1))
+    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_start_date=date(2000, 1, 1))
     random_days:int = 10
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0
