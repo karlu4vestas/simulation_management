@@ -4,11 +4,12 @@ import pytest
 from sqlmodel import Session
 import os
 from datetime import date
+from dataclasses import dataclass
 from app.app_config import AppConfig
 from db.database import Database
-from datamodel.dtos import CleanupConfiguration, RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
+from datamodel.dtos import CleanupConfigurationDTO, CleanupProgressEnum, RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
 from .integration.testdata_for_import import RootFolderWithMemoryFolders, RootFolderWithMemoryFolderTree, flatten_folder_structure 
-from .integration.testdata_for_import import generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
+from .integration.testdata_for_import import generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders,CleanupConfiguration
 
 
 @pytest.fixture(scope="function")
@@ -231,8 +232,8 @@ def cleanup_scenario_data():
     #Split the two root folder in three parts:
     # first rootfolder with all its folders randomized
     first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
-    first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
-    randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, first_rootfolder.folders)
+    #first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
+    randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, cleanup_configuration, first_rootfolder.folders)
 
     random.shuffle(first_rootfolder.folders)
     #first_rootfolder.folders
@@ -241,15 +242,15 @@ def cleanup_scenario_data():
     second_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
     random.shuffle(second_rootfolder.folders)
     mid_index = len(second_rootfolder.folders) // 2
-    second_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
     
     second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
-    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, second_rootfolder_part_one.folders)
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_one.folders)
 
     second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
-    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, second_rootfolder_part_two.folders)
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_two.folders)
 
     return {
+        "cleanup_configuration": cleanup_configuration,
         "rootfolder_tuples": rootfolders,
         "first_rootfolder": first_rootfolder,
         "second_rootfolder_part_one": second_rootfolder_part_one,

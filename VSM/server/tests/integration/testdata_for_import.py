@@ -1,12 +1,44 @@
-from datetime import timedelta, datetime
+from dataclasses import dataclass
+from datetime import date, timedelta, datetime
 from typing import Optional
 import random
 from enum import Enum
 from typing import NamedTuple
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import CleanupConfiguration, ExternalRetentionTypes, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, CleanupConfigurationDTO, CleanupProgressEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
+
+
+
+# In-memory dataclass for test data setup - not persisted to database
+# Used by test fixtures to configure cleanup settings before database insertion
+# The configuration can be used as follow:
+#   a) deactivating cleanup is done by setting cleanupfrequency to None
+#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
+#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
+#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
+#      - inactive
+#      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
+#      - cleaning: this is the last phase in which the actual cleaning happens
+#      - finished: the cleanup round is finished and we wait for the next round
+@dataclass
+class CleanupConfiguration:
+    """In-memory cleanup configuration for test data setup."""
+    cycletime: int                                          # days from initialization of the simulations til it can be cleaned
+    cleanupfrequency: int                                   # number of days between cleanup rounds
+    cleanup_start_date: date | None = None                  # at what date did the current cleanup round start
+    cleanup_progress: CleanupProgressEnum = CleanupProgressEnum.INACTIVE  # current state of the cleanup round
+    
+    def to_dto(self, rootfolder_id: int) -> CleanupConfigurationDTO:
+        """Convert to CleanupConfigurationDTO for database insertion."""
+        return CleanupConfigurationDTO(
+            rootfolder_id=rootfolder_id,
+            cycletime=self.cycletime,
+            cleanupfrequency=self.cleanupfrequency,
+            cleanup_start_date=self.cleanup_start_date,
+            cleanup_progress=self.cleanup_progress.value
+        )
 
 
 class InMemoryFolderNode:
@@ -315,7 +347,7 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     return root_folders
 
 
-def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: list[InMemoryFolderNode]):
+def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, cleanup_configuration:CleanupConfiguration, folders: list[InMemoryFolderNode]):
     """Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
     - before_leafs:       retention period starts and ends before the cleanup round start
                           => modified date = from "cleanup_start_date - retention_period - random_interval - 1"
@@ -338,7 +370,6 @@ def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, folders: 
     before_after_leafs = leafs[group_size:2*group_size]
     after_leafs = leafs[2*group_size:]
     
-    cleanup_configuration: CleanupConfiguration = rootfolder.get_cleanup_configuration()
     rand: random.Random = random.Random(42)
     ran_interval_days = 10
     retention_period_days = cleanup_configuration.cycletime

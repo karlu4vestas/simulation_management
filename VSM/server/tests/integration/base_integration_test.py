@@ -2,7 +2,8 @@ import pytest
 from typing import Dict, List, Any, NamedTuple, Optional
 from sqlmodel import Session
 from datetime import date, datetime, timedelta
-from datamodel.dtos import CleanupConfiguration, FolderNodeDTO, FolderTypeEnum, RootFolderDTO
+from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
+
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from app.web_api import FileInfo, insert_or_update_simulation_in_db, read_folders, normalize_path, read_rootfolders_by_domain_and_initials
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders

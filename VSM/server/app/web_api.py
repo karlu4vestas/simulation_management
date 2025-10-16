@@ -7,7 +7,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
-from datamodel.dtos import CleanupConfiguration, CleanupFrequencyDTO, CycleTimeDTO, ExternalRetentionTypes, RetentionTypeDTO, FolderTypeDTO
+from datamodel.dtos import CleanupConfigurationDTO, CleanupProgressEnum, CleanupFrequencyDTO, CycleTimeDTO, ExternalRetentionTypes, RetentionTypeDTO, FolderTypeDTO
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
 from db.database import Database
 from app.app_config import AppConfig
@@ -167,8 +167,9 @@ def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: 
 
 
 # update a rootfolder's cleanup_configuration
+"""
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
-def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfiguration):
+def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
     is_valid, message = cleanup_configuration.is_valid()
     if not is_valid:
         raise HTTPException(status_code=404, detail=message)
@@ -187,18 +188,25 @@ def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configur
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
       
-        rootfolder.set_cleanup_configuration(cleanup_configuration)
-        session.add(rootfolder)
+        # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
+        config_dto = rootfolder.ensure_cleanup_config(session)
+        # Update the DTO with values from the incoming dataclass
+        config_dto.cycletime = cleanup_configuration.cycletime
+        config_dto.cleanupfrequency = cleanup_configuration.cleanupfrequency
+        config_dto.cleanup_start_date = cleanup_configuration.cleanup_start_date
+        config_dto.cleanup_progress = cleanup_configuration.cleanup_progress.value
+        
+        session.add(config_dto)
         session.commit()
 
         if cleanup_configuration.can_start_cleanup():
             print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
             #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
             #start_new_cleanup_cycle(rootfolder_id)
-
         return {"message": f"Cleanup configuration updated for rootfolder {rootfolder_id}"}
+"""    
 
-def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConfiguration:
+def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConfigurationDTO:
     with Session(Database.get_engine()) as session:
         rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
@@ -474,15 +482,16 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
-        cleanup_config: CleanupConfiguration = rootfolder.get_cleanup_configuration()
+        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration()
         if not cleanup_config.can_start_cleanup():
             return {"message": f"Cannot start cleanup for rootfolder {rootfolder_id} due to invalid cleanup configuration {cleanup_config}"}
         elif cleanup_config.cleanup_start_date is None:
             cleanup_config.cleanup_start_date = func.current_date()
-            rootfolder.set_cleanup_configuration(cleanup_config)
+            #rootfolder.set_cleanup_configuration(cleanup_config)
 
         # Update the cleanup_round_start_date to current date
         session.add(rootfolder)
+        session.add(cleanup_config)
         session.commit()
         session.refresh(rootfolder)
 
@@ -597,10 +606,11 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
     path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict["path"].id)
 
     # do we have a cleanup configuration that allows start of cleanup
-    can_start_cleanup:bool = rootfolder.get_cleanup_configuration().can_start_cleanup()
+    config:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+    can_start_cleanup:bool = config.can_start_cleanup()
 
     #Prepare calculation of numeric retention_id.  
-    retention_calculator = RetentionCalculator( read_rootfolder_retention_type_dict(rootfolder.id), rootfolder.get_cleanup_configuration() ) if can_start_cleanup else None
+    retention_calculator = RetentionCalculator( read_rootfolder_retention_type_dict(rootfolder.id), config ) if can_start_cleanup else None
     external_to_internal_retention_converter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retention_type_dict(rootfolder.id))
 
     # Prepare bulk update data for existing folders
@@ -611,6 +621,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         sim_retention:RetentionTypeDTO  = external_to_internal_retention_converter.to_internal(sim.external_retention)
         path_retention:Retention = path_matcher.match(db_folder.path)
 
+
         # path retention takes priority over other retentions
         if path_retention is not None:
             db_retention = path_retention
@@ -619,7 +630,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         elif db_retention.retention_id is not None and retention_calculator.is_endstage(db_retention.retention_id): 
             # The retention (possibly set by the user) must not overwrite unless the db_retention is in endstage
 
-            # sim_retention is None here which means that the simulation must be in another stage than endstage. 
+            # sim_retention is None and the db_retention is in endstage. This means that the newly scanned simulation must be in another stage than endstage. 
             # We must therefore reset it to None so that the retention_calculator can calculate the correct retention if cleanup is active 
             db_retention = Retention(retention_id=None) 
         else:
@@ -631,7 +642,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
         if retention_calculator is not None: 
             db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-            
+
         bulk_updates.append({
             "id": db_folder.id,
             "modified_date": db_modified_date,

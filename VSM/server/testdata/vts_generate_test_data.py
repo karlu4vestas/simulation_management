@@ -1,7 +1,7 @@
 import random
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.db_api import insert_rootfolder
@@ -48,8 +48,6 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
         simulationdomain_id=domain_id,
         owner=owner,
         approvers=approvers,
-        cycle_time=cycle_time,
-        cleanupfrequency=cleanupfrequency,
         path=path
     )
     root_folder = insert_rootfolder(root_folder)
@@ -57,9 +55,20 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     #session.commit()
     #session.refresh(root_folder)
     print(f"Root folder created. id={root_folder.id} path={root_folder.path}")
+    
+    # Create cleanup config (NEW)
+    cleanup_config = CleanupConfigurationDTO(
+        rootfolder_id=root_folder.id,
+        cycletime=cycle_time,
+        cleanupfrequency=cleanupfrequency
+    )
+    session.add(cleanup_config)
+    session.flush()  # Ensure cleanup config is persisted
+    
     root_folder.folder_id = generate_folder_tree(session, root_folder.id, path, levels)
     session.add(root_folder)
     session.commit()
+    return root_folder, cleanup_config
 
 def insert_test_folder_hierarchy_in_db(session:Session):
     from app.web_api import read_cleanupfrequency_name_dict_by_domain_id
@@ -230,4 +239,5 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
     root_folders = session.exec(select(RootFolderDTO)).all()
     print("Minimal test data for unit tests inserted successfully:")
     for rf in root_folders:
-        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanupfrequency} Folder id: {rf.folder_id}")
+        config:CleanupConfigurationDTO = rf.get_cleanup_configuration(session)
+        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers} Folder id: {rf.folder_id}, CleanUpFrequency: {config.cleanupfrequency}")
