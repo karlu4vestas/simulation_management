@@ -26,7 +26,7 @@ class ExternalRetentionTypes(str, Enum):
 class CleanupProgressEnum(str, Enum):
     """Enumeration of cleanup round progress states."""
     INACTIVE = "inactive"    # No cleanup is active
-    RETENTION_REVIEW   = "review"      # Markup phase - users can adjust what simulations will be cleaned
+    RETENTION_REVIEW   = "retention_review"      # Markup phase - users can adjust what simulations will be cleaned
     CLEANING = "cleaning"    # Actual cleaning is happening
     FINISHED = "finished"    # Cleanup round is complete, waiting for next round
 
@@ -61,29 +61,29 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
                 self.cleanupfrequency == other.cleanupfrequency and 
                 self.cleanup_start_date == other.cleanup_start_date and
                 self.cleanup_progress == other.cleanup_progress)
-    
-    def is_valid(self) -> tuple[bool, str]:
-        # if cleanupfrequency is set then cycletime must also be set
-        is_valid: bool = True if (self.cleanupfrequency is None or self.cleanupfrequency == 0) else (self.cycletime is not None and self.cycletime > 0)
-        
-        if not is_valid:
-            return (False, "error: cycletime must be set if cleanupfrequency is set")
-        
-        # Validate progress state consistency with configuration
-        if self.cleanup_progress != CleanupProgressEnum.INACTIVE.value:
-            if self.cleanupfrequency is None or self.cleanupfrequency == 0:
-                return (False, "error: cleanup_progress must be INACTIVE when cleanupfrequency is None")
-            if self.cycletime is None or self.cycletime <= 0:
-                return (False, "error: cleanup_progress must be INACTIVE when cycletime is not properly set")
-        
-        return (True, "ok")
+   
+    def is_valid(self) -> bool:
+        # has cleanup_frequency and cycle_time been set. 
+        # If cleanup_start_date is None then cleanup_progress must be INACTIVE
+        is_valid: bool = (self.cleanupfrequency is not None and self.cleanupfrequency > 0) and \
+                         (self.cycletime is not None and self.cycletime > 0) and \
+                         ((self.cleanup_progress == CleanupProgressEnum.INACTIVE.value and self.cleanup_start_date is None) \
+                          or self.cleanup_start_date is not None)
+        return is_valid
+    def is_ready_to_start_cleanup(self) -> bool:
+        # Return true if cleanup is ready to start at some point with this configuration.
+        return self.is_valid() and self.cleanup_start_date is not None
+
+    def can_start_now(self) -> bool:
+        # Return true if 
+        # cleanup is ready to start at some point
+        # and the cleanup_start_date is today or in the past
+        # and self.cleanup_progress is INACTIVE or FINISHED
+        return self.is_ready_to_start_cleanup() and self.cleanup_start_date <= date.today() \
+               and self.cleanup_progress in [CleanupProgressEnum.INACTIVE.value, CleanupProgressEnum.FINISHED.value]
 
     def is_active(self) -> bool:
-        return self.cleanup_progress == CleanupProgressEnum.CLEANING.value or self.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
-
-    def can_start_cleanup(self) -> bool:
-        """Return true if cleanup can be started with this configuration."""
-        return self.is_valid()[0] and (self.cleanupfrequency is not None and self.cleanupfrequency > 0)
+        return self.cleanup_progress != CleanupProgressEnum.INACTIVE.value
     
     def can_transition_to(self, new_state: CleanupProgressEnum) -> bool:
         """Check if transition to new_state is valid from current state."""
@@ -98,14 +98,14 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         }
         
         # Check if cleanup can be started for non-inactive states
-        if new_state != CleanupProgressEnum.INACTIVE and not self.can_start_cleanup():
-            return (False, "error: cleanup configuration is not valid or cleanupfrequency is not set")
+        if new_state != CleanupProgressEnum.INACTIVE and self.can_start_now():
+            return False
 
         if new_state != CleanupProgressEnum.INACTIVE and self.cleanup_start_date is None:
-            return (False, "error: cleanup_start_date must be set before transitioning")
+            return False
 
         if new_state not in valid_transitions.get(current, []):
-            return (False, f"error: cannot transition from {current.value} to {new_state.value}")
+            return False
         
         return True
     
@@ -113,15 +113,15 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         """Returns list of valid states that can be transitioned to from current state."""
         current = CleanupProgressEnum(self.cleanup_progress)
         valid_transitions = {
-            CleanupProgressEnum.INACTIVE: [CleanupProgressEnum.RETENTION_REVIEW] if self.can_start_cleanup() else [],
+            CleanupProgressEnum.INACTIVE: [CleanupProgressEnum.RETENTION_REVIEW] if self.is_ready_to_start_cleanup() else [],
             CleanupProgressEnum.RETENTION_REVIEW: [CleanupProgressEnum.CLEANING, CleanupProgressEnum.INACTIVE],
             CleanupProgressEnum.CLEANING: [CleanupProgressEnum.FINISHED, CleanupProgressEnum.INACTIVE],
-            CleanupProgressEnum.FINISHED: [CleanupProgressEnum.INACTIVE, CleanupProgressEnum.RETENTION_REVIEW] if self.can_start_cleanup() else [CleanupProgressEnum.INACTIVE],
+            CleanupProgressEnum.FINISHED: [CleanupProgressEnum.INACTIVE, CleanupProgressEnum.RETENTION_REVIEW] if self.is_ready_to_start_cleanup() else [CleanupProgressEnum.INACTIVE],
         }
         
         return valid_transitions.get(current, [])
     
-    def transition_to(self, new_state: CleanupProgressEnum) -> tuple[bool, str]:
+    def transition_to(self, new_state: CleanupProgressEnum) -> bool:
         """
         Transition to a new cleanup progress state.
         
@@ -131,15 +131,15 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         Returns:
             tuple[bool, str]: (success, message) - True if transition succeeded, False otherwise
         """
-        can_transition, message = self.can_transition_to(new_state)
+        can_transition = self.can_transition_to(new_state)
         
         if can_transition:
             self.cleanup_progress = new_state.value
-            return (True, f"Transitioned to {new_state.value}")
+            return True
         
-        return (False, message)
+        return False
     
-    def transition_to_next(self) -> tuple[bool, str]:
+    def transition_to_next(self) -> bool:
         """
         Transition to the next default state in the cleanup workflow.
         Follows the primary path: INACTIVE -> STARTED -> CLEANING -> FINISHED -> INACTIVE
@@ -160,7 +160,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         next_state = next_state_map.get(current)
         
         if next_state is None:
-            return (False, f"error: no default next state defined for {current.value}")
+            return False
         
         return self.transition_to(next_state)
 

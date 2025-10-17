@@ -482,21 +482,16 @@ def start_new_cleanup_cycle(rootfolder_id: int):
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        if cleanup_config.can_start_cleanup() and cleanup_config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW):    
-
-        if not cleanup_config.can_start_cleanup():
-            return {"message": f"Cannot start cleanup for rootfolder {rootfolder_id} due to invalid cleanup configuration {cleanup_config}"}
-        elif not cleanup_config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW):
-            return {"message": f"Cannot transition from {cleanup_config.cleanup_progress} to RETENTION_REVIEW for rootfolder {rootfolder_id} "}
-        elif cleanup_config.cleanup_start_date is None:
-            cleanup_config.cleanup_start_date = func.current_date()
-            #rootfolder.set_cleanup_configuration(cleanup_config)
-
-        # Update the cleanup_round_start_date to current date
-        session.add(rootfolder)
-        session.add(cleanup_config)
-        session.commit()
-        session.refresh(rootfolder)
+        if cleanup_config.can_start_now():
+            cleanup_config.transition_to_next()
+            session.add(cleanup_config)
+            session.commit()
+        elif not cleanup_config.is_valid():
+            return {"message": f"Invalid cleanup configuration for rootfolder {rootfolder_id}: {cleanup_config}"}
+        elif not cleanup_config.is_ready_to_start_cleanup():
+            return {"message": f"Missing start date for cleanup of rootfolder {rootfolder_id}"}
+        else:
+            return {"message": f"Start of cleanup is in the future for rootfolder {rootfolder_id}"}
 
         # Prepare calculation of retention and the nodetype to identify leafs
         retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config)
@@ -515,6 +510,26 @@ def start_new_cleanup_cycle(rootfolder_id: int):
 
         session.commit()
         print(f"start_new_cleanup_cycle rootfolder_id: {rootfolder_id} updated retention of {len(folders)} folders" )
+
+def read_folder_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
+
+    with Session(Database.get_engine()) as session:
+        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
+
+        marked_retention_id:int = read_rootfolder_retentiontypes_dict(rootfolder.id)["marked"].id
+        leaf_nodetype_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+
+        # Get all folders marked for cleanup. FolderNodeDTO.nodetype_id == leaf_nodetype_id is not required but
+        # should we in the future handle hierarchies of simulation then we must refactor and test any way
+        folders = session.exec(select(FolderNodeDTO).where(
+            (FolderNodeDTO.rootfolder_id == rootfolder_id) &
+            (FolderNodeDTO.retention_id == marked_retention_id) &
+            (FolderNodeDTO.nodetype_id == leaf_nodetype_id)
+        )).all()
+
+        return folders
 
 # This function will insert new simulations and update existing simulations
 #  - I can be called with all simulations modified or not since last scan, because the list of simulations will be reduced to simulations that have changed or are new
@@ -609,7 +624,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
     # do we have a cleanup configuration that allows start of cleanup
     config:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-    can_start_cleanup:bool = config.can_start_cleanup()
+    can_start_cleanup:bool = config.is_ready_to_start_cleanup()
 
     #Prepare calculation of numeric retention_id.  
     retention_calculator = RetentionCalculator( read_rootfolder_retentiontypes_dict(rootfolder.id), config ) if can_start_cleanup else None

@@ -22,7 +22,7 @@ class TestCleanupProgressEnum:
     def test_enum_values(self, test_session, test_rootfolder):
         """Test that enum has correct values"""
         assert CleanupProgressEnum.INACTIVE.value == "inactive"
-        assert CleanupProgressEnum.RETENTION_REVIEW.value == "started"
+        assert CleanupProgressEnum.RETENTION_REVIEW.value == "retention_review"
         assert CleanupProgressEnum.CLEANING.value == "cleaning"
         assert CleanupProgressEnum.FINISHED.value == "finished"
 
@@ -34,7 +34,7 @@ class TestCleanupProgressEnum:
     def test_enum_from_string(self, test_session, test_rootfolder):
         """Test creating enum from string value"""
         assert CleanupProgressEnum("inactive") == CleanupProgressEnum.INACTIVE
-        assert CleanupProgressEnum("started") == CleanupProgressEnum.RETENTION_REVIEW
+        assert CleanupProgressEnum("retention_review") == CleanupProgressEnum.RETENTION_REVIEW
         assert CleanupProgressEnum("cleaning") == CleanupProgressEnum.CLEANING
         assert CleanupProgressEnum("finished") == CleanupProgressEnum.FINISHED
 
@@ -179,9 +179,8 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=date(2025, 10, 1)
         )
         
-        is_valid, message = config.is_valid()
+        is_valid = config.is_valid()
         assert is_valid is True
-        assert message == "ok"
 
     def test_valid_configuration_without_frequency(self, test_session, test_rootfolder):
         """Test that configuration is valid when cleanupfrequency is None"""
@@ -191,10 +190,10 @@ class TestCleanupConfigurationDTOValidation:
             cleanupfrequency=None,
             cleanup_start_date=None
         )
-        
-        is_valid, message = config.is_valid()
-        assert is_valid is True
-        assert message == "ok"
+
+        is_valid = config.is_valid()
+        assert is_valid is False
+
 
     def test_invalid_configuration_frequency_without_cycletime(self, test_session, test_rootfolder):
         """Test that configuration is invalid when cleanupfrequency is set but cycletime is not"""
@@ -205,9 +204,8 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=date(2025, 10, 1)
         )
         
-        is_valid, message = config.is_valid()
+        is_valid = config.is_valid()
         assert is_valid is False
-        assert "cycletime must be set" in message
 
     def test_invalid_configuration_frequency_with_zero_cycletime(self, test_session, test_rootfolder):
         """Test that configuration is invalid when cycletime is zero"""
@@ -218,9 +216,8 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=date(2025, 10, 1)
         )
         
-        is_valid, message = config.is_valid()
+        is_valid = config.is_valid()
         assert is_valid is False
-        assert "cycletime must be set" in message
 
     def test_invalid_progress_state_without_frequency(self, test_session, test_rootfolder):
         """Test that non-INACTIVE progress requires cleanupfrequency"""
@@ -232,9 +229,8 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW.value
         )
         
-        is_valid, message = config.is_valid()
+        is_valid = config.is_valid()
         assert is_valid is False
-        assert "cleanup_progress must be INACTIVE when cleanupfrequency is None" in message
 
     def test_invalid_progress_state_without_cycletime(self, test_session, test_rootfolder):
         """Test that non-INACTIVE progress requires valid cycletime"""
@@ -246,10 +242,9 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW.value
         )
         
-        is_valid, message = config.is_valid()
+        is_valid = config.is_valid()
         assert is_valid is False
-        # The first validation error should be about cycletime
-        assert "cycletime must be set if cleanupfrequency is set" in message
+
 
     def test_can_start_cleanup_true(self, test_session, test_rootfolder):
         """Test can_start_cleanup returns True when configuration is valid and frequency is set"""
@@ -260,7 +255,7 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=date(2025, 10, 1)
         )
         
-        assert config.can_start_cleanup() is True
+        assert config.is_ready_to_start_cleanup() is True
 
     def test_can_start_cleanup_false_no_frequency(self, test_session, test_rootfolder):
         """Test can_start_cleanup returns False when frequency is None"""
@@ -271,7 +266,7 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=None
         )
         
-        assert config.can_start_cleanup() is False
+        assert config.is_ready_to_start_cleanup() is False
 
     def test_can_start_cleanup_false_invalid_config(self, test_session, test_rootfolder):
         """Test can_start_cleanup returns False when configuration is invalid"""
@@ -282,7 +277,7 @@ class TestCleanupConfigurationDTOValidation:
             cleanup_start_date=date(2025, 10, 1)
         )
         
-        assert config.can_start_cleanup() is False
+        assert config.is_ready_to_start_cleanup() is False
 
 
 class TestCleanupConfigurationDTOStateTransitions:
@@ -298,9 +293,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        can_transition = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_started_to_cleaning_valid(self, test_session, test_rootfolder):
         """Test valid transition from STARTED to CLEANING"""
@@ -311,10 +305,9 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_start_date=date(2025, 10, 1),
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW
         )
-        
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.CLEANING)
+
+        can_transition = config.can_transition_to(CleanupProgressEnum.CLEANING)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_started_to_inactive_valid(self, test_session, test_rootfolder):
         """Test valid transition from STARTED to INACTIVE"""
@@ -326,9 +319,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_cleaning_to_finished_valid(self, test_session, test_rootfolder):
         """Test valid transition from CLEANING to FINISHED"""
@@ -340,9 +332,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.CLEANING
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.FINISHED)
+        can_transition = config.can_transition_to(CleanupProgressEnum.FINISHED)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_cleaning_to_inactive_valid(self, test_session, test_rootfolder):
         """Test valid transition from CLEANING to INACTIVE"""
@@ -354,9 +345,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.CLEANING
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_finished_to_inactive_valid(self, test_session, test_rootfolder):
         """Test valid transition from FINISHED to INACTIVE"""
@@ -368,9 +358,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.FINISHED
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_finished_to_started_valid(self, test_session, test_rootfolder):
         """Test valid transition from FINISHED to STARTED (new round)"""
@@ -381,10 +370,9 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_start_date=date(2025, 10, 1),
             cleanup_progress=CleanupProgressEnum.FINISHED
         )
-        
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+
+        can_transition = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert can_transition is True
-        assert message == "ok"
 
     def test_transition_inactive_to_cleaning_invalid(self, test_session, test_rootfolder):
         """Test invalid transition from INACTIVE to CLEANING"""
@@ -396,9 +384,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.CLEANING)
+        can_transition = config.can_transition_to(CleanupProgressEnum.CLEANING)
         assert can_transition is False
-        assert "cannot transition from inactive to cleaning" in message
 
     def test_transition_started_to_finished_invalid(self, test_session, test_rootfolder):
         """Test invalid transition from STARTED to FINISHED"""
@@ -410,9 +397,8 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.FINISHED)
+        can_transition = config.can_transition_to(CleanupProgressEnum.FINISHED)
         assert can_transition is False
-        assert "cannot transition from started to finished" in message
 
     def test_transition_finished_to_cleaning_invalid(self, test_session, test_rootfolder):
         """Test invalid transition from FINISHED to CLEANING"""
@@ -423,10 +409,9 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_start_date=date(2025, 10, 1),
             cleanup_progress=CleanupProgressEnum.FINISHED
         )
-        
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.CLEANING)
+
+        can_transition = config.can_transition_to(CleanupProgressEnum.CLEANING)
         assert can_transition is False
-        assert "cannot transition from finished to cleaning" in message
 
     def test_transition_without_valid_config(self, test_session, test_rootfolder):
         """Test that transition to non-INACTIVE state fails without valid config"""
@@ -438,9 +423,9 @@ class TestCleanupConfigurationDTOStateTransitions:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        can_transition, message = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        can_transition = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert can_transition is False
-        assert "cleanup configuration is not valid or cleanupfrequency is not set" in message
+
 
     def test_get_valid_next_states_from_inactive_with_valid_config(self, test_session, test_rootfolder):
         """Test getting valid next states from INACTIVE with valid config"""
@@ -524,27 +509,27 @@ class TestCleanupConfigurationDTOCompleteWorkflow:
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
         
         # Transition to STARTED
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        can_transition = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert can_transition is True
         config.cleanup_progress = CleanupProgressEnum.RETENTION_REVIEW.value
         
         # Transition to CLEANING
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.CLEANING)
+        can_transition = config.can_transition_to(CleanupProgressEnum.CLEANING)
         assert can_transition is True
         config.cleanup_progress = CleanupProgressEnum.CLEANING.value
         
         # Transition to FINISHED
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.FINISHED)
+        can_transition = config.can_transition_to(CleanupProgressEnum.FINISHED)
         assert can_transition is True
         config.cleanup_progress = CleanupProgressEnum.FINISHED.value
         
         # Transition back to INACTIVE
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
         config.cleanup_progress = CleanupProgressEnum.INACTIVE.value
         
         # Should be able to start a new round
-        assert config.can_start_cleanup() is True
+        assert config.is_ready_to_start_cleanup() is True
 
     def test_abort_cleanup_from_started(self, test_session, test_rootfolder):
         """Test aborting cleanup from STARTED state"""
@@ -557,7 +542,7 @@ class TestCleanupConfigurationDTOCompleteWorkflow:
         )
         
         # Can abort by going back to INACTIVE
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
 
     def test_abort_cleanup_from_cleaning(self, test_session, test_rootfolder):
@@ -571,7 +556,7 @@ class TestCleanupConfigurationDTOCompleteWorkflow:
         )
         
         # Can abort by going back to INACTIVE
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.INACTIVE)
+        can_transition = config.can_transition_to(CleanupProgressEnum.INACTIVE)
         assert can_transition is True
 
     def test_start_new_round_from_finished(self, test_session, test_rootfolder):
@@ -585,7 +570,7 @@ class TestCleanupConfigurationDTOCompleteWorkflow:
         )
         
         # Can start new round directly
-        can_transition, _ = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        can_transition = config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert can_transition is True
 
 
@@ -602,10 +587,9 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        success, message = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        success = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         
         assert success is True
-        assert "Transitioned to started" in message
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
 
     def test_transition_to_invalid_state(self, test_session, test_rootfolder):
@@ -617,11 +601,9 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_start_date=date(2025, 10, 1),
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
-        
-        success, message = config.transition_to(CleanupProgressEnum.CLEANING)
-        
+
+        success = config.transition_to(CleanupProgressEnum.CLEANING)
         assert success is False
-        assert "cannot transition from inactive to cleaning" in message
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value  # State unchanged
 
     def test_transition_to_complete_cycle_using_method(self, test_session, test_rootfolder):
@@ -634,22 +616,22 @@ class TestCleanupConfigurationDTOTransitionTo:
         )
         
         # INACTIVE -> STARTED
-        success, msg = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        success = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
         
         # STARTED -> CLEANING
-        success, msg = config.transition_to(CleanupProgressEnum.CLEANING)
+        success = config.transition_to(CleanupProgressEnum.CLEANING)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.CLEANING.value
         
         # CLEANING -> FINISHED
-        success, msg = config.transition_to(CleanupProgressEnum.FINISHED)
+        success = config.transition_to(CleanupProgressEnum.FINISHED)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.FINISHED.value
         
         # FINISHED -> INACTIVE
-        success, msg = config.transition_to(CleanupProgressEnum.INACTIVE)
+        success = config.transition_to(CleanupProgressEnum.INACTIVE)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
 
@@ -663,7 +645,7 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW
         )
         
-        success, msg = config.transition_to(CleanupProgressEnum.INACTIVE)
+        success = config.transition_to(CleanupProgressEnum.INACTIVE)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
 
@@ -677,7 +659,7 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_progress=CleanupProgressEnum.CLEANING
         )
         
-        success, msg = config.transition_to(CleanupProgressEnum.INACTIVE)
+        success = config.transition_to(CleanupProgressEnum.INACTIVE)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
 
@@ -691,7 +673,7 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_progress=CleanupProgressEnum.FINISHED
         )
         
-        success, msg = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        success = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
 
@@ -705,9 +687,8 @@ class TestCleanupConfigurationDTOTransitionTo:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        success, msg = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        success = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert success is False
-        assert "cleanup configuration is not valid or cleanupfrequency is not set" in msg
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value  # State unchanged
 
     def test_transition_to_skip_invalid_state(self, test_session, test_rootfolder):
@@ -721,9 +702,8 @@ class TestCleanupConfigurationDTOTransitionTo:
         )
         
         # Cannot go directly from STARTED to FINISHED
-        success, msg = config.transition_to(CleanupProgressEnum.FINISHED)
+        success = config.transition_to(CleanupProgressEnum.FINISHED)
         assert success is False
-        assert "cannot transition from started to finished" in msg
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value  # State unchanged
 
     def test_transition_to_same_state(self, test_session, test_rootfolder):
@@ -737,7 +717,7 @@ class TestCleanupConfigurationDTOTransitionTo:
         )
         
         # Trying to stay in same state should fail (not in valid transitions)
-        success, msg = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
+        success = config.transition_to(CleanupProgressEnum.RETENTION_REVIEW)
         assert success is False
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
 
@@ -755,10 +735,9 @@ class TestCleanupConfigurationDTOTransitionToNext:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        success, message = config.transition_to_next()
+        success = config.transition_to_next()
         
         assert success is True
-        assert "Transitioned to started" in message
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
 
     def test_transition_to_next_from_started(self, test_session, test_rootfolder):
@@ -771,10 +750,8 @@ class TestCleanupConfigurationDTOTransitionToNext:
             cleanup_progress=CleanupProgressEnum.RETENTION_REVIEW
         )
         
-        success, message = config.transition_to_next()
-        
+        success = config.transition_to_next()
         assert success is True
-        assert "Transitioned to cleaning" in message
         assert config.cleanup_progress == CleanupProgressEnum.CLEANING.value
 
     def test_transition_to_next_from_cleaning(self, test_session, test_rootfolder):
@@ -786,11 +763,10 @@ class TestCleanupConfigurationDTOTransitionToNext:
             cleanup_start_date=date(2025, 10, 1),
             cleanup_progress=CleanupProgressEnum.CLEANING
         )
-        
-        success, message = config.transition_to_next()
-        
+
+        success = config.transition_to_next()
+
         assert success is True
-        assert "Transitioned to finished" in message
         assert config.cleanup_progress == CleanupProgressEnum.FINISHED.value
 
     def test_transition_to_next_from_finished(self, test_session, test_rootfolder):
@@ -803,10 +779,9 @@ class TestCleanupConfigurationDTOTransitionToNext:
             cleanup_progress=CleanupProgressEnum.FINISHED
         )
         
-        success, message = config.transition_to_next()
+        success = config.transition_to_next()
         
         assert success is True
-        assert "Transitioned to inactive" in message
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
 
     def test_transition_to_next_complete_cycle(self, test_session, test_rootfolder):
@@ -820,22 +795,22 @@ class TestCleanupConfigurationDTOTransitionToNext:
         
         # INACTIVE -> STARTED
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
-        success, _ = config.transition_to_next()
+        success= config.transition_to_next()
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
         
         # STARTED -> CLEANING
-        success, _ = config.transition_to_next()
+        success = config.transition_to_next()
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.CLEANING.value
         
         # CLEANING -> FINISHED
-        success, _ = config.transition_to_next()
+        success = config.transition_to_next()
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.FINISHED.value
         
         # FINISHED -> INACTIVE
-        success, _ = config.transition_to_next()
+        success = config.transition_to_next()
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
 
@@ -849,10 +824,9 @@ class TestCleanupConfigurationDTOTransitionToNext:
             cleanup_progress=CleanupProgressEnum.INACTIVE
         )
         
-        success, message = config.transition_to_next()
+        success = config.transition_to_next()
         
         assert success is False
-        assert "cleanup configuration is not valid or cleanupfrequency is not set" in message
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value  # State unchanged
 
     def test_transition_to_next_multiple_rounds(self, test_session, test_rootfolder):
@@ -866,13 +840,13 @@ class TestCleanupConfigurationDTOTransitionToNext:
         
         # First round
         for _ in range(4):  # INACTIVE -> STARTED -> CLEANING -> FINISHED -> INACTIVE
-            success, _ = config.transition_to_next()
+            success = config.transition_to_next()
             assert success is True
         
         assert config.cleanup_progress == CleanupProgressEnum.INACTIVE.value
         
         # Second round should work the same way
-        success, _ = config.transition_to_next()
+        succes = config.transition_to_next()
         assert success is True
         assert config.cleanup_progress == CleanupProgressEnum.RETENTION_REVIEW.value
 
