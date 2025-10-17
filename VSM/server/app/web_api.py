@@ -221,10 +221,10 @@ def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConf
 
 @app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
 def read_rootfolder_retentiontypes(rootfolder_id: int):
-    retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retention_type_dict(rootfolder_id).values())
+    retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retentiontypes_dict(rootfolder_id).values())
     return retention_types
 #@app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO]) #do not expose untill needed
-def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, RetentionTypeDTO]:
+def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, RetentionTypeDTO]:
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
@@ -243,7 +243,7 @@ def read_rootfolder_retention_type_dict(rootfolder_id: int)-> dict[str, Retentio
         return retention_types
 
 def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, RetentionTypeDTO]:
-    retention_types_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder_id)
+    retention_types_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
     #filter to keep only retentions with at cycletime
     return {key:retention for key,retention in retention_types_dict.items() if retention.days_to_cleanup is not None}
 
@@ -423,7 +423,7 @@ def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
             raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
 
         # Get retention types for calculations
-        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_numeric_retentiontypes_dict(rootfolder_id), cleanup_config) 
+        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
 
         # Update expiration dates. 
         for retention in retentions:
@@ -475,7 +475,6 @@ class FileInfo:
 #
 # The following update will happen
 #   - folders with numeric retentiontypes: calculation of retention category and expiration dates
-#   - folders with non-numeric retentiontypes: The expiration date is set to None in order to show that cleanup must not be done
 def start_new_cleanup_cycle(rootfolder_id: int):
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
@@ -483,8 +482,12 @@ def start_new_cleanup_cycle(rootfolder_id: int):
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        if cleanup_config.can_start_cleanup() and cleanup_config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW):    
+
         if not cleanup_config.can_start_cleanup():
             return {"message": f"Cannot start cleanup for rootfolder {rootfolder_id} due to invalid cleanup configuration {cleanup_config}"}
+        elif not cleanup_config.can_transition_to(CleanupProgressEnum.RETENTION_REVIEW):
+            return {"message": f"Cannot transition from {cleanup_config.cleanup_progress} to RETENTION_REVIEW for rootfolder {rootfolder_id} "}
         elif cleanup_config.cleanup_start_date is None:
             cleanup_config.cleanup_start_date = func.current_date()
             #rootfolder.set_cleanup_configuration(cleanup_config)
@@ -495,24 +498,21 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         session.commit()
         session.refresh(rootfolder)
 
-        # Get retention types for calculations
-        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_numeric_retentiontypes_dict(rootfolder_id), cleanup_config) 
+        # Prepare calculation of retention and the nodetype to identify leafs
+        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config)
+        nodetype_leaf_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
 
-        # extract all folders with rootfolder_id. 
+        # extract all leafs with rootfolder_id. 
         # We can possibly optimise by 
-        #   setting expiration date to None for non-numeric retention types
         #   only selecting folders with a numeric retentiontype for further processing
-        folders = session.exec( select(FolderNodeDTO).where( FolderNodeDTO.rootfolder_id == rootfolder_id) ).all()
+        folders = session.exec( select(FolderNodeDTO).where( (FolderNodeDTO.rootfolder_id == rootfolder_id) & \
+                                                             (FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
 
+        # Update retentions 
+        for folder in folders:          
+            folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
+            session.add(folder)
 
-        # Update retentions for leafs (the vts-simulations) 
-        nodetype_leaf_id        = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
-        for folder in folders:
-            if folder.nodetype_id==nodetype_leaf_id:
-                folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
-                session.add(folder)
-
-        #@TODO  must we make a bulk commit here to save the modified retention ids ?
         session.commit()
         print(f"start_new_cleanup_cycle rootfolder_id: {rootfolder_id} updated retention of {len(folders)} folders" )
 
@@ -604,7 +604,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
 
     # prepare the path_protection_engine. it returns the id to the PathProtectionDTO and prioritizes the most specific path (most segments) if any.
-    path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retention_type_dict(rootfolder.id)
+    path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder.id)
     path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict["path"].id)
 
     # do we have a cleanup configuration that allows start of cleanup
@@ -612,8 +612,8 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
     can_start_cleanup:bool = config.can_start_cleanup()
 
     #Prepare calculation of numeric retention_id.  
-    retention_calculator = RetentionCalculator( read_rootfolder_retention_type_dict(rootfolder.id), config ) if can_start_cleanup else None
-    external_to_internal_retention_converter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retention_type_dict(rootfolder.id))
+    retention_calculator = RetentionCalculator( read_rootfolder_retentiontypes_dict(rootfolder.id), config ) if can_start_cleanup else None
+    external_to_internal_retention_converter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retentiontypes_dict(rootfolder.id))
 
     # Prepare bulk update data for existing folders
     bulk_updates = []
