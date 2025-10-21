@@ -94,27 +94,23 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     def is_starting_cleanup_round(self) -> bool:
         return self.cleanup_progress in [CleanupProgressEnum.STARTING_RETENTION_REVIEW.value]
 
-    def get_validate_transition(self) -> bool:
-        # Define valid state transitions
-        valid_transitions = {
-            CleanupProgressEnum.INACTIVE: [CleanupProgressEnum.STARTING_RETENTION_REVIEW],
-            CleanupProgressEnum.STARTING_RETENTION_REVIEW: [CleanupProgressEnum.RETENTION_REVIEW],
-            CleanupProgressEnum.RETENTION_REVIEW: [CleanupProgressEnum.CLEANING, CleanupProgressEnum.INACTIVE],
-            CleanupProgressEnum.CLEANING: [CleanupProgressEnum.FINISHED, CleanupProgressEnum.INACTIVE],
-            CleanupProgressEnum.FINISHED: [CleanupProgressEnum.INACTIVE, CleanupProgressEnum.STARTING_RETENTION_REVIEW],
-        }
-        return valid_transitions
+    # Define valid state transitions
+    valid_transitions: dict[CleanupProgressEnum, list[CleanupProgressEnum]] = {
+        CleanupProgressEnum.INACTIVE: [CleanupProgressEnum.STARTING_RETENTION_REVIEW],
+        CleanupProgressEnum.STARTING_RETENTION_REVIEW: [CleanupProgressEnum.RETENTION_REVIEW],
+        CleanupProgressEnum.RETENTION_REVIEW: [CleanupProgressEnum.CLEANING, CleanupProgressEnum.INACTIVE],
+        CleanupProgressEnum.CLEANING: [CleanupProgressEnum.FINISHED, CleanupProgressEnum.INACTIVE],
+        CleanupProgressEnum.FINISHED: [CleanupProgressEnum.INACTIVE, CleanupProgressEnum.STARTING_RETENTION_REVIEW],
+    }
     
-    def get_natural_progression__states(self) -> list[CleanupProgressEnum]:
-        # Define the natural progression through cleanup states
-        next_state_map = {
-            CleanupProgressEnum.INACTIVE: CleanupProgressEnum.STARTING_RETENTION_REVIEW,
-            CleanupProgressEnum.STARTING_RETENTION_REVIEW: [CleanupProgressEnum.RETENTION_REVIEW],
-            CleanupProgressEnum.RETENTION_REVIEW: CleanupProgressEnum.CLEANING,
-            CleanupProgressEnum.CLEANING: CleanupProgressEnum.FINISHED,
-            CleanupProgressEnum.FINISHED: CleanupProgressEnum.INACTIVE,
-        }
-        return next_state_map
+    # Define the natural progression through cleanup states
+    next_natural_state: dict[CleanupProgressEnum, CleanupProgressEnum] = {
+        CleanupProgressEnum.INACTIVE: CleanupProgressEnum.STARTING_RETENTION_REVIEW,
+        CleanupProgressEnum.STARTING_RETENTION_REVIEW: CleanupProgressEnum.RETENTION_REVIEW,
+        CleanupProgressEnum.RETENTION_REVIEW: CleanupProgressEnum.CLEANING,
+        CleanupProgressEnum.CLEANING: CleanupProgressEnum.FINISHED,
+        CleanupProgressEnum.FINISHED: CleanupProgressEnum.INACTIVE,
+    }
     
     def can_transition_to(self, new_state: CleanupProgressEnum) -> bool:
         """Check if transition to new_state is valid from current state."""
@@ -125,10 +121,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
 
         current = CleanupProgressEnum(self.cleanup_progress)
         
-        # Define valid state transitions
-        valid_transitions = self.get_validate_transition() 
-        
-        if new_state not in valid_transitions.get(current, []):
+        if new_state not in self.valid_transitions.get(current, []):
             return False
 
         return True
@@ -160,8 +153,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
             tuple[bool, str]: (success, message) - True if transition succeeded, False otherwise
         """
         current = CleanupProgressEnum(self.cleanup_progress)
-        next_states = self.get_natural_progression__states()
-        next_state = next_states.get(current, [])
+        next_state = self.next_natural_state.get(current, None)
         if next_state is None:
             return False
         

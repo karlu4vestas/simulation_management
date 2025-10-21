@@ -34,29 +34,23 @@ class CleanupProgress:
         CLEANING = "cleaning"    # Actual cleaning is happening
         FINISHED = "finished"    # Cleanup round is complete, waiting for next round
 
-    @staticmethod
-    def get_validate_transition() -> dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]]:
-        # Define valid state transitions
-        valid_transitions = {
-            CleanupProgress.ProgressEnum.INACTIVE: [CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW],
-            CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW: [CleanupProgress.ProgressEnum.RETENTION_REVIEW],
-            CleanupProgress.ProgressEnum.RETENTION_REVIEW: [CleanupProgress.ProgressEnum.CLEANING, CleanupProgress.ProgressEnum.INACTIVE],
-            CleanupProgress.ProgressEnum.CLEANING: [CleanupProgress.ProgressEnum.FINISHED, CleanupProgress.ProgressEnum.INACTIVE],
-            CleanupProgress.ProgressEnum.FINISHED: [CleanupProgress.ProgressEnum.INACTIVE, CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW],
-        }
-        return valid_transitions
+    # Define valid state transitions
+    valid_transitions: dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]] = {
+        ProgressEnum.INACTIVE: [ProgressEnum.STARTING_RETENTION_REVIEW],
+        ProgressEnum.STARTING_RETENTION_REVIEW: [ProgressEnum.RETENTION_REVIEW],
+        ProgressEnum.RETENTION_REVIEW: [ProgressEnum.CLEANING, ProgressEnum.INACTIVE],
+        ProgressEnum.CLEANING: [ProgressEnum.FINISHED, ProgressEnum.INACTIVE],
+        ProgressEnum.FINISHED: [ProgressEnum.INACTIVE, ProgressEnum.STARTING_RETENTION_REVIEW],
+    }
     
-    @staticmethod
-    def get_natural_progression_states() -> dict["CleanupProgress.ProgressEnum", "CleanupProgress.ProgressEnum"]:
-        # Define the natural progression through cleanup states
-        next_state_map = {
-            CleanupProgress.ProgressEnum.INACTIVE: CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW,
-            CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW: CleanupProgress.ProgressEnum.RETENTION_REVIEW,
-            CleanupProgress.ProgressEnum.RETENTION_REVIEW: CleanupProgress.ProgressEnum.CLEANING,
-            CleanupProgress.ProgressEnum.CLEANING: CleanupProgress.ProgressEnum.FINISHED,
-            CleanupProgress.ProgressEnum.FINISHED: CleanupProgress.ProgressEnum.INACTIVE,
-        }
-        return next_state_map
+    # Define the natural progression through cleanup states
+    next_natural_state: dict["CleanupProgress.ProgressEnum", "CleanupProgress.ProgressEnum"] = {
+        ProgressEnum.INACTIVE: ProgressEnum.STARTING_RETENTION_REVIEW,
+        ProgressEnum.STARTING_RETENTION_REVIEW: ProgressEnum.RETENTION_REVIEW,
+        ProgressEnum.RETENTION_REVIEW: ProgressEnum.CLEANING,
+        ProgressEnum.CLEANING: ProgressEnum.FINISHED,
+        ProgressEnum.FINISHED: ProgressEnum.INACTIVE,
+    }
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting cleanupfrequency to None
@@ -129,10 +123,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
 
         current = CleanupProgress.ProgressEnum(self.cleanup_progress)
         
-        # Define valid state transitions
-        valid_transitions:dict[CleanupProgress.ProgressEnum, list[CleanupProgress.ProgressEnum]] = CleanupProgress.get_validate_transition()
-        
-        if new_state not in valid_transitions.get(current, []):
+        if new_state not in CleanupProgress.valid_transitions.get(current, []):
             return False
 
         return True
@@ -164,8 +155,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
             tuple[bool, str]: (success, message) - True if transition succeeded, False otherwise
         """
         current = CleanupProgress.ProgressEnum(self.cleanup_progress)
-        next_states:dict[CleanupProgress.ProgressEnum, CleanupProgress.ProgressEnum] = CleanupProgress.get_natural_progression_states()
-        next_state = next_states.get(current, None)
+        next_state = CleanupProgress.next_natural_state.get(current, None)
         if next_state is None:
             return False
         
