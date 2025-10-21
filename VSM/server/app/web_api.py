@@ -7,7 +7,7 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
-from datamodel.dtos import CleanupConfigurationDTO, CleanupProgressEnum, CleanupFrequencyDTO, CycleTimeDTO, ExternalRetentionTypes, RetentionTypeDTO, FolderTypeDTO
+from datamodel.dtos import CleanupConfigurationDTO, CleanupProgress, CleanupFrequencyDTO, CycleTimeDTO, ExternalRetentionTypes, RetentionTypeDTO, FolderTypeDTO
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
 from db.database import Database
 from app.app_config import AppConfig
@@ -416,10 +416,10 @@ def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
-        cleanup_config: CleanupConfiguration = rootfolder.get_cleanup_configuration()
+        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
         # However, when a cleanup round is started they have time at "rootfolder.cycletime" to adjust retention
-        if not cleanup_config.can_start_cleanup():
+        if not cleanup_config.is_valid():
             raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
 
         # Get retention types for calculations
@@ -482,36 +482,40 @@ def start_new_cleanup_cycle(rootfolder_id: int):
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        if cleanup_config.can_start_now():
-            cleanup_config.transition_to_next()
+        if not cleanup_config.can_start_cleanup_now():
+            return {"message": f"Unable to transition rootfolder {rootfolder_id} to CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW with cleanup config {cleanup_config}"}
+        else:
+            if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW):
+                return {"message": f"For rootfolder {rootfolder_id}: cleanup_config.can_start_cleanup_now() is valid but start_new_cleanup_cycle is failed to transition to CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW"}
             session.add(cleanup_config)
             session.commit()
-        elif not cleanup_config.is_valid():
-            return {"message": f"Invalid cleanup configuration for rootfolder {rootfolder_id}: {cleanup_config}"}
-        elif not cleanup_config.is_ready_to_start_cleanup():
-            return {"message": f"Missing start date for cleanup of rootfolder {rootfolder_id}"}
-        else:
-            return {"message": f"Start of cleanup is in the future for rootfolder {rootfolder_id}"}
 
-        # Prepare calculation of retention and the nodetype to identify leafs
-        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config)
-        nodetype_leaf_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+            # recalculate numeric retentions
 
-        # extract all leafs with rootfolder_id. 
-        # We can possibly optimise by 
-        #   only selecting folders with a numeric retentiontype for further processing
-        folders = session.exec( select(FolderNodeDTO).where( (FolderNodeDTO.rootfolder_id == rootfolder_id) & \
-                                                             (FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
 
-        # Update retentions 
-        for folder in folders:          
-            folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
-            session.add(folder)
+            # extract all leafs with rootfolder_id. 
+            # We can possibly optimise by 
+            #   only selecting folders with a numeric retentiontype for further processing
+            nodetype_leaf_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+            folders = session.exec( select(FolderNodeDTO).where( (FolderNodeDTO.rootfolder_id == rootfolder_id) & \
+                                                                 (FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
 
-        session.commit()
-        print(f"start_new_cleanup_cycle rootfolder_id: {rootfolder_id} updated retention of {len(folders)} folders" )
+            # Update retentions 
+            retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config)
+            
+            for folder in folders:          
+                folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
+                session.add(folder)
 
-def read_folder_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
+            if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.RETENTION_REVIEW):
+                return {"message": f"For rootfolder {rootfolder_id}: failed to transition to CleanupProgress.ProgressEnum.RETENTION_REVIEW"}
+
+            session.commit()
+
+            print(f"new cleanup cycle started for : {rootfolder_id}. updated retention of {len(folders)} folders" )
+
+
+def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
 
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
@@ -622,12 +626,9 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
     path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder.id)
     path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict["path"].id)
 
-    # do we have a cleanup configuration that allows start of cleanup
-    config:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-    can_start_cleanup:bool = config.is_ready_to_start_cleanup()
-
     #Prepare calculation of numeric retention_id.  
-    retention_calculator = RetentionCalculator( read_rootfolder_retentiontypes_dict(rootfolder.id), config ) if can_start_cleanup else None
+    config:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+    retention_calculator = RetentionCalculator( read_rootfolder_retentiontypes_dict(rootfolder.id), config )
     external_to_internal_retention_converter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retentiontypes_dict(rootfolder.id))
 
     # Prepare bulk update data for existing folders
@@ -657,8 +658,10 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
             db_modified_date = sim.modified_date
 
         # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
-        if retention_calculator is not None: 
+        db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+        if db_retention.retention_id is None:
             db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+            print(f"Folder {db_folder.id} has no retention ID")
 
         bulk_updates.append({
             "id": db_folder.id,

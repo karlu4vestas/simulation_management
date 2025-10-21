@@ -3,6 +3,8 @@ from sqlalchemy import Engine
 from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
 
 def insert_vts_metadata_in_db(session:Session):
+    # ensure that redundant metadata is not present 
+    
     session.add(SimulationDomainDTO(name="vts" ))
     session.commit()
 
@@ -50,7 +52,6 @@ def insert_vts_metadata_in_db(session:Session):
     print("Test data for folder_types inserted successfully:")
     for folder in folder_types:
         print(f" - {folder.name} (ID: {folder.id})")
-
 
     session.add(CleanupFrequencyDTO(name="inactive", days=-1, simulationdomain_id=sim_id )) # need the inactive entry to have an id=1
     session.add(CleanupFrequencyDTO(name="1 week",   days= 7, simulationdomain_id=sim_id ))

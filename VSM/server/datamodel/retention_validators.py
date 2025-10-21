@@ -18,16 +18,15 @@ class RetentionCalculator:
         self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
         self.path_retention_id           = self.retention_type_str_dict["path"].id if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
-        self.is_cleanup_active           = cleanup_config.is_active()
+        self.is_in_cleanup_round         = cleanup_config.is_in_cleanup_round()
+        self.is_starting_cleanup_round   = cleanup_config.is_starting_cleanup_round()
 
-        # create numeric retention values. notice that we exclude the "marked" retentiontype if the cleanup round is inactive
-        numeric_retention_types          = {key:retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None }
-        if not self.is_cleanup_active:
-            numeric_retention_types      = {key:retention for key,retention in numeric_retention_types.items() if retention.id != self.marked_retention_id}
-            
-        self.numeric_retention_id_dict   = {retention.id: retention for retention in numeric_retention_types.values() }
-        self.numeric_retention_ids       = [retention.id for retention in numeric_retention_types.values()]
-        self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types.values()]
+        # create numeric retention values sorted by days_to_cleanup
+        numeric_retention_types:list[RetentionTypeDTO]      = sorted([retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None ], key=lambda r: r.days_to_cleanup)
+
+        self.numeric_retention_id_dict   = {retention.id: retention   for retention in numeric_retention_types}
+        self.numeric_retention_ids       = [retention.id              for retention in numeric_retention_types]
+        self.numeric_retention_durations = [retention.days_to_cleanup for retention in numeric_retention_types]
 
     def is_numeric(self, retention_id:int) -> bool:
         return retention_id in self.numeric_retention_id_dict   
@@ -72,23 +71,48 @@ class RetentionCalculator:
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
     def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date) -> Retention:
 
-        retentiontype:RetentionTypeDTO = self.retention_type_id_dict.get(retention.retention_id, None)
-        if retentiontype is not None and (retentiontype.id == self.path_retention_id or retentiontype.is_endstage): 
-            # path retention has priority so we do not change it
+        if retention.retention_id is not None and not self.is_numeric(retention.retention_id): 
+            # the retention is endstage or path retention so do not change the retention_id
             retention.expiration_date = None
-        else:
+        else: # so it is a a numeric or unknown retention
+
             if modified_date is not None:
                 retention.expiration_date = modified_date + self.cycletimedelta if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.cycletimedelta)
 
             if retention.expiration_date is None:
-                raise ValueError("retention.expiration_date is None in RetentionCalculator adjust_to_cleanup_round")
-            else:
+                raise ValueError("retention.expiration_date is None in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
+            elif self.is_starting_cleanup_round: #this is the phase where all retention are adjusted according to their expiration_date
                 days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
                 # find first index where retention_duration[idx] >= days_until_expiration
                 idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
 
                 # if days_until_expiration is greater than every threshold, return last index
                 retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+            elif retention.retention_id is None or retention.retention_id == self.marked_retention_id:
+                # The user controls the retention so outside the progress state self.is_starting_cleanup_round we must only change numeric retentions that are
+                #    - None
+                #    - or marked for clean up. because the user might change the modified_date of a marked retention during the cleanup round.
+                days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
+                # find first index where retention_duration[idx] >= days_until_expiration
+                idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
+
+                # if days_until_expiration is greater than every threshold, return last index
+                retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+
+                if retention.retention_id == self.marked_retention_id and retention_id != self.marked_retention_id:
+                    # special case: the simulation is in the retention_review or cleaning phase but the user has modified the retention,
+                    # we must assign the new retention because modifying a simulation during the cleanup round is also a way of telling that the simulation should not be cleaned yet
+                    retention.retention_id = retention_id
+                elif retention_id == self.marked_retention_id :
+                    # The new retention is about to be marked which is not OK. To handle this we must pick next retention after marked.
+                    idx = idx + 1 #skip marked. This works because self.numeric_* are sort in increasing days_to_cleanup
+                    retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+                else:
+                    retention.retention_id = retention_id 
+
+            #if retention.retention_id == self.marked_retention_id:
+            #    print("Warning: retention_id is set to 'marked' in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
+
         return retention
 
     # adjust numeric retention_type to the new cleanup_configuration

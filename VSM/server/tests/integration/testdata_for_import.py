@@ -6,7 +6,7 @@ from enum import Enum
 from typing import NamedTuple
 from sqlmodel import Session, select
 from sqlalchemy import Engine
-from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, CleanupConfigurationDTO, CleanupProgressEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, CleanupConfigurationDTO, CleanupProgress, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 
 
@@ -20,7 +20,7 @@ class CleanupConfiguration:
     cycletime: int                                          # days from initialization of the simulations til it can be cleaned
     cleanupfrequency: int                                   # number of days between cleanup rounds
     cleanup_start_date: date | None = None                  # at what date did the current cleanup round start
-    cleanup_progress: CleanupProgressEnum = CleanupProgressEnum.INACTIVE  # current state of the cleanup round
+    cleanup_progress: CleanupProgress.ProgressEnum = CleanupProgress.ProgressEnum.INACTIVE  # current state of the cleanup round
     
     def to_dto(self, rootfolder_id: int) -> CleanupConfigurationDTO:
         """Convert to CleanupConfigurationDTO for database insertion."""

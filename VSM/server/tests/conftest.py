@@ -7,7 +7,7 @@ from datetime import date
 from dataclasses import dataclass
 from app.app_config import AppConfig
 from db.database import Database
-from datamodel.dtos import CleanupConfigurationDTO, CleanupProgressEnum, RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
+from datamodel.dtos import CleanupConfigurationDTO, CleanupProgress, RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
 from .integration.testdata_for_import import RootFolderWithMemoryFolders, RootFolderWithMemoryFolderTree, flatten_folder_structure 
 from .integration.testdata_for_import import generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders,CleanupConfiguration
 
