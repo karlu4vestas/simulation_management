@@ -1,9 +1,7 @@
 import random
 from sqlmodel import Session, select
-from sqlalchemy import Engine
 from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
-from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.db_api import insert_rootfolder
 
 #-------------------------------------
@@ -92,7 +90,7 @@ def insert_test_folder_hierarchy_in_db(session:Session):
     root_folders = session.exec(select(RootFolderDTO)).all()
     print("Test data for root_folders inserted successfully:")
     for rf in root_folders:
-        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, CleanUpFrequency: {rf.cleanupfrequency} Folder id: {rf.folder_id}")
+        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers}, Folder id: {rf.folder_id}")
 
 
 from typing import Optional

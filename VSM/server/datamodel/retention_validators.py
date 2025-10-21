@@ -1,21 +1,34 @@
 from bisect import bisect_left
 from typing import Optional
 from datetime import date, timedelta
-from datamodel.dtos import ExternalRetentionTypes, Retention 
+from datamodel.dtos import CleanupProgress, ExternalRetentionTypes, Retention 
 from datamodel.dtos import CleanupConfigurationDTO, RetentionTypeDTO, PathProtectionDTO
 
 #ensure consistency of retentions
 #  
 class RetentionCalculator:
     def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfigurationDTO):
-        if not retention_type_dict or not cleanup_config.cleanup_start_date or not cleanup_config.cycletime or cleanup_config.cycletime <= 0:
+        if not retention_type_dict or not cleanup_config.is_valid():
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
+
+        # It is on the one hand practical to make a first configuration of retention without starting a cleanup round, if the user desires this
+        # but on the other hand the RetentionCalculator requires a cleanup_start_date to be able to calculate retentions
+        # If the cleanup_config can be used to start a cleanup round then use its start date
+        # If the cleanup_progress is INACTIVE and no cleanup_start_date is set, we set the cleanup_round_start_date to today. 
+        # Notice that no retention will be marked with cleanup progress in CleanupProgress.ProgressEnum.INACTIVE
+        start_date = None
+        if cleanup_config.is_valid() and cleanup_config.cleanup_start_date is not None:
+            start_date = cleanup_config.cleanup_start_date
+        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value:
+            start_date = date.today()
+        else:
+            raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_config}")
+        self.cleanup_round_start_date    = start_date
+
+        self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
 
         self.retention_type_str_dict     = retention_type_dict
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
-        self.cleanup_config              = cleanup_config
-        self.cleanup_round_start_date    = cleanup_config.cleanup_start_date
-        self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
         self.path_retention_id           = self.retention_type_str_dict["path"].id if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
         self.is_in_cleanup_round         = cleanup_config.is_in_cleanup_round()

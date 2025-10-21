@@ -27,7 +27,7 @@ def insert_vts_metadata_in_db(session:Session):
     # - **`issue`**: (null) `this state is for simulation with a cleanup issue so the user can see all simulations`
     # - **`Missing`**: (null) `this state is for simulation that are no longer found in the root folder for any reason but most likely due to the user renaming or deleting the folder
     session.add(RetentionTypeDTO(name="Marked",  days_to_cleanup=0,     simulationdomain_id=sim_id, display_rank=1,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+Next",   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=2,  is_endstage=False ))  #will be replaced with the cleanup frequency during conversions
+    session.add(RetentionTypeDTO(name="+Next",   days_to_cleanup=7,     simulationdomain_id=sim_id, display_rank=2,  is_endstage=False ))  # 7 days after start of current cleanup cycle is enough
     session.add(RetentionTypeDTO(name="+90d",    days_to_cleanup=90,    simulationdomain_id=sim_id, display_rank=3,  is_endstage=False ))
     session.add(RetentionTypeDTO(name="+180",    days_to_cleanup=180,   simulationdomain_id=sim_id, display_rank=4,  is_endstage=False ))
     session.add(RetentionTypeDTO(name="+365",    days_to_cleanup=365,   simulationdomain_id=sim_id, display_rank=5,  is_endstage=False ))

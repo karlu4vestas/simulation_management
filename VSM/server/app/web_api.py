@@ -167,20 +167,11 @@ def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: 
 
 
 # update a rootfolder's cleanup_configuration
-"""
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
 def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
-    is_valid, message = cleanup_configuration.is_valid()
+    is_valid = cleanup_configuration.is_valid()
     if not is_valid:
-        raise HTTPException(status_code=404, detail=message)
-
-    # if we are to start cleanup then set the cleanup_round_start_date to today if required
-    # else set it to None to avoid a scenario where a scheduler tries to start a cleanup round based on an old date
-    if cleanup_configuration.can_start_cleanup():
-        if cleanup_configuration.cleanup_start_date is None:
-            cleanup_configuration.cleanup_start_date = func.current_date()
-    else:
-        cleanup_configuration.cleanup_start_date = None
+        raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
 
     #now the configuration is consistent
     with Session(Database.get_engine()) as session:
@@ -189,22 +180,19 @@ def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configur
             raise HTTPException(status_code=404, detail="rootfolder not found")
       
         # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
-        config_dto = rootfolder.ensure_cleanup_config(session)
+        config_dto = rootfolder.get_cleanup_configuration(session)
         # Update the DTO with values from the incoming dataclass
-        config_dto.cycletime = cleanup_configuration.cycletime
-        config_dto.cleanupfrequency = cleanup_configuration.cleanupfrequency
+        config_dto.cycletime          = cleanup_configuration.cycletime
+        config_dto.cleanupfrequency   = cleanup_configuration.cleanupfrequency
         config_dto.cleanup_start_date = cleanup_configuration.cleanup_start_date
-        config_dto.cleanup_progress = cleanup_configuration.cleanup_progress.value
-        
-        session.add(config_dto)
-        session.commit()
+        config_dto.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress 
+        rootfolder.save_cleanup_configuration(session, config_dto)
 
-        if cleanup_configuration.can_start_cleanup():
-            print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
-            #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
-            #start_new_cleanup_cycle(rootfolder_id)
-        return {"message": f"Cleanup configuration updated for rootfolder {rootfolder_id}"}
-"""    
+        #if cleanup_configuration.can_start_cleanup():
+        #    print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
+        #    #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
+        #    #start_new_cleanup_cycle(rootfolder_id)
+        return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {config_dto.id} "}
 
 def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConfigurationDTO:
     with Session(Database.get_engine()) as session:
@@ -467,7 +455,63 @@ class FileInfo:
 # -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
 # The consistency of these calculations is highly critical to the system working correctly
 
+#check if som action needs to be taken depending on the current progress of the cleanup
+def run_cleanup_progress(rootfolder_id: int):
+    with Session(Database.get_engine()) as session:
+        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
 
+        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        if not cleanup_config:
+            raise HTTPException(status_code=404, detail="CleanupConfiguration not found")
+
+        # Depending on the current progress, take appropriate actions
+        if cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW:
+            # Perform actions for STARTING_RETENTION_REVIEW
+            # the start_new_cleanup_cycle function should have handled this state already
+            pass  # Placeholder for actual logic
+        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW:
+            # Perform actions for RETENTION_REVIEW
+            # we can progress to the next state when date.today() >= cleanup_start_date + cycletime
+            if date.today() >= cleanup_config.cleanup_start_date + cleanup_config.cycle_time:
+                if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.CLEANING):
+                    return {"message": f"For rootfolder {rootfolder_id}: failed to transition to CleanupProgress.ProgressEnum.CLEANING"}
+            pass  # Placeholder for actual logic
+        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.CLEANING:
+            # Perform actions for CLEANING
+            # in this state we must call the cleaning agent for this rootfolder
+            # 
+            pass  # Placeholder for actual logic
+        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.FINISHING:
+            # Perform actions for FINISHED
+            pass  # Placeholder for actual logic
+        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.DONE:
+            # Perform actions for FINISHED
+            pass  # Placeholder for actual logic
+        else:
+            raise HTTPException(status_code=400, detail="Invalid cleanup progress state")
+
+        session.commit()
+        return {"message": f"Processed cleanup progress for rootfolder {rootfolder_id} at state {cleanup_config.cleanup_progress}"}
+
+# This function will be when the cleanup round transition to finished
+# The purpose is to set all folders marked to the next retentiontype
+
+def cleanup_cycle_finish(rootfolder_id: int, simulations: list[FileInfo] ):
+    pass
+
+
+#this function will be called by the cleanup agents to update the marked folders after cleanup attempt
+def cleanup_cycle_update_marked_folders(rootfolder_id: int, simulations: list[FileInfo] ):
+    # steps 
+    # 1) verify that the rootfolder is in cleaning state
+    # 2) if in cleaning state then verify the simulations belong to the rootfolder and are marked for deletion before updating the state
+    # 3) That the ExternalRetentionTypes is not Unknown because the whole purpose of the cleanup is to go to an endstage of Clean, Issue or Missing
+
+    # finally update the simulations that fullfill the above and ignore the rest
+    # before exit progress the state to finished if there were any marked folders that were processed
+    pass
 
 
 # The following is called by the scheduler (or webclient through update_rootfolder_cleanup_configuration at present) to starts a new cleanup round
@@ -475,7 +519,7 @@ class FileInfo:
 #
 # The following update will happen
 #   - folders with numeric retentiontypes: calculation of retention category and expiration dates
-def start_new_cleanup_cycle(rootfolder_id: int):
+def cleanup_cycle_start(rootfolder_id: int):
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
@@ -487,6 +531,7 @@ def start_new_cleanup_cycle(rootfolder_id: int):
         else:
             if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW):
                 return {"message": f"For rootfolder {rootfolder_id}: cleanup_config.can_start_cleanup_now() is valid but start_new_cleanup_cycle is failed to transition to CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW"}
+            cleanup_config.cleanup_start_date = date.today()
             session.add(cleanup_config)
             session.commit()
 
@@ -818,13 +863,12 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
             current_parent_path_ids = existing_node.path_ids
         else:
             # Node doesn't exist, create it
-            # @TODO need to add modified date to the leafnode
             if index < len(segments) - 1:
                 new_node = FolderNodeDTO(
                     rootfolder_id=rootfolder_id,
                     parent_id=current_parent_id,
-                    name=segment,                  
-                    nodetype_id = nodetypes[FolderTypeEnum.INNERNODE].id,   #@TODO very vts specifc - must be made generic when other departments are onboarded
+                    name=segment,
+                    nodetype_id=nodetypes[FolderTypeEnum.INNERNODE].id,
                     path="/".join(current_path_segments),  # Full path up to this segment
                 )
             else:

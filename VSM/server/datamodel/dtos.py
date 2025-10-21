@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Relationship, Session
 from typing import Optional
 from datetime import date
@@ -32,15 +33,17 @@ class CleanupProgress:
         STARTING_RETENTION_REVIEW   = "starting_retention_review"      # This is the only phase where the backend is allowed to mark simulation for cleanup.
         RETENTION_REVIEW            = "retention_review"      # Markup phase - users can adjust what simulations will be cleaned. 
         CLEANING = "cleaning"    # Actual cleaning is happening
-        FINISHED = "finished"    # Cleanup round is complete, waiting for next round
+        FINISHING = "finish_cleanup_round"    # finish the cleanup round
+        DONE = "cleanup_is_done"    # Cleanup round is complete, waiting for next round
 
     # Define valid state transitions
     valid_transitions: dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]] = {
         ProgressEnum.INACTIVE: [ProgressEnum.STARTING_RETENTION_REVIEW],
         ProgressEnum.STARTING_RETENTION_REVIEW: [ProgressEnum.RETENTION_REVIEW],
         ProgressEnum.RETENTION_REVIEW: [ProgressEnum.CLEANING, ProgressEnum.INACTIVE],
-        ProgressEnum.CLEANING: [ProgressEnum.FINISHED, ProgressEnum.INACTIVE],
-        ProgressEnum.FINISHED: [ProgressEnum.INACTIVE, ProgressEnum.STARTING_RETENTION_REVIEW],
+        ProgressEnum.CLEANING: [ProgressEnum.FINISHING, ProgressEnum.INACTIVE],
+        ProgressEnum.FINISHING: [ProgressEnum.DONE, ProgressEnum.INACTIVE],
+        ProgressEnum.DONE: [ProgressEnum.INACTIVE, ProgressEnum.STARTING_RETENTION_REVIEW],
     }
     
     # Define the natural progression through cleanup states
@@ -48,8 +51,9 @@ class CleanupProgress:
         ProgressEnum.INACTIVE: ProgressEnum.STARTING_RETENTION_REVIEW,
         ProgressEnum.STARTING_RETENTION_REVIEW: ProgressEnum.RETENTION_REVIEW,
         ProgressEnum.RETENTION_REVIEW: ProgressEnum.CLEANING,
-        ProgressEnum.CLEANING: ProgressEnum.FINISHED,
-        ProgressEnum.FINISHED: ProgressEnum.INACTIVE,
+        ProgressEnum.CLEANING: ProgressEnum.FINISHING,
+        ProgressEnum.FINISHING: ProgressEnum.DONE,
+        ProgressEnum.DONE: ProgressEnum.STARTING_RETENTION_REVIEW,
     }
 
 # The configuration can be used as follow:
@@ -104,7 +108,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         if not has_valid_configuration:
             return False
 
-        has_valid_progress = self.cleanup_progress in [CleanupProgress.ProgressEnum.INACTIVE.value, CleanupProgress.ProgressEnum.FINISHED.value]
+        has_valid_progress = self.cleanup_progress in [CleanupProgress.ProgressEnum.INACTIVE.value, CleanupProgress.ProgressEnum.DONE.value]
         return has_valid_progress
     
     def is_in_cleanup_round(self) -> bool:
@@ -241,6 +245,31 @@ class RootFolderBase(SQLModel):
         session.add(self)
         session.commit()
         return new_cleanup
+
+    def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
+        if self.cleanup_config_id is not None:
+            config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
+            if config is None:
+                # Create new cleanup configuration if none exists or if it was deleted
+                config = CleanupConfigurationDTO(rootfolder_id=self.id)
+                session.add(config)
+                session.commit()
+                session.refresh(config)
+                self.cleanup_config_id = config.id
+
+        if config is None:
+            raise HTTPException(status_code=404, detail="unable to save cleanup configuration")
+
+        if config is not None:
+            config.cycletime          = cleanup_configuration.cycletime
+            config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
+            config.cleanup_start_date = cleanup_configuration.cleanup_start_date
+            config.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress
+
+        session.add(self)
+        session.commit()
+        return config
+
 
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
