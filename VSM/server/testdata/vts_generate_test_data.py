@@ -2,7 +2,7 @@ import random
 from sqlmodel import Session, select
 from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
-from db.db_api import insert_rootfolder
+from db.db_api import insert_rootfolder, read_cleanupfrequency_name_dict_by_domain_id
 
 #-------------------------------------
 # helper to generate random retenttype except for the "Path" retention. 
@@ -220,7 +220,6 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
     Insert minimal test data for unit tests - only creates 2 small root folders
     to avoid the massive data generation that slows down unit tests.
     """
-    from app.web_api import read_cleanupfrequency_name_dict_by_domain_id
 
     vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
     if not vts_simulation_domain or not vts_simulation_domain.id:

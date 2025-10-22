@@ -93,7 +93,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         # If cleanup_start_date is None then cleanup_progress must be INACTIVE
         is_valid: bool = (self.cleanupfrequency is not None and self.cleanupfrequency > 0) and \
                          (self.cycletime is not None and self.cycletime > 0) and \
-                         ((self.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value and self.cleanup_start_date is None) \
+                         ((self.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value) \
                           or self.cleanup_start_date is not None)
         return is_valid
     
@@ -112,7 +112,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
         return has_valid_progress
     
     def is_in_cleanup_round(self) -> bool:
-        return self.cleanup_progress in [CleanupProgress.ProgressEnum.RETENTION_REVIEW.value, CleanupProgress.ProgressEnum.CLEANING.value]
+        return self.cleanup_progress in [CleanupProgress.ProgressEnum.RETENTION_REVIEW.value, CleanupProgress.ProgressEnum.CLEANING.value, CleanupProgress.ProgressEnum.FINISHING.value]
     
     def is_starting_cleanup_round(self) -> bool:
         return self.cleanup_progress in [CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW.value]
@@ -247,6 +247,7 @@ class RootFolderBase(SQLModel):
         return new_cleanup
 
     def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
+        #@TODO we should use insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
         if self.cleanup_config_id is not None:
             config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
             if config is None:

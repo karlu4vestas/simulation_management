@@ -90,7 +90,7 @@ class RetentionCalculator:
         else: # so it is a a numeric or unknown retention
 
             if modified_date is not None:
-                retention.expiration_date = modified_date + self.cycletimedelta if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.cycletimedelta)
+                retention.expiration_date = (modified_date + self.cycletimedelta) if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.cycletimedelta)
 
             if retention.expiration_date is None:
                 raise ValueError("retention.expiration_date is None in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
@@ -118,8 +118,7 @@ class RetentionCalculator:
                     retention.retention_id = retention_id
                 elif retention_id == self.marked_retention_id :
                     # The new retention is about to be marked which is not OK. To handle this we must pick next retention after marked.
-                    idx = idx + 1 #skip marked. This works because self.numeric_* are sort in increasing days_to_cleanup
-                    retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+                    retention.retention_id = self.get_retention_id_after_marked()
                 else:
                     retention.retention_id = retention_id 
 
@@ -127,14 +126,11 @@ class RetentionCalculator:
             #    print("Warning: retention_id is set to 'marked' in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
 
         return retention
-
-    # adjust numeric retention_type to the new cleanup_configuration
-    #   - This is what you what when starting a new cleanup round
-    #
-    # if non numeric retention then set expiration_date to None
-    # if numeric retention then update numeric retention_id to the expiration_date and the cleanup_configuration
-    #def adjust_retentions_from_cleanup_configuration(self, retention:Retention) -> Retention:
-    #    return self.adjust_from_cleanup_configuration_and_modified_date(retention)
+    def get_retention_id_after_marked(self) -> Optional[RetentionTypeDTO]:
+        # skip marked at index 0. 
+        # This works because 1) the "marked" retention is mandatory for the cleanup solution and has days_to_cleanup = 0 
+        # and 2) numeric_retention_ids is sorted in ascending days_to_cleanup
+        return self.numeric_retention_ids[1]
 
 #ensure consistency of path retentions
 class PathProtectionEngine:
