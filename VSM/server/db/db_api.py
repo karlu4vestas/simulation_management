@@ -456,7 +456,7 @@ class FileInfo:
 #  - the expiration date and numeric retentions will:
 #       if cleanup is active then recalculate them 
 #       if cleanup is inactive then ignore them 
-def insert_or_update_simulation_in_db(rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+def insert_or_update_simulations_in_db(rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
     #here we can remove all existing simulation if nothing changes for them
     return insert_or_update_simulation_in_db_internal(rootfolder_id, simulations)
 

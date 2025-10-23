@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
 
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from db.db_api import FileInfo, insert_or_update_simulation_in_db, read_folders, normalize_path, read_rootfolders_by_domain_and_initials
+from db.db_api import FileInfo, insert_or_update_simulations_in_db, read_folders, normalize_path, read_rootfolders_by_domain_and_initials
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolderTree, RootFolderWithMemoryFolders
 
 class RootFolderWithFolderNodeDTOList(NamedTuple):
@@ -36,7 +36,7 @@ class BaseIntegrationTest:
         file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=folder.modified_date, nodetype=FolderTypeEnum.VTS_SIMULATION, external_retention=folder.retention) 
                                             for folder in rootfolder_with_folders.folders if folder.is_leaf ]
        
-        insert_or_update_simulation_in_db(rootfolder.id, file_info_list)
+        insert_or_update_simulations_in_db(rootfolder.id, file_info_list)
 
         # get all rootfolders and folders in the db for validation
         rootfolders: List[RootFolderDTO] = read_rootfolders_by_domain_and_initials(rootfolder.simulationdomain_id)

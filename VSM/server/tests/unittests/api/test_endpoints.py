@@ -1,11 +1,11 @@
 import pytest
-from app.app_config import AppConfig
-from db.database import Database
+from sqlmodel import Session
 from fastapi.testclient import TestClient
 from app.web_api import app
+from app.app_config import AppConfig
+from db.database import Database
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from testdata.vts_generate_test_data import insert_minimal_test_data_for_unit_tests 
-from sqlmodel import Session
 
 @pytest.fixture
 def client():

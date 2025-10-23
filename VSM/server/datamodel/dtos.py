@@ -58,18 +58,21 @@ class CleanupProgress:
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting cleanupfrequency to None
-#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
-#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
+#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. 
+#        If cleanup_round_start_date is not set then we assume today
+#   c) cycletime: is minimum number of days from last modification of a simulation til it can be cleaned
+#        It can be set with cleanup is inactive cleanupfrequency is None
 #   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
-#      - inactive
-#      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
+#      - inactive: going from an activate state to inactive will set the cleanup_start_date to None. 
+#                  If inactivate state and cleanupfrequency, cycletime and cleanup_start_date will start the cleanup when the cleanup_start_date is reached.
+#      - started:  the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
 #      - cleaning: this is the last phase in which the actual cleaning happens
 #      - finished: the cleanup round is finished and we wait for the next round
 class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
     rootfolder_id: int              = Field(default=None, foreign_key="rootfolderdto.id")
     cycletime: int                  = Field(default=0)
-    cleanupfrequency: int           = Field(default=0)
+    cleanupfrequency: int           = Field(default=0)  # days to next cleanup round
     cleanup_start_date: date | None = Field(default=None)
     cleanup_progress: str           = Field(default=CleanupProgress.ProgressEnum.INACTIVE.value)
 

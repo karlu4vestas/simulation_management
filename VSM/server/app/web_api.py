@@ -10,12 +10,13 @@ from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, Simu
 from db.database import Database
 from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+
 from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
 from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials, update_rootfolder_cleanup_configuration
 from db.db_api import read_rootfolder_retentiontypes, read_folders
 from db.db_api import read_pathprotections, add_path_protection, delete_path_protection
-from db.db_api import change_retentions 
+from db.db_api import change_retentions, FileInfo 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -173,3 +174,28 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO
 
 
 #-----------------end maintenance of rootfolders and information under it -------------------
+
+#-----------------Agents API -------------------
+from scheduler.cleanup_scheduler import AgentInfo, CleanupScheduler, CleanupTaskDTO
+@app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
+def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
+    return AgentInfo.reserve_task(agent)
+
+@app.post("/v1/agent/task/{task_id}/task_completion")
+def fs_agent_task_completion(task_id: int, status: str, status_message: str|None = None) -> dict[str,str]:
+    return AgentInfo.task_completion(task_id, status, status_message)
+
+@app.post("/v1/agent/task/{task_id}/insert_or_update_simulations")
+def fs_agent_insert_or_update_simulations_in_db(task_id: int, rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+    return AgentInfo.insert_or_update_simulations_in_db(task_id, rootfolder_id, simulations)
+
+@app.get("/v1/agent/task/{task_id}/marked_for_cleanup", response_model=list[str])
+def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -> list[str]:
+    return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
+
+#-----------------Scheduler API -------------------
+@app.post("/v1/scheduler/update_calendars_and_tasks")
+def fs_schedule_calendars_and_tasks():
+    CleanupScheduler.update_calendars_and_tasks()
+    CleanupScheduler.call_internal_agents()
+    return {"message": "Scheduler updated successfully"}

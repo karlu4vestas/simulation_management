@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import pytest
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
 from datamodel.dtos import CleanupProgress, FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RetentionUpdateDTO, RootFolderDTO, ExternalRetentionTypes
-from db.db_api import change_retentions, insert_or_update_simulation_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
+from db.db_api import change_retentions, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
 from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import insert_rootfolder,insert_cleanup_configuration
 from db.db_api import FileInfo
@@ -419,7 +419,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
                                                               modified_date=sim_changed_by_import_ui.modified_date, 
                                                               nodetype=FolderTypeEnum.VTS_SIMULATION,
                                                               external_retention=ExternalRetentionTypes.Unknown)
-        insert_or_update_simulation_in_db(rootfolder.id, [fileinfo_sim_changed_by_import_ui])
+        insert_or_update_simulations_in_db(rootfolder.id, [fileinfo_sim_changed_by_import_ui])
 
         #verify that the two changed simulations are no longer marked for cleanup
         reduced_marked_folders: list[FolderNodeDTO] = read_folders_marked_for_cleanup(rootfolder.id)

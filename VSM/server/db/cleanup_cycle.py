@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
@@ -49,7 +49,7 @@ def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
 
 # This function will be when the cleanup round transition to finished
 # The purpose is to set all folders marked to the next retentiontype
-def cleanup_cycle_finishing(rootfolder_id: int ) -> dict[str, str]:
+def cleanup_cycle_finishing(rootfolder_id: int) -> dict[str, str]:
     # steps 
     # 1) verify that the rootfolder is in cleaning state
     # 2) if in cleaning state then unmarked remaining simulation in the rootfolder before trasitioning to CleanupProgress.ProgressEnum.DONE
@@ -72,13 +72,14 @@ def cleanup_cycle_finishing(rootfolder_id: int ) -> dict[str, str]:
                 session.add(folder)
 
         if not cleanup_config.transition_to_next():
-            raise HTTPException(status_code=400, detail="Failed to transition cleanup config")
+            raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
 
+        session.add(cleanup_config)
         session.commit()
         return {"message": f"Finished cleanup cycle for rootfolder {rootfolder_id}"}
 
 #this function will be called by the cleanup agents to update the marked folders after cleanup attempt
-def cleanup_cycle_cleaning_done(rootfolder_id: int ) -> dict[str, str]:
+def cleanup_cycle_prepare_next_cycle(rootfolder_id: int) -> dict[str, str]:
     #Advance the cleanup startdate to today to ensure that the next round will be calculated from today
     with Session(Database.get_engine()) as session:
         rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
@@ -89,7 +90,10 @@ def cleanup_cycle_cleaning_done(rootfolder_id: int ) -> dict[str, str]:
         if not cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.DONE:
             raise HTTPException(status_code=400, detail="RootFolder is not in DONE state")
 
-        cleanup_config.cleanup_start_date = date.today()
+        cleanup_config.cleanup_start_date = cleanup_config.cleanup_start_date + timedelta(days=cleanup_config.cleanupfrequency_days)
+
+        if not cleanup_config.transition_to_next():
+            raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
         session.add(cleanup_config)
         session.commit()
 
