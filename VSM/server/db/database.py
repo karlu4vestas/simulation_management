@@ -1,7 +1,6 @@
-from sqlmodel import SQLModel, create_engine, Session, select
-from sqlalchemy import Engine
 from typing import Optional
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
+from sqlmodel import SQLModel, Session, create_engine, select
+from sqlalchemy import Engine
 from app.app_config import AppConfig
 
 class Database:
@@ -46,7 +45,9 @@ class Database:
         if self._engine is None:
             return True
             
-        # List of all table models that should be checked (including metadata tables)
+        # List of all table models that should be checked (including metadata tables). 
+        # The import is placed here to avoid circular imports. 
+        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
         table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO]
         
         try:

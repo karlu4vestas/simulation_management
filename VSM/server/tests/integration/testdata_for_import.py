@@ -3,11 +3,8 @@ from datetime import date, timedelta, datetime
 from typing import Optional
 import random
 from enum import Enum
-from typing import NamedTuple
-from sqlmodel import Session, select
-from sqlalchemy import Engine
-from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, CleanupConfigurationDTO, CleanupProgress, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
-from db.database import Database
+from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 
 
 

@@ -5,11 +5,12 @@ from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
-from datamodel.dtos import CleanupConfigurationDTO, CleanupProgress, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
+from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
 from db.database import Database
 from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 
 from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
@@ -176,7 +177,7 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from scheduler.cleanup_scheduler import AgentInfo, CleanupScheduler, CleanupTaskDTO
+from cleanup_cycle.cleanup_scheduler import AgentInfo, CleanupScheduler, CleanupTaskDTO
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
     return AgentInfo.reserve_task(agent)
@@ -194,8 +195,10 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
     return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
 
 #-----------------Scheduler API -------------------
+from cleanup_cycle.cleanup_scheduler import CleanupScheduler
+from cleanup_cycle.internal_agents import InternalAgentFactory
 @app.post("/v1/scheduler/update_calendars_and_tasks")
 def fs_schedule_calendars_and_tasks():
+    InternalAgentFactory.run_internal_agents()
     CleanupScheduler.update_calendars_and_tasks()
-    CleanupScheduler.call_internal_agents()
     return {"message": "Scheduler updated successfully"}

@@ -1,8 +1,9 @@
-from datetime import date, timedelta
-from sqlmodel import Session, func, select
-from fastapi import Query, HTTPException
+from datetime import timedelta
+from sqlmodel import Session, select
+from fastapi import HTTPException
 from db.database import Database
-from datamodel.dtos import CleanupProgress, CleanupConfigurationDTO, RootFolderDTO, FolderNodeDTO, FolderTypeEnum
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
+from cleanup_cycle.cleanup_dtos import CleanupProgress, CleanupConfigurationDTO
 from datamodel.retention_validators import RetentionCalculator
 from db.db_api import read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
  
@@ -92,54 +93,9 @@ def cleanup_cycle_prepare_next_cycle(rootfolder_id: int) -> dict[str, str]:
 
         cleanup_config.cleanup_start_date = cleanup_config.cleanup_start_date + timedelta(days=cleanup_config.cleanupfrequency_days)
 
-        if not cleanup_config.transition_to_next():
-            raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
+        #if not cleanup_config.transition_to_next():
+        #    raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
         session.add(cleanup_config)
         session.commit()
 
     return {"message": f"Cleanup cycle cleaning done for rootfolder {rootfolder_id} new cleanup_start_date {cleanup_config.cleanup_start_date}"}
-
-#check if som action needs to be taken depending on the current progress of the cleanup
-# def run_cleanup_progress(rootfolder_id: int):
-#     with Session(Database.get_engine()) as session:
-#         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
-#         if not rootfolder:
-#             raise HTTPException(status_code=404, detail="RootFolder not found")
-
-#         cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-#         if not cleanup_config:
-#             raise HTTPException(status_code=404, detail="CleanupConfiguration not found")
-
-#         # Depending on the current progress, take appropriate actions
-#         if cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW:
-#             # Perform actions for STARTING_RETENTION_REVIEW
-#             # the start_new_cleanup_cycle function should have handled this state already
-#             pass  # Placeholder for actual logic
-#         elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW:
-#             # Perform actions for RETENTION_REVIEW
-#             # we can progress to the next state when date.today() >= cleanup_start_date + cycletime
-#             if date.today() >= cleanup_config.cleanup_start_date + cleanup_config.cycle_time:
-#                 if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.CLEANING):
-#                     return {"message": f"For rootfolder {rootfolder_id}: failed to transition to CleanupProgress.ProgressEnum.CLEANING"}
-            
-#             pass  # Placeholder for actual logic
-#         elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.CLEANING:
-#             # Perform actions for CLEANING
-#             # in this state we must call the cleaning agent with the folders to be cleaned for this rootfolder
-
-
-#             # When the agent is done cleaning then it must call cleanup_cycle_cleaning_done to register what got cleaned. 
-#             # This will also progress the state to FINISHING when all marked folders are processed
-#             pass  # Placeholder for actual logic
-#         elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.FINISHING:
-#             # Perform actions for FINISHED: cleanup_cycle_finish
-#             cleanup_cycle_finishing(rootfolder_id) #will also progress the state to DONE
-#         elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.DONE:
-#             # No actions needed for DONE
-#             # we could call cleanup_cycle_start to start a new round. This is TBD
-#             pass  # Placeholder for actual logic
-#         else:
-#             raise HTTPException(status_code=400, detail="Invalid cleanup progress state")
-
-#         session.commit()
-#         return {"message": f"Processed cleanup progress for rootfolder {rootfolder_id} at state {cleanup_config.cleanup_progress}"}

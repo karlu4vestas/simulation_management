@@ -1,9 +1,9 @@
 from bisect import bisect_left
 from typing import Optional
 from datetime import date, timedelta
-from datamodel.dtos import CleanupProgress, ExternalRetentionTypes, Retention 
-from datamodel.dtos import CleanupConfigurationDTO, RetentionTypeDTO, PathProtectionDTO
-
+from datamodel.dtos import ExternalRetentionTypes, Retention 
+from datamodel.dtos import RetentionTypeDTO, PathProtectionDTO
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 #ensure consistency of retentions
 #  
 class RetentionCalculator:

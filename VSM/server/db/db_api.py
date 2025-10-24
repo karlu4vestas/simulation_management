@@ -1,13 +1,12 @@
 from datetime import date
 from typing import Literal, Optional
 from dataclasses import dataclass
-from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlmodel import Session, func, select
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import Query, HTTPException
 from db.database import Database
-from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO, FolderTypeEnum, ExternalRetentionTypes, Retention 
+from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, FolderNodeDTO
+from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO, FolderTypeEnum, Retention, FileInfo 
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
@@ -437,13 +436,6 @@ def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
 
 # -------------------------- insertion of simulation by agents ---------
 
-@dataclass
-class FileInfo:
-    filepath: str
-    modified_date: date
-    nodetype: FolderTypeEnum
-    external_retention: ExternalRetentionTypes
-    id: int = None   # will be used during updates
 
 
 # -------------------------- all calculations for expiration dates, retentions are done in below functions ---------
