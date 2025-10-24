@@ -93,8 +93,8 @@ def cleanup_cycle_prepare_next_cycle(rootfolder_id: int) -> dict[str, str]:
 
         cleanup_config.cleanup_start_date = cleanup_config.cleanup_start_date + timedelta(days=cleanup_config.cleanupfrequency_days)
 
-        #if not cleanup_config.transition_to_next():
-        #    raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
+        if not cleanup_config.transition_to_next():
+            raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
         session.add(cleanup_config)
         session.commit()
 

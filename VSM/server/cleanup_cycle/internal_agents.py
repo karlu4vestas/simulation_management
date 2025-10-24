@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date, timedelta 
 from cleanup_cycle.cleanup_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, cleanup_cycle_finishing, cleanup_cycle_prepare_next_cycle
@@ -21,9 +22,8 @@ class AgentTemplate(ABC):
     def run(self):
         self.reserve_task()
         if self.task is not None:
-            self.execute_task()
-
-        pass
+            asyncio.run(self.execute_task())
+        self.complete_task()
 
     def reserve_task(self):
         self.task = AgentInfo.reserve_task(self.agent_info)
@@ -36,7 +36,7 @@ class AgentTemplate(ABC):
                 AgentInfo.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
 
     @abstractmethod
-    def execute_task(self):
+    async def execute_task(self):
         # Subclasses must implement this method to execute their specific task logic.
         pass
 
@@ -171,15 +171,18 @@ class AgentNotification(AgentTemplate):
                 else:
                     self.send_notification(message, receivers)
 
+
+from cleanup_cycle.on_premise_scan_agents import AgentScanRootFolder
 class InternalAgentFactory:
     @staticmethod
     def get_internal_agents() -> list[AgentTemplate]:
         return [
             AgentCalendarCreation(),
+            AgentScanRootFolder(),
             AgentCleanupCycleStart(),
+            AgentNotification(),
             AgentCleanupCycleFinishing(),
             AgentCleanupCyclePrepareNext(),
-            AgentNotification()
     ]
 
     @staticmethod

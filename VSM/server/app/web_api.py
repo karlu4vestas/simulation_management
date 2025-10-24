@@ -1,7 +1,7 @@
 import io
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
@@ -197,8 +197,16 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
 #-----------------Scheduler API -------------------
 from cleanup_cycle.cleanup_scheduler import CleanupScheduler
 from cleanup_cycle.internal_agents import InternalAgentFactory
-@app.post("/v1/scheduler/update_calendars_and_tasks")
-def fs_schedule_calendars_and_tasks():
+
+def run_scheduler_tasks():
+    """Background task to run internal agents and update calendars/tasks"""
     InternalAgentFactory.run_internal_agents()
     CleanupScheduler.update_calendars_and_tasks()
-    return {"message": "Scheduler updated successfully"}
+
+@app.post("/v1/scheduler/update_calendars_and_tasks")
+def fs_schedule_calendars_and_tasks(background_tasks: BackgroundTasks):
+    # running the entire scheduler as a background task ensure
+    #  - the backend is available to other requests from the frontend
+    #  - each agent is run sequentially so that we do not run out of RAM due to too many concurrent tasks
+    background_tasks.add_task(run_scheduler_tasks)
+    return {"message": "Scheduler tasks started in background"}

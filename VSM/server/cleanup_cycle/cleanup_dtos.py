@@ -1,5 +1,5 @@
 from enum import Enum
-from datetime import date
+from datetime import date, datetime
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 
@@ -157,7 +157,6 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
 
 
 # ------------------cleanup calendar and tasks ------------------
-from datetime import date, datetime, timedelta, timezone
 
 # The scheduler runs periodically to activate the tasks in the rootfolders calendar when their scheduled time comes.
 # Agents pull ACTIVATED tasks from the central queue by trying to make a reservation of a task that matched their profile (ActionType,storage_id), 
@@ -196,10 +195,10 @@ class TaskStatus(str, Enum):
 class ActionType(str, Enum):
     """Types of actions that can be scheduled in the calendar."""
     CREATE_CLEANUP_CALENDAR   = "create_cleanup_calendar"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
+    SCAN_ROOTFOLDER           = "scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. 0 day into START_RETENTION_REVIEW. Can take upto one day
     START_RETENTION_REVIEW    = "start_retention_review"                    # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
     SEND_INITIAL_NOTIFICATION = "send_notification"                         # internal email agent: Notify stakeholders about the new retention review. 1 day into the RETENTION_REVIEW phase. Takes less than a minute
     SEND_FINAL_NOTIFICATION   = "send_notification"                         # internal email agent: Notify stakeholders about the ongoing retention review. About a week before end of RETENTION_REVIEW phase. Takes less than a minute
-    SCAN_ROOTFOLDER           = "scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. About 3 days before the end of the RETENTION_REVIEW phase. Can take upto one day
     CLEAN_ROOTFOLDER          = "clean_simulations"                         # storage agent: clean marked simulations. 0 day into the CLEANING phase. Can take upto a day
     FINISH_CLEANUP_CYCLE      = "finish_cleanup_cycle"                      # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type.
     PREPARE_NEXT_CLEANUP_CYCLE= "prepare_next_cleanup_cycle"                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
@@ -227,6 +226,7 @@ class CleanupTaskBase(SQLModel):
     calendar_id: int | None             = Field(default=None, foreign_key="cleanupcalendardto.id", description="Reference to calendar entry that created this task")
     #information from the cleanup configuration
     rootfolder_id: int                  = Field(foreign_key="rootfolderdto.id", index=True)
+    path:str                            = Field(description="Full Path of the rootfolder to perform the action on")
     task_offset: int                    = Field(description="Days offset into the current cleanup phase when this action must be executed")
 
     # Info from an agent to match a task

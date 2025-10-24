@@ -190,6 +190,7 @@ class CleanupScheduler:
             task_start_retention_review = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=0,
                 action_type=ActionType.START_RETENTION_REVIEW.value,
                 storage_id=None,  # Internal action
@@ -203,6 +204,7 @@ class CleanupScheduler:
             task_send_initial_notification = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=1,
                 action_type=ActionType.SEND_INITIAL_NOTIFICATION.value,
                 storage_id=None,  # Internal action
@@ -218,6 +220,7 @@ class CleanupScheduler:
             task_send_final_notification = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=retention_review_duration - 7,
                 action_type=ActionType.SEND_FINAL_NOTIFICATION.value,
                 storage_id=None,  # Internal action
@@ -231,6 +234,7 @@ class CleanupScheduler:
             task_scan_rootfolder = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=retention_review_duration - 3,
                 action_type=ActionType.SCAN_ROOTFOLDER.value,
                 storage_id=rootfolder.storage_id,  
@@ -244,6 +248,7 @@ class CleanupScheduler:
             task_clean_rootfolder = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=retention_review_duration,  # Start of CLEANING phase
                 action_type=ActionType.CLEAN_ROOTFOLDER.value,
                 storage_id=rootfolder.storage_id,  
@@ -257,6 +262,7 @@ class CleanupScheduler:
             task_finish_cleanup_cycle = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=retention_review_duration + 1,  # 1 day after cleaning starts
                 action_type=ActionType.FINISH_CLEANUP_CYCLE.value,
                 storage_id=None,  # Internal action
@@ -270,6 +276,7 @@ class CleanupScheduler:
             task_prepare_next_cleanup_cycle = CleanupTaskDTO(
                 calendar_id=calendar.id,
                 rootfolder_id=config.rootfolder_id,
+                path=rootfolder.path,
                 task_offset=retention_review_duration + 2,  # 2 days after cleaning starts
                 action_type=ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value,
                 storage_id=None,  # Internal action
@@ -401,5 +408,5 @@ class AgentInterfaceMethods:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
 
         simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(task_id, rootfolder_id)
-        paths:list[str] = [folder.full_path for folder in simulations ]
+        paths:list[str] = [folder.path for folder in simulations ]
         return paths
