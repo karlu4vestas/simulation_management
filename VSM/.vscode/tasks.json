@@ -400,6 +400,60 @@
       },
       "problemMatcher": [],
       "dependsOn": "Install debugpy"
+    },
+    {
+      "label": "Run scan.py in debug mode",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-m",
+        "pdb",
+        "${workspaceFolder}/server/cleanup_cycle/scan/scan.py",
+        "\\\\?\\UNC\\vestas.net\\common\\DTS_migration_excel_references",
+        "${workspaceFolder}/output/_Temp",
+        "--nScanners=1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "Run scan.py with verbose output",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        "-u",
+        "-v",
+        "${workspaceFolder}/server/cleanup_cycle/scan/scan.py",
+        "\\\\?\\UNC\\vestas.net\\common\\DTS_migration_excel_references",
+        "${workspaceFolder}/output/_Temp",
+        "--nScanners=1"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "dedicated"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
     }
   ]
 }

@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import date, timedelta
 from datamodel.dtos import ExternalRetentionTypes, Retention 
 from datamodel.dtos import RetentionTypeDTO, PathProtectionDTO
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 #ensure consistency of retentions
 #  
 class RetentionCalculator:

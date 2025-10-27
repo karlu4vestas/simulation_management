@@ -195,6 +195,23 @@
       "env": {
         "PYTHONPATH": "${workspaceFolder}/server"
       }
+    },
+    {
+      "name": "Debug scan.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/cleanup_cycle/scan/scan.py",
+      "args": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/output/_Temp",
+        "--nScanners=1"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
     }
   ],
   "compounds": [

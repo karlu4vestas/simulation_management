@@ -69,7 +69,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     return root_folder, cleanup_config
 
 def insert_test_folder_hierarchy_in_db(session:Session):
-    from app.web_api import read_cleanupfrequency_name_dict_by_domain_id
+    from db.db_api import read_cleanupfrequency_name_dict_by_domain_id
 
     vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
     domain_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0

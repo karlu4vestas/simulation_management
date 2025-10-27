@@ -1,9 +1,9 @@
-sqlmodel
 pytest
 pytest-asyncio
 pytest-cov
 httpx
 fastapi
+sqlmodel
 uvicorn
 zstandard
-pyahocorasick
+numpy

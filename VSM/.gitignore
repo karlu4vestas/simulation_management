@@ -49,3 +49,6 @@ bld/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# VSCode Counter
+.VSCodeCounter/

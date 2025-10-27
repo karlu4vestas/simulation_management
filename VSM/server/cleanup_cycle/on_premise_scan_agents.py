@@ -1,8 +1,8 @@
 import os
 from datetime import date
 from cleanup_cycle.cleanup_dtos import ActionType 
-from server.cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods
-from server.cleanup_cycle.internal_agents import AgentTemplate
+from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods
+from cleanup_cycle.internal_agents import AgentTemplate
 from datamodel.dtos import ExternalRetentionTypes, FileInfo, FolderTypeEnum
 
 class AgentScanRootFolder(AgentTemplate):
