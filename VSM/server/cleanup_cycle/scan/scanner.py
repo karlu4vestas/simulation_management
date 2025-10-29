@@ -1,15 +1,17 @@
 import os
 import sys 
 import time
-from datetime import datetime
 import numpy as np
+from datetime import datetime
 from queue import Queue
 from threading import Event, Thread
+from multiprocessing.sharedctypes import Value
 #from concurrent.futures import ThreadPoolExecutor
 import RobustIO
+from progress_reporter import ProgressReporter
 #from file_owner import FileOwner
 
-def as_date_time(time): return datetime.fromtimestamp(time).strftime('%Y-%m-%d %H-%M')
+def as_date_time(time): return datetime.fromtimestamp(time).strftime('%Y-%m-%d_%H-%M-%S')
 
 class ScanIO:
     def __init__( self, folder:str, scanning_output:Queue[str], error_queue:Queue[str] ):
@@ -30,6 +32,8 @@ class ScanPathConfig:
     scan_path:str = None
     output_root:str = None
     scan_output_folder:str = None
+    scan_output_file:str = None
+    scan_output_errorlog_file:str = None
 
     scanio:ScanIO=None
     output_queue:Queue[str]=Queue()
@@ -46,14 +50,18 @@ class ScanPathConfig:
             RobustIO.IO.create_folder(self.scan_output_folder)
             if not RobustIO.IO.exist_path(self.scan_output_folder) :
                 raise FileNotFoundError(f"Failed to create output folder: {self.scan_output_folder}")
+
+        self.scan_output_file          = os.path.join(self.scan_output_folder, as_date_time(time.time())+"_scan_results.csv")
+        self.scan_output_errorlog_file = os.path.join(self.scan_output_folder, as_date_time(time.time())+"_scan_errors.csv")
+
         self.scanio = ScanIO(scan_path, self.output_queue, self.error_queue)
 
     def start_error_thread(self):
-        self.error_writer_thread = Thread(target=ScanPathConfig.error_file_writer_task, args=(self.scan_output_folder, self.error_queue, ), daemon=True) 
+        self.error_writer_thread = Thread(target=ScanPathConfig.error_file_writer_task, args=(self.scan_output_errorlog_file, self.error_queue, ), daemon=True) 
         self.error_writer_thread.start()
 
     def start_scan_writer_threads(self):
-        self.output_writer_thread = Thread(target=ScanPathConfig.file_writer_task, args=(self.scan_output_folder, self.output_queue, ), daemon=True) 
+        self.output_writer_thread = Thread(target=ScanPathConfig.file_writer_task, args=(self.scan_output_file, self.output_queue, ), daemon=True) 
         self.output_writer_thread.start()
     
     @staticmethod
@@ -72,8 +80,7 @@ class ScanPathConfig:
             spc.error_writer_thread.join()
 
     @staticmethod
-    def file_writer_task(folderpath:str, queue:Queue[str]):
-        filepath:str = os.path.join(folderpath, as_date_time(time.time())+" - scan_results.csv")
+    def file_writer_task(filepath:str, queue:Queue[str]):
         with open(filepath, 'w', encoding="utf-8", buffering= 2**18 ) as file:
             file.writelines( f"\"folder\";\"min_modified\";\"max_modified\";\"min_accessed\";\"max_accessed\";\"files\"\n" )        
             while True:
@@ -87,9 +94,7 @@ class ScanPathConfig:
                     queue.task_done()
 
     @staticmethod
-    def error_file_writer_task(folderpath:str, queue:Queue[str]):
-
-        filepath:str = os.path.join(folderpath, as_date_time(time.time())+" - scan_errors.csv")
+    def error_file_writer_task(filepath:str, queue:Queue[str]):
         with open(filepath, 'w', encoding="utf-8", buffering= 2**18 ) as file:
             #file.writelines( f"\"folder\";\"exception(ns)\"\n" )                
             file.writelines( f"\"folder\";\"sys.info[0]\";\"sys.info[1]\";\"sys.info[2]\";\"lineno\"\n" )                
@@ -109,11 +114,10 @@ class ScanParameters:
     def __init__(self):
         self.scanpath_config:list[ScanPathConfig] = [] 
         self.io_queue: Queue[ScanIO] = Queue() 
-        self.output_archive:str = None           # used by progress writer
         self.nbScanners:int = 0                  # number of threads used to scan input folders
         self.scan_is_done_event:Event = Event()  # used by the scanner to signal to the main loop that scanning is done
         self.scan_abort_event:Event = Event()    # can be used to signal that the scanning must abort
-        self.nb_processed_folders: int = 0
+        self.nb_processed_folders: Value = Value('i', 0)        #number of threads to use to get file owners. 0 means no owner retrieval
 
 
 class Scanner:
@@ -194,7 +198,7 @@ class Scanner:
 
     # get next the files in the directory and enqueue its subfolders 
     @staticmethod
-    def getDirs_task( io_queue:Queue[ScanIO], scan_abort_event:Event, nb_dirs_processed:int, max_failure:int=3):
+    def getDirs_task( io_queue:Queue[ScanIO], scan_abort_event:Event, nb_dirs_processed:Value, max_failure:int=3):
         #def getDirs_task( io_queue:Queue[ScanIO], stop_event:Event, nb_dirs_processed:int, owner_threadpool:ThreadPoolExecutor, max_failure:int=3):
 
         while True and not scan_abort_event.is_set():                
@@ -212,23 +216,22 @@ class Scanner:
             while failures < max_failure and not succes:
                 try:
                     with os.scandir(folder) as ite:    
-                        entries = [ entry for entry in ite ]
+                        entries: list[os.DirEntry] = [ entry for entry in ite ]
                         
-                    files       = [ entry for entry in entries if entry.is_file(follow_symlinks=False) ]
-                    file_states = [ f.stat(follow_symlinks=False) for f in files ]
+                    files: list[os.DirEntry]          = [ entry for entry in entries if entry.is_file(follow_symlinks=False) ]
+                    file_states: list[os.stat_result] = [ f.stat(follow_symlinks=False) for f in files ]
 
                     if len(files) > 0:
 
                         min_modified, max_modified, str_modify_dates   = Scanner.timestamp_statistics( lambda : [state.st_mtime     for state in file_states]     )
                         min_accessed, max_accessed, str_accessed_dates = Scanner.timestamp_statistics( lambda : [state.st_atime     for state in file_states]     )
-                        _,  _,  str_created_dates                      = Scanner.timestamp_statistics( lambda : [state.st_birthtime for state in file_states] )
                         str_file_names = [f.name for f in files]
                         str_file_bytes = [str(s.st_size) for s in file_states]
                         str_owners     =  [""] * len(files) #str_owners     =  [""] * len(files) if owner_threadpool is None else FileOwner.getOwners( files, owner_threadpool) 
 
-                        if not(len(str_modify_dates)==len(str_accessed_dates) and len(str_modify_dates)==len(str_created_dates) and 
+                        if not(len(str_modify_dates)==len(str_accessed_dates) and 
                                len(str_modify_dates)==len(str_file_names)     and len(str_modify_dates)==len(str_file_bytes) ):
-                            msg           = f"length issue: {len(str_modify_dates)}, {len(str_accessed_dates)}, {len(str_created_dates)}, {len(str_file_names)}, {len(str_file_bytes)}, {len(str_owners)}"
+                            msg           = f"length issue: {len(str_modify_dates)}, {len(str_accessed_dates)}, {len(str_file_names)}, {len(str_file_bytes)}, {len(str_owners)}"
                             error_message = f"\"{folder}\";\"{msg}\";\"\";\"\";\"\"\n"
                             error_queue.put(error_message)
                         else:
@@ -239,8 +242,8 @@ class Scanner:
                             #3: str_create
                             #4: str_byte
                             #5: str_owner
-                            files = [ f"{str_file}\x00{str_modify}\x00{str_access}\x00{str_create}\x00{str_byte}\x00{str_owner}" 
-                                      for str_file, str_modify, str_access, str_create, str_byte, str_owner in zip(str_file_names,str_modify_dates,str_accessed_dates,str_created_dates,str_file_bytes, str_owners) ]
+                            files = [ f"{str_file}\x00{str_modify}\x00{str_access}\x00{str_byte}\x00{str_owner}" 
+                                      for str_file, str_modify, str_access, str_byte, str_owner in zip(str_file_names,str_modify_dates,str_accessed_dates,str_file_bytes, str_owners) ]
                             files = "\x00\x00".join(files) 
                             #print( files )
 

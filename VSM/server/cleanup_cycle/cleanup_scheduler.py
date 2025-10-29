@@ -361,7 +361,26 @@ class AgentInterfaceMethods:
                 session.add(reserved_task)
                 session.commit()
                 return reserved_task
+
+    @staticmethod
+    def task_progress(task_id: str, progress_message: str|None = None) -> dict[str,str]:
+        
+        with Session(Database.get_engine()) as session:
+            task = session.exec(
+                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
+            ).first()
+            if not task:
+                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
             
+            if task.status  != TaskStatus.RESERVED.value:
+                raise HTTPException(status_code=400, detail=f"The task with id {task_id} is not in RESERVED state and cannot be updated to INPROGRESS") 
+
+            task.status = TaskStatus.RESERVED.value
+            task.status_message = progress_message
+            session.add(task)
+            session.commit()
+            return {"message": f"Task {task_id} updated to status {task.status}"}
+
     @staticmethod
     def task_completion(task_id: int, status: str, status_message: str|None = None) -> dict[str,str]:
         # validate that status is valid
@@ -374,7 +393,10 @@ class AgentInterfaceMethods:
             ).first()
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-            
+
+            if task.status not in [TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]:
+                raise HTTPException(status_code=400, detail=f"The task with id {task_id} is not valid. Must be one of {[TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]}")
+
             task.status = status
             task.status_message = status_message
             task.completed_at = datetime.now(timezone.utc)
@@ -384,7 +406,7 @@ class AgentInterfaceMethods:
 
 
     @staticmethod
-    def task_insert_or_update_simulations_in_db(task_id: int, rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list[FileInfo]) -> dict[str, str]:
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
             task = session.exec(
@@ -393,12 +415,12 @@ class AgentInterfaceMethods:
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
 
-        return insert_or_update_simulations_in_db(rootfolder_id, simulations)
+        return insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
 
 
     # return the list of full folder paths that are marked for cleanup in the given rootfolder
     @staticmethod
-    def read_simulations_marked_for_cleanup(task_id: int, rootfolder_id: int) -> list[str]:
+    def task_read_folders_marked_for_cleanup(task_id: int) -> list[str]:
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
             task = session.exec(
@@ -407,6 +429,6 @@ class AgentInterfaceMethods:
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
 
-        simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(task_id, rootfolder_id)
-        paths:list[str] = [folder.path for folder in simulations ]
+            simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(task.rootfolder_id)
+            paths:list[str] = [folder.path for folder in simulations]
         return paths

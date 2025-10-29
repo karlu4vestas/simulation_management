@@ -3,15 +3,24 @@ import os
 import time
 from queue import Queue
 from threading import Thread, Event 
-#from threading import active_count
+from threading import active_count
 from multiprocessing import Value
+from typing import NamedTuple
 
 import RobustIO
-from ProgressWriter import ProgressWriter
-from scanner import ScanIO, ScanParameters, ScanPathConfig, Scanner
+from ProgressWriter import ProgressReporter
+from scanner import ScanParameters, ScanPathConfig, Scanner
 
 
-def do_scan(scan_path, output_archive, nbScanners, scan_subdirs=True):
+class ScanResult(NamedTuple):
+    """Result of a directory scan operation."""
+    nb_scanned_folders: int
+    scanned_root_folders: list[str]
+    scan_output_files: list[str]
+    error_log_files: list[str]
+
+
+def do_scan(scan_path:str, output_archive:str, nbScanners:int, scan_subdirs:bool, progress_reporter:ProgressReporter) -> ScanResult:
     # Organise the output from the scanning under a folder "output_archive/scanned_folder" for each folder in scan_path 
     # Under "scanned_folder" create the following files
     #  - scan.csv:  for the scan results
@@ -22,28 +31,31 @@ def do_scan(scan_path, output_archive, nbScanners, scan_subdirs=True):
     # scan_subdirs=True means that all subfolders of scan_path will be scanned separately. 
     # scan_subdirs=True means that scanning is limited to scan_path such that there will only be one "scanned_folder"
 
+    #returns a tuple with
+    #  number of scanned folders
+    #  list of scanned root folders
+    #  list of scan output files
+    #  list of error log files
+
     # ------ start checking and preparing how the scan of folders must be done and the output organised ----------
-    scan_path = os.path.normpath(scan_path)
+    scan_path      = os.path.normpath(scan_path)
+    output_archive = os.path.normpath(output_archive)
+
     if not RobustIO.IO.exist_path(scan_path)  :
         raise FileNotFoundError(f"Paths does not exist: {scan_path}")
 
-    #create output folders
-    output_archive  = os.path.normpath(output_archive)
-    RobustIO.IO.create_folder(output_archive)
-    if not RobustIO.IO.exist_path(output_archive) :
-        raise FileNotFoundError(f"Failed to create output folder: {output_archive}")
-
-    dirs_to_scan: list[str] = []
+    #get the list of folders to scan as root folders
+    rootfolders_to_scan: list[str] = []
     if scan_subdirs:
         # adjust the output archive so that reporting of all subfolder is inside a folder with the same from the scan folder
-        scan_folder_name:str  = os.path.basename(scan_path)
-        output_archive:str    = os.path.join( output_archive, scan_folder_name)
+        scan_folder_name:str = os.path.basename(scan_path)
+        output_archive:str   = os.path.join( output_archive, scan_folder_name)
         with os.scandir(scan_path) as ite:
-            dirs_to_scan: list[str] = [entry.path for entry in ite 
+            rootfolders_to_scan: list[str] = [entry.path for entry in ite 
                                         if entry.is_dir() and (not "y-migrated\\apps" in entry.path.lower()) and \
                                           (not "y:\\apps" in entry.path.lower()) and (not "\\.snapshot" in entry.path.lower())]
     else:
-        dirs_to_scan.append(scan_path)
+        rootfolders_to_scan.append(scan_path)
 
     #ensure that the main output folder exists
     if not RobustIO.IO.exist_path(output_archive) :
@@ -55,24 +67,24 @@ def do_scan(scan_path, output_archive, nbScanners, scan_subdirs=True):
 
 
     params: ScanParameters = ScanParameters()
-    params.output_archive = output_archive
     params.nbScanners = nbScanners
-    params.nb_processed_folders = Value('i',0)        
 
-    for folder in dirs_to_scan:
-        params.scanpath_config.append( ScanPathConfig(folder, output_archive) )
+    scan_output_files: list[str] = [] 
+    errorlog_files: list[str] = []
+    for folder in rootfolders_to_scan:
+        config: ScanPathConfig = ScanPathConfig(folder, output_archive)
+        params.scanpath_config.append( config )
+        scan_output_files.append( config.scan_output_file )
+        errorlog_files.append( config.scan_output_errorlog_file )
 
-    #write and log progress every 60 seconds
-    reporting_interval = 10 
-    progressWrite = ProgressWriter(reporting_interval, params)
     try:
         job = Thread(target=Scanner.start, args=( params, ), daemon=True )
         job.start()
 
         #wait for scanner to be done.VSCodeCounter or the scan to exist
         while not params.scan_is_done_event.is_set() and not params.scan_abort_event.is_set():
-            time.sleep(1)
-            progressWrite.update()
+            progress_reporter.update(params.nb_processed_folders.value, params.io_queue.qsize(), active_count())
+            time.sleep(progress_reporter.seconds_between_update)
 
     except KeyboardInterrupt: #@TODO this will not work for a background service 
         #print("scanning interupted")
@@ -82,8 +94,14 @@ def do_scan(scan_path, output_archive, nbScanners, scan_subdirs=True):
     if params.scan_abort_event.is_set():
         Scanner.stop(params)
 
-    progressWrite.close()
-    params=progressWrite=None
+    progress_reporter.update(params.nb_processed_folders.value, params.io_queue.qsize(), active_count())
+
+    return ScanResult(
+        nb_scanned_folders=params.nb_processed_folders.value,
+        scanned_root_folders=rootfolders_to_scan,
+        scan_output_files=scan_output_files,
+        error_log_files=errorlog_files
+    )
 
 
 # example:  python scan.py "\\?\UNC\vestas\common\Y-migrated\_Temp\karlu" "C:/Users/karlu/Downloads/output/_Temp_reports"
@@ -105,7 +123,15 @@ if __name__ == "__main__":
         nScanners = 1024
     else: 
         nScanners = args.nScanners
-    do_scan( scan_path, output_archive, nScanners, scan_subdirs=False)
+
+    from ProgressWriter import ProgressReporter, ProgressWriter
+    progress_reporter = ProgressWriter( seconds_between_update=5, seconds_between_filelog=60)
+    progress_reporter.open(output_archive)
+
+    scan_result = do_scan( scan_path, output_archive, nScanners, scan_subdirs=False, progress_reporter=progress_reporter)
+
+    progress_reporter.close()
+
 #"""
 
 """    

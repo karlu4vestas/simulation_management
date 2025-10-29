@@ -2,7 +2,7 @@ import asyncio
 from datetime import date, timedelta 
 from cleanup_cycle.cleanup_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, cleanup_cycle_finishing, cleanup_cycle_prepare_next_cycle
-from cleanup_cycle.cleanup_scheduler import CleanupScheduler
+from cleanup_cycle.cleanup_scheduler import CleanupScheduler, AgentInterfaceMethods
 
 # ----------------- AgentTemplate -----------------
 from abc import ABC, abstractmethod
@@ -26,14 +26,14 @@ class AgentTemplate(ABC):
         self.complete_task()
 
     def reserve_task(self):
-        self.task = AgentInfo.reserve_task(self.agent_info)
+        self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
 
     def complete_task(self ):
         if self.task is not None:
             if self.error_message is not None:
-                AgentInfo.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
+                AgentInterfaceMethods.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
             else:
-                AgentInfo.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
+                AgentInterfaceMethods.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
 
     @abstractmethod
     async def execute_task(self):
@@ -172,7 +172,7 @@ class AgentNotification(AgentTemplate):
                     self.send_notification(message, receivers)
 
 
-from cleanup_cycle.on_premise_scan_agents import AgentScanRootFolder
+from server.cleanup_cycle.on_premise_scan_agent import AgentScanRootFolder
 class InternalAgentFactory:
     @staticmethod
     def get_internal_agents() -> list[AgentTemplate]:

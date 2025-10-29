@@ -187,6 +187,7 @@ class TaskStatus(str, Enum):
     PLANNED      = "planned"         # Task is waiting to be picked up
     ACTIVATED    = "activated"       # Task has been activated and is ready for execution
     RESERVED     = "reserved"        # Task has been reserved by an agent
+    INPROGRESS   = "in_progress"     # Task is currently being executed
     COMPLETED    = "completed"       # Task finished successfully
     FAILED       = "failed"          # Task failed (terminal state)
     #CANCELLED    = "cancelled"       # Task was cancelled

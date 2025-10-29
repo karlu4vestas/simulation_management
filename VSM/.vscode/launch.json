@@ -212,6 +212,19 @@
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
+    },
+    {
+      "name": "Debug folder_tree.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/cleanup_cycle/scan/folder_tree.py",
+      "args": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1"
+      }
     }
   ],
   "compounds": [
