@@ -5,14 +5,15 @@ from datetime import date, datetime
 from cleanup_cycle.cleanup_dtos import ActionType 
 from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods
 from cleanup_cycle.internal_agents import AgentTemplate
+from cleanup_cycle.scan.scan import do_scan, ScanResult 
 from datamodel.dtos import ExternalRetentionTypes, FileInfo, FolderTypeEnum
-from scan.scan import do_scan, ScanResult 
-from scan.ProgressWriter import ProgressWriter, ProgressReporter
-from scan.folder_tree import FolderTree, FolderTreeNode
+from cleanup_cycle.scan.ProgressWriter import ProgressWriter, ProgressReporter
+from cleanup_cycle.scan.folder_tree import FolderTree, FolderTreeNode
 #from server.cleanup_cycle.scan.progress_reporter import ProgressReporter
 
-class AgentScanRootFolder(AgentTemplate):
+class AgentScanVTSRootFolder(AgentTemplate):
     temporary_result_folder: str | None
+    vts_name_set:set[str]  = set( [name.casefold() for name in ["INPUTS","DETWIND","EIG","INT","LOG", "OUT","PARTS","PROG","STA"] ] )    
 
     def __init__(self):
         super().__init__("AgentScanRootfolder", [ActionType.SCAN_ROOTFOLDER.value])
@@ -50,7 +51,7 @@ class AgentScanRootFolder(AgentTemplate):
 
     # The purpose of this class is to resuse the ProgressWriter to report progress to the task
     class AgentProgressWriter(ProgressWriter):
-        def __init__(self, agentScanRootFolder: "AgentScanRootFolder", seconds_between_update:int, seconds_between_filelog:int):
+        def __init__(self, agentScanRootFolder: "AgentScanVTSRootFolder", seconds_between_update:int, seconds_between_filelog:int):
             super().__init__(seconds_between_update, seconds_between_filelog)
             self.agentScanRootFolder = agentScanRootFolder
 
@@ -66,7 +67,7 @@ class AgentScanRootFolder(AgentTemplate):
         scan_path = os.path.normpath(path)
         output_archive = os.path.normpath(meta_file_path)
 
-        progress_reporter:ProgressReporter = AgentScanRootFolder.AgentProgressWriter( self, seconds_between_update=1, seconds_between_filelog=60)
+        progress_reporter:ProgressReporter = AgentScanVTSRootFolder.AgentProgressWriter( self, seconds_between_update=1, seconds_between_filelog=60)
         progress_reporter.open(output_archive)
         scan_io_result:ScanResult = do_scan( scan_path, output_archive, nb_scan_thread, scan_subdirs=False, progress_reporter=progress_reporter)
         progress_reporter.close()
@@ -125,7 +126,6 @@ class AgentScanRootFolder(AgentTemplate):
         vts_label:str              = "vts_simulations"
         vts_hierarchical_label:str = "vts_hierarchical_simulations"
         has_vts_children_label:str = "has_vts_children"
-        vts_name_set:set[str]      = set( [name.casefold() for name in ["INPUTS","DETWIND","EIG","INT","LOG", "OUT","PARTS","PROG","STA"] ] )    
         #small_vts_name_set:set[str] = set( [name.casefold() for name in ["EIG","INT"] ] )
         
         prefix: str = ""

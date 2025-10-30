@@ -3,7 +3,7 @@ import random
 from datetime import date, timedelta
 from collections.abc import Iterable
 import bigtree
-from bigtree import  list_to_tree, find_full_path, tree_to_polars
+from bigtree import  list_to_tree
 
 # Type alias for bigtree.Node
 FolderTreeNode = bigtree.Node

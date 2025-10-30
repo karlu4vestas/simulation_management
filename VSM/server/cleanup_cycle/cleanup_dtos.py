@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from enum import Enum
 from datetime import date, datetime
 from sqlmodel import SQLModel, Field
@@ -203,7 +204,6 @@ class ActionType(str, Enum):
     CLEAN_ROOTFOLDER          = "clean_simulations"                         # storage agent: clean marked simulations. 0 day into the CLEANING phase. Can take upto a day
     FINISH_CLEANUP_CYCLE      = "finish_cleanup_cycle"                      # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type.
     PREPARE_NEXT_CLEANUP_CYCLE= "prepare_next_cleanup_cycle"                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
-
 
 class AgentInfo(BaseModel):
     """Represents the agent Information that is required to reserve and report on tasks.

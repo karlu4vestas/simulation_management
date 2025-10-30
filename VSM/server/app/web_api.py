@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
 from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO 
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention 
 from db.database import Database
 from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
@@ -168,7 +168,7 @@ def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
 #   the expiration date for non-numeric retentions is set to None
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type
 @app.post("/v1/rootfolders/{rootfolder_id}/retentions")
-def fs_change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
+def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
     return change_retentions(rootfolder_id, retentions)
 
 

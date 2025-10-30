@@ -1,14 +1,18 @@
+import os
 from dataclasses import dataclass
 from datetime import date, timedelta
 import pytest
+
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
-from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RetentionUpdateDTO, RootFolderDTO, ExternalRetentionTypes
+from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, FolderRetention, RootFolderDTO, ExternalRetentionTypes
 
 from db.db_api import change_retentions, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
 from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import insert_rootfolder,insert_cleanup_configuration
 from db.db_api import FileInfo
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, CleanupProgress
+from app.web_api import run_scheduler_tasks
+from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
 from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNodeDTOList
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 
@@ -404,7 +408,13 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         del marked_folders[-1]
         retention: Retention = sim_changed_from_ui.get_retention()
         retention.retention_id = retention.retention_id+1 # change to the Next retention type after marked 
-        retention_dto = RetentionUpdateDTO(folder_id=sim_changed_from_ui.id, retention_id=retention.retention_id, pathprotection_id=0)
+        # With inheritance, we can create RetentionUpdateDTO directly from retention fields
+        retention_dto = FolderRetention(
+            retention_id=retention.retention_id, 
+            pathprotection_id=retention.pathprotection_id,
+            expiration_date=retention.expiration_date,
+            folder_id=sim_changed_from_ui.id
+        )
         change_retentions(rootfolder.id, [retention_dto])
         #verify that the two changed simulations are no longer marked for cleanup
         reduced_marked_folders: list[FolderNodeDTO] = read_folders_marked_for_cleanup(rootfolder.id)
@@ -426,10 +436,51 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         reduced_marked_folders: list[FolderNodeDTO] = read_folders_marked_for_cleanup(rootfolder.id)
         assert len(reduced_marked_folders) == len(marked_folders), \
             f"Expected {len(marked_folders)} marked folders but found {len(reduced_marked_folders)}"
+    
+    class LocalFileStorage:
+        def __init__(self, base_path: str):
+            self.base_path = base_path
 
-    def test_transitions_from_INACTIVE_to_RETENTION_REVIEW_to_CLEANING_to_FINISHED(self, integration_session, cleanup_scenario_data):
+        def write_folder(self, folder_path: str):
+            full_path = os.path.join(self.base_path, folder_path.lstrip("/"))
+            os.makedirs(full_path, exist_ok=True)
+
+        def write_file(self, file_path: str, content: str = ""):
+            full_path = os.path.join(self.base_path, file_path.lstrip("/"))
+            dir_path = os.path.dirname(full_path)
+            os.makedirs(dir_path, exist_ok=True)
+            with open(full_path, 'w') as f:
+                f.write(content)
+    
+    def ignore_test_full_cleanup_cycle(self, integration_session, cleanup_scenario_data):
         #self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data)
-        pass
+
+        #Create one rootfolders that is configured for cleanup. retrieve keys_to_run_in_order = ["first_rootfolder"] and possibly
+        first_rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]
+        #write the folder to the storage so that we can scan for it 
+
+        #start by getting the current working directory
+        io_dir_for_storage_test: str = os.path.normpath("/workspaces/simulation_management/VSM/io_dir_for_storage_test")
+        if not os.path.exists(io_dir_for_storage_test):
+            os.makedirs(io_dir_for_storage_test)
+        
+        storage = TestCleanupWorkflows.LocalFileStorage(base_path=io_dir_for_storage_test)
+        vts_subfolder_names:str = list(AgentScanVTSRootFolder.vts_name_set);
+        for folder in first_rootfolder_data.folders:
+            if folder.is_leaf:
+                storage.write_folder(folder.path)
+                #not add the vst subfolders and later on files
+                for vts_subfolder_name in vts_subfolder_names:
+                    storage.write_folder( os.path.join(folder.path, vts_subfolder_name) )
+                    #add a dummy file to each vts subfolder
+                    storage.write_file( os.path.join(folder.path, vts_subfolder_name, "dummy_file.txt"), content="This is a dummy file." )
+
+        #the following is used by AgentScanVTSRootFolder
+        os.environ['TEMPORARY_SCAN_RESULTS'] = os.path.join(io_dir_for_storage_test, "temp")  # where should the file and folder meta data be placed
+        os.environ['SCAN_THREADS'] = str(1)  # number of scanning threads
+
+        run_scheduler_tasks()
+        
 
 
     #   step 3: finalize the cleanup round so we are ready for the next cleanup round

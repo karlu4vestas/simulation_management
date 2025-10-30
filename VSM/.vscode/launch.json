@@ -202,8 +202,8 @@
       "request": "launch",
       "program": "${workspaceFolder}/server/cleanup_cycle/scan/scan.py",
       "args": [
-        "${workspaceFolder}",
-        "${workspaceFolder}/output/_Temp",
+        "${workspaceFolder}/TEMP_testdata/scan_input",
+        "${workspaceFolder}/TEMP_testdata/scan_output/_Temp",
         "--nScanners=1"
       ],
       "console": "integratedTerminal",

@@ -7,8 +7,8 @@ from queue import Queue
 from threading import Event, Thread
 from multiprocessing.sharedctypes import Value
 #from concurrent.futures import ThreadPoolExecutor
-import RobustIO
-from progress_reporter import ProgressReporter
+from cleanup_cycle.scan import RobustIO
+from cleanup_cycle.scan.progress_reporter import ProgressReporter
 #from file_owner import FileOwner
 
 def as_date_time(time): return datetime.fromtimestamp(time).strftime('%Y-%m-%d_%H-%M-%S')

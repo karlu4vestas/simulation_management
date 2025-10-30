@@ -7,9 +7,9 @@ from threading import active_count
 from multiprocessing import Value
 from typing import NamedTuple
 
-import RobustIO
-from ProgressWriter import ProgressReporter
-from scanner import ScanParameters, ScanPathConfig, Scanner
+from cleanup_cycle.scan import RobustIO
+from cleanup_cycle.scan.ProgressWriter import ProgressReporter
+from cleanup_cycle.scan.scanner import ScanParameters, ScanPathConfig, Scanner
 
 
 class ScanResult(NamedTuple):

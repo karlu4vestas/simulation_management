@@ -6,7 +6,7 @@ from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
 from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, FolderNodeDTO
-from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, RetentionUpdateDTO, FolderTypeEnum, Retention, FileInfo 
+from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention, FolderTypeEnum, Retention, FileInfo 
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
@@ -372,7 +372,7 @@ def delete_path_protection(rootfolder_id: int, protection_id: int):
         session.commit()
         return {"message": f"Path protection {protection_id} deleted"}
 
-def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
+def change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
     print(f"start change_retention_category rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
     
     with Session(Database.get_engine()) as session:
@@ -390,8 +390,11 @@ def change_retentions(rootfolder_id: int, retentions: list[RetentionUpdateDTO]):
         retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
 
         # Update expiration dates. 
+        # Since RetentionUpdateDTO IS-A Retention, we can pass it directly to the calculator
         for retention in retentions:
-            retention.set_retention( retention_calculator.adjust_expiration_date_from_cleanup_configuration_and_retentiontype(retention.get_retention()) )
+            retention.update_retention_fields(
+                retention_calculator.adjust_expiration_date_from_cleanup_configuration_and_retentiontype(retention)
+            )
            
         # Prepare bulk update data - much more efficient than Python loops
         # update with the retention information and reset the days_to_cleanup to 0 

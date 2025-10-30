@@ -3,8 +3,8 @@ import os
 import sys
 import time
 import math
-import RobustIO
-from progress_reporter import ProgressReporter
+from cleanup_cycle.scan import RobustIO
+from cleanup_cycle.scan.progress_reporter import ProgressReporter
 
 class ProgressWriter(ProgressReporter):
     @staticmethod

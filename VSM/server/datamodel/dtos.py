@@ -153,11 +153,28 @@ class RootFolderDTO(RootFolderBase, table=True):
 
 
 
-@dataclass # these parameters must always be in sync
+@dataclass
 class Retention:
+    """Core retention data structure for folder retention information."""
     retention_id: int
     pathprotection_id: int | None = None
     expiration_date: date | None = None
+
+@dataclass
+class FolderRetention(Retention):
+    """
+    DTO for updating folder retention from client.
+    Inherits all retention fields and adds folder_id for API routing.
+    Since this IS-A Retention, it can be passed directly to functions expecting Retention objects.
+    """
+    folder_id: int = 0
+    
+    def update_retention_fields(self, retention: Retention) -> None:
+        """Update the retention fields from a Retention object."""
+        self.retention_id = retention.retention_id
+        self.pathprotection_id = retention.pathprotection_id
+        self.expiration_date = retention.expiration_date
+
 
 class FolderNodeBase(SQLModel):
     rootfolder_id: int                    = Field(foreign_key="rootfolderdto.id")
@@ -194,18 +211,6 @@ class PathProtectionBase(SQLModel):
 class PathProtectionDTO(PathProtectionBase, table=True):
     id: int | None       = Field(default=None, primary_key=True)
 
-
-class RetentionUpdateDTO(SQLModel):
-    folder_id: int                  = Field(foreign_key="foldernodedto.id")
-    retention_id: int               = Field(foreign_key="retentiontypedto.id")
-    pathprotection_id: int          = Field(default=0, foreign_key="pathprotectiondto.id")
-    expiration_date: date | None    = None  # calculated expiration date for this folder
-    def get_retention(self) -> Retention:
-        return Retention(self.retention_id, self.pathprotection_id, self.expiration_date)
-    def set_retention(self, retention: Retention):
-        self.retention_id = retention.retention_id
-        self.pathprotection_id = retention.pathprotection_id
-        self.expiration_date = retention.expiration_date
 
 @dataclass
 class FileInfo:

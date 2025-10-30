@@ -14,7 +14,7 @@ class AgentTemplate(ABC):
     success_message: str | None
 
     def __init__(self, agent_id: str, action_types: list[str], supported_storage_ids: list[str]|None = None):
-        self.agent_info = AgentInfo(agent_id, action_types, supported_storage_ids)
+        self.agent_info = AgentInfo(agent_id=agent_id, action_types=action_types, supported_storage_ids=supported_storage_ids)
 
     def __repr__(self):
         return f"AgentTemplate(agent_info={self.agent_info})"
@@ -172,13 +172,13 @@ class AgentNotification(AgentTemplate):
                     self.send_notification(message, receivers)
 
 
-from server.cleanup_cycle.on_premise_scan_agent import AgentScanRootFolder
+from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
 class InternalAgentFactory:
     @staticmethod
     def get_internal_agents() -> list[AgentTemplate]:
         return [
             AgentCalendarCreation(),
-            AgentScanRootFolder(),
+            AgentScanVTSRootFolder(),
             AgentCleanupCycleStart(),
             AgentNotification(),
             AgentCleanupCycleFinishing(),
