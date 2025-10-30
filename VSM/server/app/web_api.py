@@ -169,7 +169,8 @@ def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type
 @app.post("/v1/rootfolders/{rootfolder_id}/retentions")
 def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
-    return change_retentions(rootfolder_id, retentions)
+    result = change_retentions(rootfolder_id, retentions)
+    return result
 
 
 

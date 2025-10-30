@@ -26,17 +26,18 @@ def insert_vts_metadata_in_db(session:Session):
     # - **`clean`**: (null) `this state is for clean simulation so the user can see all simulations`
     # - **`issue`**: (null) `this state is for simulation with a cleanup issue so the user can see all simulations`
     # - **`Missing`**: (null) `this state is for simulation that are no longer found in the root folder for any reason but most likely due to the user renaming or deleting the folder
-    session.add(RetentionTypeDTO(name="Marked",  days_to_cleanup=0,     simulationdomain_id=sim_id, display_rank=1,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+Next",   days_to_cleanup=7,     simulationdomain_id=sim_id, display_rank=2,  is_endstage=False ))  # 7 days after start of current cleanup cycle is enough
-    session.add(RetentionTypeDTO(name="+90d",    days_to_cleanup=90,    simulationdomain_id=sim_id, display_rank=3,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+180",    days_to_cleanup=180,   simulationdomain_id=sim_id, display_rank=4,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+365",    days_to_cleanup=365,   simulationdomain_id=sim_id, display_rank=5,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+730",    days_to_cleanup=730,   simulationdomain_id=sim_id, display_rank=6,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="+1095",   days_to_cleanup=1095,  simulationdomain_id=sim_id, display_rank=7,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="Path",    days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=8,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="Issue",   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=9,  is_endstage=True ))
-    session.add(RetentionTypeDTO(name="Clean",   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=10, is_endstage=True  ))
-    session.add(RetentionTypeDTO(name="Missing", days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=11, is_endstage=True  ))
+    session.add(RetentionTypeDTO(name="?",         days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=0,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="Marked",    days_to_cleanup=0,     simulationdomain_id=sim_id, display_rank=1,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="+7d(Next)", days_to_cleanup=7,     simulationdomain_id=sim_id, display_rank=2,  is_endstage=False ))  # 7 days after start of current cleanup cycle is enough
+    session.add(RetentionTypeDTO(name="+90d",      days_to_cleanup=90,    simulationdomain_id=sim_id, display_rank=3,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="+180",      days_to_cleanup=180,   simulationdomain_id=sim_id, display_rank=4,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="+365",      days_to_cleanup=365,   simulationdomain_id=sim_id, display_rank=5,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="+730",      days_to_cleanup=730,   simulationdomain_id=sim_id, display_rank=6,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="+1095",     days_to_cleanup=1095,  simulationdomain_id=sim_id, display_rank=7,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="Path",      days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=8,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name="Issue",     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=9,  is_endstage=True ))
+    session.add(RetentionTypeDTO(name="Clean",     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=10, is_endstage=True  ))
+    session.add(RetentionTypeDTO(name="Missing",   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=11, is_endstage=True  ))
     session.commit()
 
     retentions = session.exec(select(RetentionTypeDTO)).all()

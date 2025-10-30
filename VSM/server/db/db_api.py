@@ -208,8 +208,8 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, Retentio
         if not retention_types:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         
-        if not retention_types.get("+next",None):
-            raise HTTPException(status_code=404, detail="retentiontypes does not contain 'next' retention type")
+        #if not retention_types.get("+next",None):
+        #    raise HTTPException(status_code=404, detail="retentiontypes does not contain 'next' retention type")
 
         if not retention_types.get("path", None):
             raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=vts_simulation for {rootfolder.id}")
@@ -561,9 +561,10 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
 
         # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
         db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-        if db_retention.retention_id is None:
-            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-            print(f"Folder {db_folder.id} has no retention ID")
+        #if db_retention.retention_id is None:
+        #    # TODO this is strange because we already calculated db_retention above. must be a debug statement
+        #    db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+        #    print(f"Folder {db_folder.id} has no retention ID")
 
         bulk_updates.append({
             "id": db_folder.id,

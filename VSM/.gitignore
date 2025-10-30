@@ -53,5 +53,4 @@ Thumbs.db
 # VSCode Counter
 .VSCodeCounter/
 
-VSM/output/
-output/
+io_dir_for_storage_test/

@@ -29,8 +29,9 @@ class RetentionCalculator:
 
         self.retention_type_str_dict     = retention_type_dict
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
-        self.path_retention_id           = self.retention_type_str_dict["path"].id if self.retention_type_str_dict.get("path", None) is not None else 0  
+        self.path_retention_id           = self.retention_type_str_dict["path"].id   if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
+        self.undefined_retention_id      = self.retention_type_str_dict["?"].id      if self.retention_type_str_dict.get("?", None) is not None else 0  
         self.is_in_cleanup_round         = cleanup_config.is_in_cleanup_round()
         self.is_starting_cleanup_round   = cleanup_config.is_starting_cleanup_round()
 
@@ -84,11 +85,10 @@ class RetentionCalculator:
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
     def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date) -> Retention:
 
-        if retention.retention_id is not None and not self.is_numeric(retention.retention_id): 
+        if retention.retention_id is not None and not self.is_numeric(retention.retention_id) and retention.retention_id != self.undefined_retention_id: 
             # the retention is endstage or path retention so do not change the retention_id
             retention.expiration_date = None
-        else: # so it is a a numeric or unknown retention
-
+        else: # so it is a a numeric or unknown retention                
             if modified_date is not None:
                 retention.expiration_date = (modified_date + self.cycletimedelta) if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.cycletimedelta)
 
