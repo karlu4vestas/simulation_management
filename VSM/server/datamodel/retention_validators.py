@@ -83,7 +83,21 @@ class RetentionCalculator:
     # if numeric retention then 
     #   use the modified_date to update expiration_date if it will result in longer retention (expiration_date)
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
-    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date) -> Retention:
+    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date, new_modified_date:date=None) -> Retention:
+        if modified_date is None:# must be a new simulation
+            if new_modified_date is not None: 
+                #if so the use the new modified date
+                modified_date = new_modified_date
+            
+            if  retention.retention_id is None:
+                #no existing valid retention_id so we must set the retention to undefined
+                retention.retention_id = self.undefined_retention_id  
+        elif new_modified_date is not None and new_modified_date != modified_date:
+            # so we have an existing retention and a new modified date:
+            #    => the retention must be recalculated unless it is path protected
+            modified_date = new_modified_date
+            if retention.retention_id != self.path_retention_id:
+                retention.retention_id = self.undefined_retention_id #then is will be schduled to cleanup sooner or later
 
         if retention.retention_id is not None and not self.is_numeric(retention.retention_id) and retention.retention_id != self.undefined_retention_id: 
             # the retention is endstage or path retention so do not change the retention_id
@@ -94,33 +108,34 @@ class RetentionCalculator:
 
             if retention.expiration_date is None:
                 raise ValueError("retention.expiration_date is None in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
-            elif self.is_starting_cleanup_round: #this is the phase where all retention are adjusted according to their expiration_date
-                days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
-                # find first index where retention_duration[idx] >= days_until_expiration
-                idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
+            elif self.cleanup_round_start_date != None: 
+                if self.is_starting_cleanup_round: #this is the phase where all retention are adjusted according to their expiration_date
+                    days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
+                    # find first index where retention_duration[idx] >= days_until_expiration
+                    idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
 
-                # if days_until_expiration is greater than every threshold, return last index
-                retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
-            elif retention.retention_id is None or retention.retention_id == self.marked_retention_id:
-                # The user controls the retention so outside the progress state self.is_starting_cleanup_round we must only change numeric retentions that are
-                #    - None
-                #    - or marked for clean up. because the user might change the modified_date of a marked retention during the cleanup round.
-                days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
-                # find first index where retention_duration[idx] >= days_until_expiration
-                idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
+                    # if days_until_expiration is greater than every threshold, return last index
+                    retention.retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+                elif retention.retention_id is None or retention.retention_id == self.marked_retention_id:
+                    # The user controls the retention so outside the progress state self.is_starting_cleanup_round we must only change numeric retentions that are
+                    #    - None
+                    #    - or marked for clean up. because the user might change the modified_date of a marked retention during the cleanup round.
+                    days_to_expiration = (retention.expiration_date - self.cleanup_round_start_date).days
+                    # find first index where retention_duration[idx] >= days_until_expiration
+                    idx = bisect_left(self.numeric_retention_durations, days_to_expiration)
 
-                # if days_until_expiration is greater than every threshold, return last index
-                retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
+                    # if days_until_expiration is greater than every threshold, return last index
+                    retention_id = self.numeric_retention_ids[idx] if idx < len(self.numeric_retention_durations) else self.numeric_retention_ids[len(self.numeric_retention_durations) - 1]
 
-                if retention.retention_id == self.marked_retention_id and retention_id != self.marked_retention_id:
-                    # special case: the simulation is in the retention_review or cleaning phase but the user has modified the retention,
-                    # we must assign the new retention because modifying a simulation during the cleanup round is also a way of telling that the simulation should not be cleaned yet
-                    retention.retention_id = retention_id
-                elif retention_id == self.marked_retention_id :
-                    # The new retention is about to be marked which is not OK. To handle this we must pick next retention after marked.
-                    retention.retention_id = self.get_retention_id_after_marked()
-                else:
-                    retention.retention_id = retention_id 
+                    if retention.retention_id == self.marked_retention_id and retention_id != self.marked_retention_id:
+                        # special case: the simulation is in the retention_review or cleaning phase but the user has modified the retention,
+                        # we must assign the new retention because modifying a simulation during the cleanup round is also a way of telling that the simulation should not be cleaned yet
+                        retention.retention_id = retention_id
+                    elif retention_id == self.marked_retention_id :
+                        # The new retention is about to be marked which is not OK. To handle this we must pick next retention after marked.
+                        retention.retention_id = self.get_retention_id_after_marked()
+                    else:
+                        retention.retention_id = retention_id 
 
             #if retention.retention_id == self.marked_retention_id:
             #    print("Warning: retention_id is set to 'marked' in RetentionCalculator adjust_from_cleanup_configuration_and_modified_date")
@@ -168,10 +183,11 @@ class ExternalToInternalRetentionTypeConverter:
 
         valid_values = [e.value.lower() for e in ExternalRetentionTypes if e.value is not None]
         self.retention_type_dict = { key: retentiontype for key, retentiontype in retention_type_dict.items() if key in valid_values }
+        self.undefined_retention_type = self.retention_type_dict.get('?', None)
 
     def to_internal(self, external_retention: ExternalRetentionTypes) -> RetentionTypeDTO:
-        internal_retention:RetentionTypeDTO = None
-        if external_retention is not None and external_retention != ExternalRetentionTypes.Unknown:
+        internal_retention:RetentionTypeDTO = self.undefined_retention_type
+        if external_retention is not None and external_retention != ExternalRetentionTypes.UNDEFINED:
             internal_retention = self.retention_type_dict.get(external_retention.value.lower(), None)
             if internal_retention is None:
                 raise ValueError(f"cannot map external retention type '{external_retention}' to any internal retention type")

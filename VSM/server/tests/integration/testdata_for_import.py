@@ -70,7 +70,7 @@ class InMemoryFolderNode:
 class RandomInternalRetentionType:
     def __init__(self, seed:int):
         self.rand_int_generator = random.Random(seed)
-        self.retention_types = [ ExternalRetentionTypes.Unknown, ExternalRetentionTypes.Issue, ExternalRetentionTypes.Clean]
+        self.retention_types = [ ExternalRetentionTypes.UNDEFINED, ExternalRetentionTypes.Issue, ExternalRetentionTypes.Clean]
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]
@@ -105,7 +105,7 @@ def generate_node_name(
                    random_internal_retention: RandomInternalRetentionType
                  ) -> InMemoryFolderNode:
 
-    external_retentiontype: ExternalRetentionTypes = ExternalRetentionTypes.Unknown # default retention is None for inner nodes and can be None for leaf nodes
+    external_retentiontype: ExternalRetentionTypes = ExternalRetentionTypes.UNDEFINED # default retention is None for inner nodes and can be None for leaf nodes
     if is_leaf:
         name = f"VTS_{parent_name}_{sibling_counter + 1}" if parent is not None else f"VTS_{parent_name}"
         external_retentiontype = random_internal_retention.next()

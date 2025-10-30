@@ -142,7 +142,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
         simulations_without_sub_simulations:list[FileInfo] = [ FileInfo( filepath = prefix+n.get_attr(vts_label),
                                                                          modified_date = modified_date,
                                                                          nodetype = FolderTypeEnum.VTS_SIMULATION,
-                                                                         external_retention = ExternalRetentionTypes.Unknown.value
+                                                                         external_retention = ExternalRetentionTypes.UNDEFINED.value
                                                                         )
                                                                 for n, modified_date in zip(simulations_without_sub_simulations, simulations_without_sub_simulations_modified_date)]
         

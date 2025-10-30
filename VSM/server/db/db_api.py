@@ -557,14 +557,15 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
             pass # keep existing retention
 
         if db_modified_date != sim.modified_date:
+            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date, sim.modified_date)
             db_modified_date = sim.modified_date
-
-        # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
-        db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-        #if db_retention.retention_id is None:
-        #    # TODO this is strange because we already calculated db_retention above. must be a debug statement
-        #    db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-        #    print(f"Folder {db_folder.id} has no retention ID")
+        else:
+            # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
+            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+            #if db_retention.retention_id is None:
+            #    # TODO this is strange because we already calculated db_retention above. must be a debug statement
+            #    db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
+            #    print(f"Folder {db_folder.id} has no retention ID")
 
         bulk_updates.append({
             "id": db_folder.id,

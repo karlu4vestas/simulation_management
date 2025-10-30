@@ -29,6 +29,7 @@ class DataIOSet:
     externalToInternalRetentionTypeConverter: ExternalToInternalRetentionTypeConverter = None # converter for external to internal retention types for the rootfolder   
     path_retention: RetentionTypeDTO = None # the path retention for the rootfolder
     marked_retention: RetentionTypeDTO = None # the marked retention for the rootfolder
+    undefined_retention: RetentionTypeDTO = None # the undefined retention for the rootfolder
     nodetype_leaf: int = None # the folder type id for leaf nodes (simulations)
     nodetype_inner: int = None # the folder type id for inner nodes
 
@@ -98,6 +99,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
                 data_set.retention_calculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id), cleanup_config_dto)
             data_set.path_retention       = data_set.retention_calculator.retention_type_str_dict["path"]
             data_set.marked_retention     = data_set.retention_calculator.retention_type_str_dict["marked"]
+            data_set.undefined_retention   = data_set.retention_calculator.retention_type_str_dict["?"]
             data_set.externalToInternalRetentionTypeConverter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id))
 
             dataio_sets.append(data_set)
@@ -248,7 +250,8 @@ class TestCleanupWorkflows(BaseIntegrationTest):
                         assert folder.pathprotection_id is None
 
                         # and retention is numeric
-                        assert data_set.retention_calculator.is_numeric(folder.retention_id)
+                        assert data_set.retention_calculator.is_numeric(folder.retention_id) or folder.retention_id == data_set.undefined_retention.id, \
+                                f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been numeric or undefined but is {folder.retention_id}"
 
                         if not data_set.retention_calculator.is_starting_cleanup_round:
                             assert folder.retention_id != data_set.marked_retention.id, \
@@ -283,7 +286,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         input_leafs_lookup: dict[str, InMemoryFolderNode] = {normalize_path(folder.path): folder for folder in second_part_one_data_set.input.folders if folder.is_leaf }
         second_part_one_data_set.input_leafs_to_be_marked_dict = {path: folder for path,folder in input_leafs_lookup.items() 
                                                                   if folder.testcase_dict["folder_retention_case"] == InMemoryFolderNode.TestCaseEnum.BEFORE and 
-                                                                     folder.retention == ExternalRetentionTypes.Unknown }     
+                                                                     folder.retention == ExternalRetentionTypes.UNDEFINED }     
 
         rootfolder:RootFolderDTO = second_part_one_data_set.output.rootfolder
         output_leafs_before_start: dict[str,FolderNodeDTO] = {normalize_path(folder.path): folder for folder in read_folders(rootfolder.id) if folder.nodetype_id == second_part_one_data_set.nodetype_leaf}
@@ -311,16 +314,16 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             assert leaf_after_start is not None, f"unable to lookup leaf_after_start for {path_after_start}"
 
             # verify that leafs planned to be in path_or_endstage_retention_ids have the correct retention both before and after the start of the cleanup round
-            if leaf_input.retention is not ExternalRetentionTypes.Unknown:
+            if leaf_input.retention is not ExternalRetentionTypes.UNDEFINED:
                 assert leaf_before_start.retention_id in path_or_endstage_retention_ids, \
                     f"The Folder {leaf_before_start.path} should have been in path_or_endstage_retention_ids but is {leaf_before_start.retention_id}"
                 assert leaf_after_start.retention_id  in path_or_endstage_retention_ids, \
                     f"The Folder {leaf_after_start.path} should have been in path_or_endstage_retention_ids but is {leaf_after_start.retention_id}"
             else: # the leaf_input will becom a numeric retention
-                assert second_part_one_data_set.retention_calculator.is_numeric(leaf_before_start.retention_id), \
-                    f"The Folder {leaf_before_start.path} should have been numeric before start but is {leaf_before_start.retention_id}"
-                assert second_part_one_data_set.retention_calculator.is_numeric(leaf_after_start.retention_id), \
-                    f"The Folder {leaf_after_start.path} should have been numeric after start but is {leaf_after_start.retention_id}"
+                assert second_part_one_data_set.retention_calculator.is_numeric(leaf_before_start.retention_id) or leaf_before_start.retention_id == second_part_one_data_set.undefined_retention.id, \
+                    f"The Folder {leaf_before_start.path} should have been numeric or undefined before start but is {leaf_before_start.retention_id}"
+                assert second_part_one_data_set.retention_calculator.is_numeric(leaf_after_start.retention_id) or leaf_after_start.retention_id == second_part_one_data_set.undefined_retention.id, \
+                    f"The Folder {leaf_after_start.path} should have been numeric or undefined after start but is {leaf_after_start.retention_id}"
 
                 # verify that 
                 # 1) input leafs planned to be marked for cleanup 
@@ -429,7 +432,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         fileinfo_sim_changed_by_import_ui:FileInfo = FileInfo(filepath=sim_changed_by_import_ui.path, 
                                                               modified_date=sim_changed_by_import_ui.modified_date, 
                                                               nodetype=FolderTypeEnum.VTS_SIMULATION,
-                                                              external_retention=ExternalRetentionTypes.Unknown)
+                                                              external_retention=ExternalRetentionTypes.UNDEFINED)
         insert_or_update_simulations_in_db(rootfolder.id, [fileinfo_sim_changed_by_import_ui])
 
         #verify that the two changed simulations are no longer marked for cleanup

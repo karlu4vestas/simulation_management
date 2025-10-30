@@ -19,7 +19,7 @@ class FolderTypeEnum(str, Enum):
     VTS_SIMULATION  = "vts_simulation"
 
 class ExternalRetentionTypes(str, Enum):
-    Unknown = None
+    UNDEFINED = None
     Issue = "Issue"
     Clean = "Clean"
     Missing = "Missing"
