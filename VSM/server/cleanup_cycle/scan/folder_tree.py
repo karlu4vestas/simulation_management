@@ -53,7 +53,7 @@ class FolderTree:
             has_children:bool      = node.get_attr(has_vts_children_label,False)           
             is_vts_simulation:bool = len([c.name for c in node.children if c.name.lower() in vts_names]) == len(vts_names)
             is_hierarchical:bool   = is_vts_simulation and has_children
-
+            
             if is_vts_simulation:
                 node.set_attrs({vts_label: node.path_name[len(self.internal_root):]})
 

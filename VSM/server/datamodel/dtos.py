@@ -18,11 +18,18 @@ class FolderTypeEnum(str, Enum):
     INNERNODE       = "innernode"
     VTS_SIMULATION  = "vts_simulation"
 
+class RetentionTypeEnum(str, Enum):
+    NUMERIC = None
+    PATH = "Path"
+    ISSUE = "Issue"
+    CLEAN = "Clean"
+    MISSING = "Missing"
+
 class ExternalRetentionTypes(str, Enum):
     UNDEFINED = None
-    Issue = "Issue"
-    Clean = "Clean"
-    Missing = "Missing"
+    ISSUE = "Issue"
+    CLEAN = "Clean"
+    MISSING = "Missing"
 
 
 
@@ -152,6 +159,37 @@ class RootFolderDTO(RootFolderBase, table=True):
     #    return self.cleanup_config
 
 
+@dataclass
+class FileInfo:
+    filepath: str
+    modified_date: date
+    nodetype: FolderTypeEnum
+    external_retention: ExternalRetentionTypes
+    id: int = None   # will be used during updates
+
+
+def retention_type_dto_to_external(retention_dto: RetentionTypeDTO | None) -> ExternalRetentionTypes:
+    # Convert RetentionTypeDTO to ExternalRetentionTypes.
+    # Maps based on the retention name from the database.
+    # Args:
+    #     retention_dto: The internal retention type DTO from database       
+
+    if retention_dto is None:
+        return ExternalRetentionTypes.UNDEFINED
+    
+    retention_name = retention_dto.name.lower()
+    
+    # Map specific retention names to external types
+    if retention_name == "issue":
+        return ExternalRetentionTypes.ISSUE
+    elif retention_name == "clean":
+        return ExternalRetentionTypes.CLEAN
+    elif retention_name == "missing":
+        return ExternalRetentionTypes.MISSING
+    else:
+        # All numeric retentions and other types map to UNDEFINED
+        return ExternalRetentionTypes.UNDEFINED
+
 
 @dataclass
 class Retention:
@@ -195,6 +233,35 @@ class FolderNodeBase(SQLModel):
         self.retention_id = retention.retention_id
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
+    
+    def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, RetentionTypeDTO]) -> FileInfo:
+        # Convert FolderNodeBase to FileInfo with all fields populated except id.        
+        # Args:
+        #     nodetype_dict: Dictionary mapping nodetype_id to FolderTypeDTO
+        #     retention_dict: Dictionary mapping retention_id to RetentionTypeDTO
+        
+        # Get nodetype enum from nodetype_id
+        nodetype_dto = nodetype_dict.get(self.nodetype_id)
+        if nodetype_dto is None:
+            raise ValueError(f"Unknown nodetype_id: {self.nodetype_id}")
+        
+        # Convert nodetype name to FolderTypeEnum
+        try:
+            nodetype = FolderTypeEnum(nodetype_dto.name)
+        except ValueError:
+            # Default to INNERNODE if unknown type
+            nodetype = FolderTypeEnum.INNERNODE
+        
+        # Get retention type and convert to external retention
+        retention_dto = retention_dict.get(self.retention_id)
+        external_retention = retention_type_dto_to_external(retention_dto)
+        
+        return FileInfo(
+            filepath=self.path,
+            modified_date=self.modified_date,
+            nodetype=nodetype,
+            external_retention=external_retention,
+        )
 
 class FolderNodeDTO(FolderNodeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
@@ -211,11 +278,3 @@ class PathProtectionBase(SQLModel):
 class PathProtectionDTO(PathProtectionBase, table=True):
     id: int | None       = Field(default=None, primary_key=True)
 
-
-@dataclass
-class FileInfo:
-    filepath: str
-    modified_date: date
-    nodetype: FolderTypeEnum
-    external_retention: ExternalRetentionTypes
-    id: int = None   # will be used during updates

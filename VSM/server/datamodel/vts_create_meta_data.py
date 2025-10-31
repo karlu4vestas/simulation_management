@@ -1,6 +1,6 @@
+from enum import Enum
 from sqlmodel import Session, select
-from sqlalchemy import Engine
-from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, RetentionTypeDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
+from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, RetentionTypeDTO, RetentionTypeEnum, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
 
 def insert_vts_metadata_in_db(session:Session):
     # ensure that redundant metadata is not present 
@@ -13,6 +13,9 @@ def insert_vts_metadata_in_db(session:Session):
     sim_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0
     if sim_id == 0:
         raise ValueError("vts simulation domain not found")
+
+     
+
 
     # **Retention Catalog** (key=retention_label, value=days_to_cleanup):
     # - **`marked`** (0 days): Mandatory state. This state is for simulation were the retention expired (`retention_expiration_date <= cleanup_round_start_date`). Changing to this retention sets `retention_expiration_date = cleanup_round_start_date`
@@ -34,10 +37,10 @@ def insert_vts_metadata_in_db(session:Session):
     session.add(RetentionTypeDTO(name="+365",      days_to_cleanup=365,   simulationdomain_id=sim_id, display_rank=5,  is_endstage=False ))
     session.add(RetentionTypeDTO(name="+730",      days_to_cleanup=730,   simulationdomain_id=sim_id, display_rank=6,  is_endstage=False ))
     session.add(RetentionTypeDTO(name="+1095",     days_to_cleanup=1095,  simulationdomain_id=sim_id, display_rank=7,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="Path",      days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=8,  is_endstage=False ))
-    session.add(RetentionTypeDTO(name="Issue",     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=9,  is_endstage=True ))
-    session.add(RetentionTypeDTO(name="Clean",     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=10, is_endstage=True  ))
-    session.add(RetentionTypeDTO(name="Missing",   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=11, is_endstage=True  ))
+    session.add(RetentionTypeDTO(name=RetentionTypeEnum.PATH.value,      days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=8,  is_endstage=False ))
+    session.add(RetentionTypeDTO(name=RetentionTypeEnum.ISSUE.value,     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=9,  is_endstage=True ))
+    session.add(RetentionTypeDTO(name=RetentionTypeEnum.CLEAN.value,     days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=10, is_endstage=True  ))
+    session.add(RetentionTypeDTO(name=RetentionTypeEnum.MISSING.value,   days_to_cleanup=None,  simulationdomain_id=sim_id, display_rank=11, is_endstage=True  ))
     session.commit()
 
     retentions = session.exec(select(RetentionTypeDTO)).all()

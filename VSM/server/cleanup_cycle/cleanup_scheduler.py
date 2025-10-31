@@ -418,9 +418,9 @@ class AgentInterfaceMethods:
         return insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
 
 
-    # return the list of full folder paths that are marked for cleanup in the given rootfolder
+    # return the list of FileInfo objects for folders that are marked for cleanup in the given rootfolder
     @staticmethod
-    def task_read_folders_marked_for_cleanup(task_id: int) -> list[str]:
+    def task_read_folders_marked_for_cleanup(task_id: int) -> list[FileInfo]:
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
             task = session.exec(
@@ -429,6 +429,25 @@ class AgentInterfaceMethods:
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
 
+            # Get rootfolder to access simulationdomain_id
+            rootfolder = session.exec(
+                select(RootFolderDTO).where(RootFolderDTO.id == task.rootfolder_id)
+            ).first()
+            if not rootfolder:
+                raise HTTPException(status_code=404, detail=f"The rootfolder with id {task.rootfolder_id} was not found")
+
+            # Get folder type dictionary (by name)
+            from db.db_api import read_folder_type_dict_pr_domain_id, read_retentiontypes_dict_by_domain_id
+            nodetype_dict_by_name = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
+            retention_dict_by_name = read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
+            
+            # Convert to ID-based dictionaries
+            nodetype_dict  = {ft.id: ft for ft in nodetype_dict_by_name.values()}
+            retention_dict = {rt.id: rt for rt in retention_dict_by_name.values()}
+
+            # Get simulations marked for cleanup
             simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(task.rootfolder_id)
-            paths:list[str] = [folder.path for folder in simulations]
-        return paths
+            
+            # Convert each FolderNodeDTO to FileInfo using get_fileinfo()
+            file_infos:list[FileInfo] = [folder.get_fileinfo(session, nodetype_dict, retention_dict) for folder in simulations]
+        return file_infos

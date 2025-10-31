@@ -70,7 +70,7 @@ class InMemoryFolderNode:
 class RandomInternalRetentionType:
     def __init__(self, seed:int):
         self.rand_int_generator = random.Random(seed)
-        self.retention_types = [ ExternalRetentionTypes.UNDEFINED, ExternalRetentionTypes.Issue, ExternalRetentionTypes.Clean]
+        self.retention_types = [ ExternalRetentionTypes.UNDEFINED, ExternalRetentionTypes.ISSUE, ExternalRetentionTypes.CLEAN]
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]

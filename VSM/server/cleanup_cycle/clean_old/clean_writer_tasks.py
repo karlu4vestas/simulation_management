@@ -34,21 +34,21 @@ class ThreadSafeDeletionCounter():
     # constructor
     def __init__(self):
         # initialize counter
-        self.files_deleted = 0
-        self.bytes_deleted = 0
+        self._files_deleted = 0
+        self._bytes_deleted = 0
         # initialize lock
         self._lock = Lock()
  
     # increment the values
     def add(self, files_deleted, bytes_deleted):
         with self._lock:
-            self.files_deleted += files_deleted
-            self.bytes_deleted += bytes_deleted
+            self._files_deleted += files_deleted
+            self._bytes_deleted += bytes_deleted
  
     # get the values
     def values(self):
         with self._lock:
-            return self.files_deleted, self.bytes_deleted
+            return self._files_deleted, self._bytes_deleted
 
 
 

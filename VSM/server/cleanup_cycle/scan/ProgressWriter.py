@@ -28,21 +28,8 @@ class ProgressWriter(ProgressReporter):
         self.logfile_handle.write("time;duration (min);enqueued;processed;current dirs/s;mean dirs/s;active threads\n")
         
     def close (self):
-        #current_time = time.time()
-
-        #write the final line to the log and close the file
-        #self.update_log()
         self.logfile_handle.close()
 
-        """#show progress on screen    
-        seconds   = current_time - self.start_time 
-        #remember to extract the stop signal
-        processed_folders = self.param.nb_processed_folders.value 
-        scan_rate = math.trunc( processed_folders/seconds + 0.5)       
-        sys.stdout.write(f"\r{ProgressWriter.as_date_time(time.time())} Folders processed: {processed_folders} in { math.trunc(seconds + 0.5) } seconds "\
-                         f"at a rate of {scan_rate} folders pr second          \n")
-        sys.stdout.flush()    
-        """
     def update (self, nb_processed_folders:int, io_queue_qsize:int, active_threads:int):
 
         current_time = time.time()

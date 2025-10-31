@@ -11,6 +11,23 @@ from cleanup_cycle.scan.ProgressWriter import ProgressWriter, ProgressReporter
 from cleanup_cycle.scan.folder_tree import FolderTree, FolderTreeNode
 #from server.cleanup_cycle.scan.progress_reporter import ProgressReporter
 
+# The purpose of this class is to resuse the ProgressWriter to report progress to the task
+class AgentScanProgressWriter(ProgressWriter):
+    def __init__(self, agentScanRootFolder: "AgentScanVTSRootFolder", seconds_between_update:int, seconds_between_filelog:int):
+        super().__init__(seconds_between_update, seconds_between_filelog)
+        self.agentScanRootFolder = agentScanRootFolder
+
+    def write_realtime_progress(self, nb_processed_folders:int, mean_dirs_second:int, io_queue_qsize:int, active_threads:int):    
+        #report real-time progress to the task.
+        msg: str = f"\rFolders processed; pr second, queue_size, threads: {nb_processed_folders}; {mean_dirs_second}; {io_queue_qsize}; {active_threads}"
+        self.task = AgentInterfaceMethods.task_progress(self.agentScanRootFolder.task.id, msg)
+
+    def open(self, output_path: str):
+        super().open(output_path)
+        
+    def close(self):
+        super().close()
+
 class AgentScanVTSRootFolder(AgentTemplate):
     temporary_result_folder: str | None
     vts_name_set:set[str]  = set( [name.casefold() for name in ["INPUTS","DETWIND","EIG","INT","LOG", "OUT","PARTS","PROG","STA"] ] )    
@@ -30,16 +47,19 @@ class AgentScanVTSRootFolder(AgentTemplate):
         if self.temporary_result_folder is None:
             return
 
-        root_folder_name: str = os.path.basename(self.task.path)
-        date_time_str: str = date.today().strftime("%Y%m%d:%H%M%S")
-        metadata_file: str = os.path.join(self.temporary_result_folder, date_time_str+"_"+root_folder_name+"_metadata.csv")
+        root_folder_name: str  = os.path.basename(self.task.path)
+        date_time_str: str     = date.today().strftime("%Y%m%d:%H%M%S")
+        metadata_file: str     = os.path.join(self.temporary_result_folder, date_time_str+"_"+root_folder_name+"_metadata.csv")
 
         scan_result:ScanResult = self.scan_metadata(self.task.path, metadata_file, self.nb_scan_thread)
         if scan_result.nb_scanned_folders == 0:
             self.error_message = f"Failed to scan metadata for {self.task.path}. Zero folders processed: {scan_result.message}"
             return
 
+        extract_simulations: list[FileInfo]
+        n_hierarchical_simulations: int
         extract_simulations, n_hierarchical_simulations = self.extract_simulations(scan_result.scan_output_files[0])
+        
         AgentInterfaceMethods.task_progress(self.task.id, f"Identified {len(extract_simulations)} simulations and ignored {n_hierarchical_simulations} hierarchical simulations")
         if len(extract_simulations) == 0:
             return False, "No simulations were found during the scan."
@@ -48,32 +68,54 @@ class AgentScanVTSRootFolder(AgentTemplate):
         # This must however come from AgentInterfaceMethods.task_insert_or_update_simulations_in_db
         result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db(self.task.id, extract_simulations)
 
-
-    # The purpose of this class is to resuse the ProgressWriter to report progress to the task
-    class AgentProgressWriter(ProgressWriter):
-        def __init__(self, agentScanRootFolder: "AgentScanVTSRootFolder", seconds_between_update:int, seconds_between_filelog:int):
-            super().__init__(seconds_between_update, seconds_between_filelog)
-            self.agentScanRootFolder = agentScanRootFolder
-
-        def write_realtime_progress(self, nb_processed_folders:int, mean_dirs_second:int, io_queue_qsize:int, active_threads:int):    
-            #report real-time progress to the task.
-            msg: str = f"\rFolders processed; pr second, queue_size, threads: {nb_processed_folders}; {mean_dirs_second}; {io_queue_qsize}; {active_threads}"
-            self.task = AgentInterfaceMethods.task_progress(self.agentScanRootFolder.task.id, msg)
-
     def scan_metadata(self, path: str, meta_file_path: str, nb_scan_thread:int) -> ScanResult:
-        success: bool = False
-        msg: str = ""
-
-        scan_path = os.path.normpath(path)
+        scan_path      = os.path.normpath(path)
         output_archive = os.path.normpath(meta_file_path)
 
-        progress_reporter:ProgressReporter = AgentScanVTSRootFolder.AgentProgressWriter( self, seconds_between_update=1, seconds_between_filelog=60)
+        progress_reporter:ProgressReporter = AgentScanProgressWriter( self, seconds_between_update=10, seconds_between_filelog=60)
         progress_reporter.open(output_archive)
+        
         scan_io_result:ScanResult = do_scan( scan_path, output_archive, nb_scan_thread, scan_subdirs=False, progress_reporter=progress_reporter)
+        
         progress_reporter.close()
-
         return scan_io_result
 
+    #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
+    def extract_simulations(self, scan_result_file: str) -> tuple[list[FileInfo], int]:
+
+        # Notice that the modified date from the load_all_paths is the max date of alle subfolders and files.
+        # The metadata scan includes the entire foldertree this is why we can convert a node' path to a modified date below.
+        folder_modified_date_dict: dict[str, date] = self.load_all_paths(scan_result_file)
+        if len(folder_modified_date_dict) == 0:
+            return [], 0
+
+        #Define lables for identifying the vts simulation in the tree structure and where we have issues with hierarchical vts-simulations
+        vts_label:str              = "vts_simulations"
+        vts_hierarchical_label:str = "vts_hierarchical"
+        has_vts_children_label:str = "has_vts_children"
+        #small_vts_name_set:set[str] = set( [name.casefold() for name in ["EIG","INT"] ] )
+        
+        prefix: str = ""
+        tree:FolderTree = FolderTree(folder_modified_date_dict.keys(), prefix=prefix, path_separator="\\")
+        
+        tree.mark_vts_simulations(vts_label, AgentScanVTSRootFolder.vts_name_set, vts_hierarchical_label, has_vts_children_label)
+        simulations_with_sub_simulations:tuple[FolderTreeNode,...]    = tree.findall(lambda node: node.get_attr(vts_hierarchical_label,False))
+
+        simulations_without_sub_simulations:tuple[FolderTreeNode,...] = tree.findall(lambda node: len(node.get_attr(vts_label,"")) > 0 and not node.get_attr(vts_hierarchical_label,False))
+        simulations_without_sub_simulations_modified_date:list[date]  = [ folder_modified_date_dict[prefix+n.get_attr(vts_label)] for n in simulations_without_sub_simulations] 
+        tree = None
+
+        #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
+        simulations_without_sub_simulations:list[FileInfo] = [ FileInfo( filepath = prefix+n.get_attr(vts_label),
+                                                                         modified_date = modified_date,
+                                                                         nodetype = FolderTypeEnum.VTS_SIMULATION,
+                                                                         external_retention = ExternalRetentionTypes.UNDEFINED.value
+                                                                        )
+                                                                for n, modified_date in zip(simulations_without_sub_simulations, simulations_without_sub_simulations_modified_date)]
+        
+
+        return simulations_without_sub_simulations, len(simulations_with_sub_simulations)    
+    
     def load_all_paths(self, scan_output_file: str) -> dict[str, date]:
         # The scan output file is a csv file with a header like:"folder";"min_modified";"max_modified";"min_accessed";"max_accessed";"files"
         # Load folder and max_modified from the CSV as fast as possible
@@ -111,40 +153,3 @@ class AgentScanVTSRootFolder(AgentTemplate):
             return {}
         
         return folder_modified_data
-
-    #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
-    def extract_simulations(self, scan_result_file: str) -> tuple[list[FileInfo], int]:
-
-        # the folder_modified_date_dict will amonst other be used to retrieve the modified date using path from the tree structure. 
-        # This implies that folder must represent the path of all nodes in the tree structure.
-
-        folder_modified_date_dict: dict[str, date] = self.load_all_paths(scan_result_file)
-        if len(folder_modified_date_dict) == 0:
-            return [], 0
-
-        #Define lables for identifying the vts simulation in the tree structure and where we have issues with hierarchical vts-simulations
-        vts_label:str              = "vts_simulations"
-        vts_hierarchical_label:str = "vts_hierarchical_simulations"
-        has_vts_children_label:str = "has_vts_children"
-        #small_vts_name_set:set[str] = set( [name.casefold() for name in ["EIG","INT"] ] )
-        
-        prefix: str = ""
-        tree:FolderTree = FolderTree(folder_modified_date_dict.keys(), prefix=prefix, path_separator="\\")
-        
-        tree.mark_vts_simulations(vts_label, vts_name_set, vts_hierarchical_label, has_vts_children_label, folder_modified_date_dict)
-        simulations_with_sub_simulations:tuple[FolderTreeNode,...]    = tree.findall(lambda node: node.get_attr(vts_hierarchical_label,False))
-
-        simulations_without_sub_simulations:tuple[FolderTreeNode,...] = tree.findall(lambda node: len(node.get_attr(vts_label,"")) > 0 and not node.get_attr(vts_hierarchical_label,False))
-        simulations_without_sub_simulations_modified_date:list[date]  = [ folder_modified_date_dict[prefix+n.get_attr(vts_label)] for n in simulations_without_sub_simulations] 
-        tree = None
-
-        #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
-        simulations_without_sub_simulations:list[FileInfo] = [ FileInfo( filepath = prefix+n.get_attr(vts_label),
-                                                                         modified_date = modified_date,
-                                                                         nodetype = FolderTypeEnum.VTS_SIMULATION,
-                                                                         external_retention = ExternalRetentionTypes.UNDEFINED.value
-                                                                        )
-                                                                for n, modified_date in zip(simulations_without_sub_simulations, simulations_without_sub_simulations_modified_date)]
-        
-
-        return simulations_without_sub_simulations, len(simulations_with_sub_simulations)
