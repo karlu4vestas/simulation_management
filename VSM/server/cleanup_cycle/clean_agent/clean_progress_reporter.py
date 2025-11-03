@@ -1,7 +1,5 @@
-"""
-Progress reporter base class and default implementation for cleanup operations.
-Follows the same pattern as ProgressReporter/ProgressWriter in the scan module.
-"""
+# Progress reporter base class and default implementation for cleanup operations.
+# Follows the same pattern as ProgressReporter/ProgressWriter in the scan module.
 from abc import ABC, abstractmethod
 import os
 import sys
@@ -96,8 +94,7 @@ class CleanProgressWriter(CleanProgressReporter):
 
     def write_realtime_progress(self, measures: CleanMeasures, mean_sims_second: int, deletion_queue_size: int, active_threads: int):
         # Write real-time progress to stdout.
-        # This method can be overridden in subclasses to customize progress output.
-        
+        # This method can be overridden in subclasses to customize progress output.        
         # Args:
         #     measures: CleanMeasures with all cleanup statistics
         #     mean_sims_second: Average simulations per second
@@ -114,8 +111,7 @@ class CleanProgressWriter(CleanProgressReporter):
 
     def write_filelog(self, measures: CleanMeasures, deletion_queue_size: int, active_threads: int, run_time_min: int, current_sims_second: int, mean_sims_second: int):
         # Write progress to the log file.
-        # This method can be overridden in subclasses to customize log output.
-        
+        # This method can be overridden in subclasses to customize log output.        
         # Args:
         #     measures: CleanMeasures with all cleanup statistics
         #     deletion_queue_size: Current size of deletion queue

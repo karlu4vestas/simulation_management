@@ -14,7 +14,7 @@ server/cleanup_cycle/clean_agent/
 ├── clean_workers.py               # Worker thread implementations
 ├── clean_parameters.py            # Configuration (CleanMode, CleanParameters)
 ├── clean_progress_reporter.py    # Progress reporting (abstract + default)
-├── simulation_stubs.py            # Simulation class stubs (BaseSimulation, Simulation)
+├── simulation.py            # Simulation class stubs (BaseSimulation, Simulation)
 ├── thread_safe_counters.py       # Thread-safe counters
 └── test_clean_main.py             # Test/demo script
 ```

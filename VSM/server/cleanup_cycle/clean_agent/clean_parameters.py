@@ -54,35 +54,33 @@ class CleanParameters:
         self.error_count = ThreadSafeCounter()
     
     def get_measures(self) -> CleanMeasures:
-        """Get all cleanup measures as a named tuple.
+        # Get all cleanup measures as a named tuple.        
+        # Returns:
+        #     CleanMeasures: Named tuple containing all cleanup statistics:
+        #         - simulations_processed: Total simulations processed
+        #         - simulations_cleaned: Simulations successfully cleaned
+        #         - simulations_issue: Simulations with issues
+        #         - simulations_skipped: Simulations skipped
+        #         - files_deleted: Total files deleted
+        #         - bytes_deleted: Total bytes deleted
+        #         - error_count: Total errors encountered
+        # Thread-safety notes:
+        #     Each individual counter read is thread-safe (protected by its own lock).
+        #     However, the overall snapshot is NOT atomic across all counters - values may
+        #     be read at slightly different points in time if worker threads are actively
+        #     updating counters.
+        #             
+        #     This is acceptable because:
+        #     1. During execution: Used by progress monitor for periodic updates where
+        #        approximate values are sufficient to show that work is progressing.
+        #        Perfect consistency is not required for progress reporting.
+        #   
+        #     2. Final report: Called after all worker threads have stopped (after join()),
+        #        so no concurrent modifications occur and the snapshot is consistent.
+        #    
+        #     The non-atomic reads provide a good balance between simplicity and the
+        #     actual requirements of the system.
         
-        Returns:
-            CleanMeasures: Named tuple containing all cleanup statistics:
-                - simulations_processed: Total simulations processed
-                - simulations_cleaned: Simulations successfully cleaned
-                - simulations_issue: Simulations with issues
-                - simulations_skipped: Simulations skipped
-                - files_deleted: Total files deleted
-                - bytes_deleted: Total bytes deleted
-                - error_count: Total errors encountered
-        
-        Thread-safety notes:
-            Each individual counter read is thread-safe (protected by its own lock).
-            However, the overall snapshot is NOT atomic across all counters - values may
-            be read at slightly different points in time if worker threads are actively
-            updating counters.
-            
-            This is acceptable because:
-            1. During execution: Used by progress monitor for periodic updates where
-               approximate values are sufficient to show that work is progressing.
-               Perfect consistency is not required for progress reporting.
-            
-            2. Final report: Called after all worker threads have stopped (after join()),
-               so no concurrent modifications occur and the snapshot is consistent.
-            
-            The non-atomic reads provide a good balance between simplicity and the
-            actual requirements of the system.
-        """
         deletions:DeletionCounts = self.deletion_measures.values()        
         return CleanMeasures(
             simulations_processed=self.simulations_processed.value(),

@@ -1,6 +1,4 @@
-"""
-Worker thread implementations for cleanup operations.
-"""
+# Worker thread implementations for cleanup operations.
 import os
 import sys
 import time
@@ -8,7 +6,9 @@ import threading
 from queue import Empty
 from cleanup_cycle.clean_agent.clean_parameters import CleanParameters, CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter
-from cleanup_cycle.clean_agent.simulation_stubs import Simulation
+from cleanup_cycle.clean_agent.simulation import Simulation, SimulationEvalResult
+from server.cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from server.datamodel.dtos import ExternalRetentionTypes
 
 
 def simulation_worker(params: CleanParameters):
@@ -33,23 +33,24 @@ def simulation_worker(params: CleanParameters):
                 break
             
             # Create simulation object with filepath and modified_date from FileInfo
-            sim:Simulation = Simulation(sim_input.filepath, sim_input.modified_date)
-            
+            file_registry: SimulationFileRegistry = SimulationFileRegistry(sim_input.filepath, params.error_queue)
+            sim: Simulation = Simulation(sim_input.filepath, sim_input.modified_date, params.error_queue, file_registry)
+
             # Get files to clean
-            files = sim.get_files_to_clean()
-            
+            eval : SimulationEvalResult = sim.eval()
+
             # Queue files for deletion
-            for file_path in files:
+            for file_path in eval.all_cleaners_files:
                 params.file_deletion_queue.put(file_path)
             
             # Put lightweight FileInfo result in result queue instead of full Simulation
             # This avoids memory issues from keeping large file structures in memory
-            params.processed_simulations_result_queue.put(sim.GetFileInfo())
+            params.processed_simulations_result_queue.put(eval.file_info)
             
             # Update appropriate counter based on simulation status
-            if sim.was_cleaned:
+            if len(eval.all_cleaners_files) > 0:
                 params.simulations_cleaned.increment()
-            elif sim.has_issue:
+            elif eval.file_info.external_retention == ExternalRetentionTypes.ISSUE:
                 params.simulations_issue.increment()
             else:
                 params.simulations_skipped.increment()

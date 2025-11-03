@@ -16,7 +16,7 @@ clean_agent/
 ├── clean_workers.py           # Worker thread implementations
 ├── clean_parameters.py        # Configuration and state
 ├── clean_progress_reporter.py # Progress reporting (abstract + default)
-├── simulation_stubs.py        # Simulation class stubs
+├── simulation.py        # Simulation class stubs
 ├── thread_safe_counters.py   # Thread-safe counters
 └── test_clean_main.py         # Test/demo script
 ```
@@ -175,7 +175,7 @@ class Simulation(BaseSimulation):
 
 **To replace with real implementation:**
 1. Implement the actual scanning and file identification logic
-2. Update `simulation_stubs.py` with the real implementation
+2. Update `simulation.py` with the real implementation
 3. Ensure the properties and methods match the interface
 
 ## Output Files

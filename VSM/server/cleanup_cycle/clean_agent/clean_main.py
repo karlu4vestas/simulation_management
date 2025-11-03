@@ -1,6 +1,5 @@
 # Main entry point for cleanup operations.
 # Coordinates multi-threaded cleanup of VTS simulations.
-
 import os
 from datetime import datetime
 from typing import NamedTuple

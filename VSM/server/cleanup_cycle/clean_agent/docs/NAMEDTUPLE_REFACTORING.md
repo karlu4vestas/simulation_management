@@ -113,7 +113,7 @@ finally:
    - Changed parameter from `simulation_paths: list[str]` to `simulations: list[SimulationInput]`
    - Updated queue loading logic
 
-2. **`simulation_stubs.py`**
+2. **`simulation.py`**
    - Added `modified_date` parameter to `Simulation.__init__()`
    - Modified date now comes from database instead of `date.today()`
 

@@ -173,7 +173,7 @@ clean_agent/
 ├── clean_workers.py           # Thread workers
 ├── clean_parameters.py        # Config & state
 ├── clean_progress_reporter.py # Progress reporting
-├── simulation_stubs.py        # Simulation stubs
+├── simulation.py        # Simulation stubs
 ├── thread_safe_counters.py   # Thread-safe counters
 └── test_clean_main.py         # Test script
 ```
