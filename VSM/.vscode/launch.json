@@ -225,6 +225,34 @@
       "env": {
         "PYTHONUNBUFFERED": "1"
       }
+    },
+    {
+      "name": "main_GenerateSimulation.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations/main_GenerateSimulation.py",
+      "args": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "main_validate_cleanup.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations/main_validate_cleanup.py",
+      "args": [],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
     }
   ],
   "compounds": [
