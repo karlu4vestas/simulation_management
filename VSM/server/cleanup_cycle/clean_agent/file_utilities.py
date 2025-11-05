@@ -1,18 +1,28 @@
 import numpy as np
+from datetime import datetime
+from typing import Optional, NamedTuple
 
-def get_size_stat_from_file_entries(file_entries: dict):
+#FileStatistics: Named tuple containing:
+#     - bytes: Total size in bytes across all files
+#     - count_files: Total number of files
+#     - max_date: Most recent modification timestamp (or None)
+#     - min_date: Oldest modification timestamp (or None)
+#     - file_entries: The input dictionary (passed through)
+class FileStatistics(NamedTuple):
+    bytes: int
+    count_files: int
+    max_date: Optional[datetime]
+    min_date: Optional[datetime]
+    file_entries: dict
+
+def get_size_stat_from_file_entries(file_entries: dict) -> FileStatistics:
     # Compute size and timestamp statistics from a dictionary of file entries.
     
     # Args:
     #     file_entries: Dictionary where values are lists of DirEntry objects (files)
     
     # Returns:
-    #     Tuple of (bytes, count_files, max_date, min_date, file_entries):
-    #     - bytes_: Total size in bytes across all files
-    #     - count_files: Total number of files
-    #     - max_date: Most recent modification timestamp (or None)
-    #     - min_date: Oldest modification timestamp (or None)
-    #     - file_entries: The input dictionary (passed through)
+    #     FileStatistics
     
     # Note:
     #     - Timestamps after Year 2038 problem threshold (2^31 - 1) are excluded from date calculations
@@ -33,7 +43,10 @@ def get_size_stat_from_file_entries(file_entries: dict):
         file_timestamp = [state.st_mtime for state in files_stat if state.st_mtime < max_time]  # have to create a list with valid timestamps first
         if len(file_timestamp) > 0:
             file_timestamp = np.fromiter(file_timestamp, dtype=np.float64)
-            max_date = np.max(file_timestamp)
-            min_date = np.min(file_timestamp)
+            max_timestamp = np.max(file_timestamp)
+            min_timestamp = np.min(file_timestamp)
+            # Convert timestamps to datetime objects
+            max_date = datetime.fromtimestamp(max_timestamp)
+            min_date = datetime.fromtimestamp(min_timestamp)
 
-    return bytes_, count_files, max_date, min_date, file_entries
+    return FileStatistics(bytes_, count_files, max_date, min_date, file_entries)

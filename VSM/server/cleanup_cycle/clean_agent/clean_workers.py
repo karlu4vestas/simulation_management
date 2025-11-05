@@ -7,8 +7,8 @@ from queue import Empty
 from cleanup_cycle.clean_agent.clean_parameters import CleanParameters, CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter
 from cleanup_cycle.clean_agent.simulation import Simulation, SimulationEvalResult
-from server.cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
-from server.datamodel.dtos import ExternalRetentionTypes
+from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from datamodel.dtos import ExternalRetentionTypes
 
 
 def simulation_worker(params: CleanParameters):
@@ -87,8 +87,9 @@ def deletion_worker(params: CleanParameters):
         file_path = None
         try:
             # Get file from queue with timeout
-            file_path = params.file_deletion_queue.get(timeout=1)
-            
+            timeout=None
+            file_path = params.file_deletion_queue.get(timeout=timeout)
+
             # Check for poison pill
             if file_path is None:
                 params.file_deletion_queue.task_done()
@@ -139,7 +140,8 @@ def error_writer_worker(params: CleanParameters, error_log_path: str):
                 path, error = None, None
                 try:
                     # Get error from queue with timeout
-                    path, error = params.error_queue.get(timeout=1)
+                    timeout=None
+                    path, error = params.error_queue.get()
                     
                     # Check for poison pill
                     if path is None:

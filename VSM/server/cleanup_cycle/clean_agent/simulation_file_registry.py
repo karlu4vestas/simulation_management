@@ -12,6 +12,8 @@ import time
 from queue import Queue
 from typing import Optional, Callable
 
+from cleanup_cycle.clean_agent.file_utilities import FileStatistics, get_size_stat_from_file_entries
+
 
 class SimulationFileRegistry:
     # Registry for efficiently accessing files and folders within a simulation directory tree.
@@ -40,6 +42,7 @@ class SimulationFileRegistry:
         self._threadpool = threadpool
         self.all_dir_entries: dict[str, list[os.DirEntry]] = {}
         self.all_file_entries: dict[str, list[os.DirEntry]] = {}
+        self.direct_child_folders_in_base_path: dict[str, list[os.DirEntry]] = None
         
         # Scan on initialization
         self._scan_all()
@@ -189,3 +192,36 @@ class SimulationFileRegistry:
         #         for file_entry in files:
         #             print(file_entry.path, file_entry.stat().st_size)
         return self.all_dir_entries, self.all_file_entries
+
+    def get_immediate_folders_in_root(self) -> dict[str, os.DirEntry]:
+        # Returns: the immediate child folders in the simulation root where the 
+        # dict keys are the lowercase name of the subfolder and the value is the DirEntry object.
+        # Example:
+        #   {
+        #       "inputs": <DirEntry 'INPUTS'>,
+        #       "int": <DirEntry 'INT'>,
+        #       "prog": <DirEntry 'PROG'>,
+        #       "outputs": <DirEntry 'OUTPUTS'>
+        #   }
+        if self.direct_child_folders_in_base_path is None:
+            self.direct_child_folders_in_base_path: dict[str, os.DirEntry] = {}
+            # Get the direct child directories from the root path ("")
+            root_dirs = self.all_dir_entries.get("", [])
+            for dir_entry in root_dirs:
+                # Map lowercase folder name to the DirEntry object
+                self.direct_child_folders_in_base_path[dir_entry.name.lower()] = dir_entry
+
+        return self.direct_child_folders_in_base_path
+    
+    def get_simulation_statistics(self) -> FileStatistics:
+        # Calculate total size and modification dates of all files in simulation.
+        
+        # Returns:
+        #     SizeStats: Named tuple containing:
+        #     - bytes: Total size in bytes across all files
+        #     - count_files: Total number of files
+        #     - max_date: Most recent modification timestamp (or None)
+        #     - min_date: Oldest modification timestamp (or None)
+        #     - file_entries: The input dictionary (passed through)
+        _, all_files = self.get_all_entries()
+        return get_size_stat_from_file_entries(all_files)

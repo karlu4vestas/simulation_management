@@ -6,7 +6,7 @@ from cleanup_cycle.cleanup_dtos import ActionType
 from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods 
 from cleanup_cycle.internal_agents import AgentTemplate
 from datamodel.dtos import ExternalRetentionTypes, FileInfo, FolderTypeEnum
-from cleanup_cycle.clean_agent.clean_main import clean_main, CleanMainResult
+from cleanup_cycle.clean_agent.clean_main import clean_main, CleanupResult
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
 
@@ -78,7 +78,7 @@ class AgentCleanRootFolder(AgentTemplate):
             self.error_message = "No simulations marked for cleanup"
             return
         
-        clean_result: CleanMainResult = self.clean_simulations(simulations)
+        clean_result: CleanupResult = self.clean_simulations(simulations)
         if clean_result is None:
             return
         
@@ -95,7 +95,7 @@ class AgentCleanRootFolder(AgentTemplate):
         if len(clean_result.results) > 0:
             result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
 
-    def clean_simulations(self, simulations: list[FileInfo]) -> CleanMainResult | None:
+    def clean_simulations(self, simulations: list[FileInfo]) -> CleanupResult | None:
         
         # Create output path for logs
         root_folder_name: str = os.path.basename(self.task.path)
@@ -106,7 +106,7 @@ class AgentCleanRootFolder(AgentTemplate):
         progress_reporter: CleanProgressReporter = AgentCleanProgressWriter( self, seconds_between_update=10, seconds_between_filelog=60 )
         progress_reporter.open(output_path)
 
-        clean_result: CleanMainResult = None
+        clean_result: CleanupResult = None
         try:
             clean_result = clean_main( simulations          = simulations,
                                        progress_reporter    = progress_reporter,

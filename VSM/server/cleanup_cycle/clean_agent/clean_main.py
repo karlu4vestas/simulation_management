@@ -1,24 +1,48 @@
 # Main entry point for cleanup operations.
 # Coordinates multi-threaded cleanup of VTS simulations.
 import os
-from datetime import datetime
-from typing import NamedTuple
+from dataclasses import dataclass
 from threading import Thread
-from datamodel.dtos import FileInfo, FolderTypeEnum, FileInfo
+from datamodel.dtos import FileInfo, FileInfo
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanParameters, CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter 
-from cleanup_cycle.clean_agent.clean_workers import (
-    simulation_worker,
-    deletion_worker,
-    progress_monitor_worker,
-    error_writer_worker
-)
+from cleanup_cycle.clean_agent.clean_workers import ( simulation_worker, deletion_worker, progress_monitor_worker,error_writer_worker)
 
 
-class CleanMainResult(NamedTuple):
-    # Return value from clean_main containing results and measures
+@dataclass
+class CleanupResult:
+    """Return value from clean_main containing results and measures"""
     results: list[FileInfo]  # List of processed simulations with status
     measures: CleanMeasures  # Summary statistics from cleanup operation
+    
+    def __str__(self) -> str:
+        # Convert CleanMainResult to a formatted string for printing.
+        # Returns:
+        #     Formatted string with cleanup statistics
+        # Example:
+        #     >>> result = clean_main(...)
+        #     >>> print(result)
+            
+        #     Cleanup completed:
+        #       Simulations processed: 150
+        #       Simulations cleaned: 120
+        #       Simulations with issues: 5
+        #       Simulations skipped: 25
+        #       Files deleted: 45000
+        #       Bytes deleted: 1250000000
+        #       Errors: 2
+
+        return (
+            f"\nCleanup completed:\n"
+            f"  Simulations FileInfo processed: {len(self.results)}\n"
+            f"  Simulations processed: {self.measures.simulations_processed}\n"
+            f"  Simulations cleaned: {self.measures.simulations_cleaned}\n"
+            f"  Simulations with issues: {self.measures.simulations_issue}\n"
+            f"  Simulations skipped: {self.measures.simulations_skipped}\n"
+            f"  Files deleted: {self.measures.files_deleted}\n"
+            f"  Bytes deleted: {self.measures.bytes_deleted}\n"
+            f"  Errors: {self.measures.error_count}"
+        )
 
 
 def clean_main(
@@ -29,7 +53,7 @@ def clean_main(
     num_sim_workers: int = 32,
     num_deletion_workers: int = 2,
     deletion_queue_max_size: int = 1_000_000
-) -> CleanMainResult:
+) -> CleanupResult:
     # Clean VTS simulations with multi-threading as follows
     # 1. Sets up queues and counters
     # 2. Spawns worker threads:
@@ -155,12 +179,13 @@ def clean_main(
         params.error_queue.put((None, None))
         
         # Wait for all threads
+        timeout=7200 # 2 hours very long timeout just in case in case the queues are very large
         for t in simulation_threads:
-            t.join(timeout=25)
+            t.join(timeout=timeout)
         for t in deletion_threads:
-            t.join(timeout=25)
-        monitor.join(timeout=25)
-        error_thread.join(timeout=25)
+            t.join(timeout=timeout)
+        monitor.join(timeout=timeout)
+        error_thread.join(timeout=timeout)
 
     except KeyboardInterrupt:
         params.stop_event.set()
@@ -182,11 +207,11 @@ def clean_main(
     while not params.processed_simulations_result_queue.empty():
         try:
             # Queue now contains FileInfo objects directly (not Simulation objects)
-            file_info = params.processed_simulations_result_queue.get_nowait()
+            file_info = params.processed_simulations_result_queue.get()
             deletion_results.append(file_info)
         except:
             break
     
     # Get final statistics and return both results and measures
     measures: CleanMeasures = params.get_measures()
-    return CleanMainResult(results=deletion_results, measures=measures)
+    return CleanupResult(results=deletion_results, measures=measures)

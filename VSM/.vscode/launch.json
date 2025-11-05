@@ -202,15 +202,16 @@
       "request": "launch",
       "program": "${workspaceFolder}/server/cleanup_cycle/scan/scan.py",
       "args": [
-        "${workspaceFolder}/TEMP_testdata/scan_input",
-        "${workspaceFolder}/TEMP_testdata/scan_output/_Temp",
+        "/workspaces/simulation_management/VSM",
+        "/workspaces/simulation_management/VSM/io_dir_for_storage_test/TEMP_testdata/scan_output/_Temp",
         "--nScanners=1"
       ],
       "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
+      "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server"
       }
     },
     {
@@ -230,10 +231,10 @@
       "name": "main_GenerateSimulation.py",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations/main_GenerateSimulation.py",
+      "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_GenerateSimulation.py",
       "args": [],
       "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations",
+      "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",
@@ -244,10 +245,10 @@
       "name": "main_validate_cleanup.py",
       "type": "debugpy",
       "request": "launch",
-      "program": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations/main_validate_cleanup.py",
+      "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_validate_cleanup.py",
       "args": [],
       "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server/tests/unittests/generate_vts_simulations",
+      "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",

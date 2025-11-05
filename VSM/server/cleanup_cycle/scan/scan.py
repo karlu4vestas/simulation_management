@@ -109,6 +109,7 @@ def do_scan(scan_path:str, output_archive:str, nbScanners:int, scan_subdirs:bool
 # example 3: py -O scan.py "\\?\UNC\\aumelfile11\vaus"  ../../data/scan_metadata --nScanners=512  --owner_threads=32
 #"""
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Scan directories and save results.")
     parser.add_argument("scan_path",          type=str,  help="Path of the folder to scan")
     parser.add_argument("output_archive",     type=str,  help="Path of the scan result ")

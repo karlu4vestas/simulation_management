@@ -7,9 +7,10 @@ import tempfile
 from queue import Queue
 from multiprocessing.pool import ThreadPool
 from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from tests import test_storage
 
 # Global test storage location
-TEST_STORAGE_LOCATION = "/workspaces/simulation_management/VSM/io_dir_for_storage_test"
+TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 
 class TestSimulationFileRegistry:

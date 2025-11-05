@@ -8,9 +8,10 @@ from cleanup_cycle.clean_agent.clean_main import clean_main
 from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
 from cleanup_cycle.clean_agent.clean_parameters import CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
+from tests import test_storage
 
 # Global test storage location
-TEST_STORAGE_LOCATION = "/workspaces/simulation_management/VSM/io_dir_for_storage_test"
+TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 class TestCleanMain:
     """Test the clean_main function with various scenarios"""
@@ -93,8 +94,8 @@ class TestCleanMain:
             assert hasattr(sim_result, 'modified_date')
             assert hasattr(sim_result, 'nodetype')
             assert hasattr(sim_result, 'external_retention')
-            assert sim_result.nodetype == FolderTypeEnum.VTS_SIMULATION
-            assert sim_result.external_retention == ExternalRetentionTypes.UNDEFINED
+            assert sim_result.nodetype == None # because the simulation folder created in the test is empty
+            assert sim_result.external_retention == None # because the simulation folder created in the test is empty
 
     def test_clean_main_empty_simulations(self, progress_reporter, temp_output_dir):
         """Test clean_main with empty simulation list"""

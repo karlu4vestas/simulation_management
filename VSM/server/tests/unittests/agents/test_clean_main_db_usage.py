@@ -9,14 +9,15 @@ import os
 import shutil
 from datetime import date
 from dataclasses import dataclass
-from cleanup_cycle.clean_agent.clean_main import clean_main
+from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
 from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
 from cleanup_cycle.clean_agent.clean_parameters import CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
+from tests import test_storage
 
 
 # Global test storage location
-TEST_STORAGE_LOCATION = "/workspaces/simulation_management/VSM/io_dir_for_storage_test"
+TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 
 class TestCleanMainDatabaseUsage:
@@ -256,7 +257,8 @@ class TestCleanMainDatabaseUsage:
             reporter.close()
 
     def test_fileinfo_attributes_preserved(self, progress_reporter, temp_output_dir):
-        """Test that all FileInfo attributes are preserved through processing"""
+        # if we try to clean an empty folder  with no file then we must expect that the folder is not recognised as a simulation.
+        # As such it attributes will be NONE except for the path to the folder 
         test_date = date(2024, 6, 15)
         test_path = os.path.join(TEST_STORAGE_LOCATION, "test/specific/path")
         simulations = [
@@ -279,9 +281,9 @@ class TestCleanMainDatabaseUsage:
         
         # Verify all attributes are preserved
         assert len(result.results) == 1
-        result_sim = result.results[0]
+        result_sim: CleanupResult = result.results[0]
         
         assert result_sim.filepath == test_path
-        assert result_sim.modified_date == test_date
-        assert result_sim.nodetype == FolderTypeEnum.VTS_SIMULATION
-        assert result_sim.external_retention == ExternalRetentionTypes.UNDEFINED
+        assert result_sim.modified_date == None
+        assert result_sim.nodetype == None
+        assert result_sim.external_retention == None

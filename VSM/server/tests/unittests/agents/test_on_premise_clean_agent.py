@@ -13,11 +13,12 @@ from datetime import datetime, date
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
 from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanRootFolder
-from cleanup_cycle.clean_agent.clean_main import CleanMainResult
+from cleanup_cycle.clean_agent.clean_main import CleanupResult
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
 from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
+from tests import test_storage
 
-TEST_STORAGE_LOCATION = "/workspaces/simulation_management/VSM/io_dir_for_storage_test"
+TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 class TestAgentCleanProgressWriter(unittest.TestCase):
     """Test the nested AgentCleanProgressWriter class"""
@@ -204,7 +205,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
             error_count=0
         )
         
-        mock_clean_main.return_value = CleanMainResult(
+        mock_clean_main.return_value = CleanupResult(
             results=result_fileinfos,
             measures=measures
         )
@@ -286,7 +287,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
             )
         ]
         
-        mock_clean_main.return_value = CleanMainResult(
+        mock_clean_main.return_value = CleanupResult(
             results=result_fileinfos,
             measures=measures
         )
@@ -385,7 +386,7 @@ class TestAgentIntegration(unittest.TestCase):
             error_count=0
         )
         
-        mock_clean_main.return_value = CleanMainResult(
+        mock_clean_main.return_value = CleanupResult(
             results=result_fileinfos,
             measures=measures
         )

@@ -1,23 +1,22 @@
-import io
 from contextlib import asynccontextmanager
-from typing import Literal, Optional
-from fastapi import FastAPI, Query, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
 from sqlmodel import Session, func, select
 from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention 
-from db.database import Database
-from app.app_config import AppConfig
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-
-from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
+from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
 from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials, update_rootfolder_cleanup_configuration
 from db.db_api import read_rootfolder_retentiontypes, read_folders
 from db.db_api import read_pathprotections, add_path_protection, delete_path_protection
 from db.db_api import change_retentions, FileInfo 
+
+from app.app_config import AppConfig
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

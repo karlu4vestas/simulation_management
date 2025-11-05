@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Relationship, Session
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -162,7 +162,7 @@ class RootFolderDTO(RootFolderBase, table=True):
 @dataclass
 class FileInfo:
     filepath: str
-    modified_date: date
+    modified_date: datetime
     nodetype: FolderTypeEnum
     external_retention: ExternalRetentionTypes
     id: int = None   # will be used during updates

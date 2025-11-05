@@ -205,7 +205,7 @@ This will:
 - Process sample simulation paths
 - Demonstrate basic usage
 - Show custom progress reporter example
-- Create logs in `./clean_test_output/`
+- Create logs in `io_dir_for_storage_test`
 
 ## Thread Configuration
 
