@@ -185,7 +185,7 @@
       }
     },
     {
-      "name": "Generate In memory folders",
+      "name": "Debug testdata_for_import",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/integration/testdata_for_import.py",
@@ -228,7 +228,7 @@
       }
     },
     {
-      "name": "main_GenerateSimulation.py",
+      "name": "Debug main_GenerateSimulation.py",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_GenerateSimulation.py",
@@ -242,13 +242,32 @@
       }
     },
     {
-      "name": "main_validate_cleanup.py",
+      "name": "Debug main_validate_cleanup.py",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_validate_cleanup.py",
       "args": [],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server"
+      }
+    },
+    {
+      "name": "Debug Integration Phase 5 Test",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_5_scheduler_and_agents",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",

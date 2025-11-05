@@ -336,7 +336,7 @@ def read_pathprotections( rootfolder_id: int ):
         return paths
 
 def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
-    print(f"Adding path protection {path_protection}")
+    #print(f"Adding path protection {path_protection}")
     with Session(Database.get_engine()) as session:
         # Check if path protection already exists for this path in this rootfolder
         existing_protection = session.exec(
@@ -373,7 +373,7 @@ def delete_path_protection(rootfolder_id: int, protection_id: int):
         return {"message": f"Path protection {protection_id} deleted"}
 
 def change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
-    print(f"start change_retention_category rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
+    #print(f"start change_retention_category rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
     
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
@@ -410,7 +410,7 @@ def change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
         session.bulk_update_mappings(FolderNodeDTO, bulk_updates)
         session.commit()
         
-        print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
+        #print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
         return {"message": f"Updated rootfolder {rootfolder_id} with {len(retentions)} retentions"}
 
 # -------------------------- db operation related to cleanup_cycle action ---------
@@ -480,7 +480,7 @@ def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: 
         insertion_results: dict[str, int]   = insert_simulations_in_db(rootfolder, insert_simulations)
         insert_simulations = None
 
-        print(insertion_results)
+        #print(insertion_results)
         if insertion_results.get("failed_path_count", 0) > 0:
             print(f"Failed to insert some simulations for rootfolder {rootfolder_id}: {insertion_results.get('failed_paths', [])}")
             raise HTTPException(status_code=500, detail=f"Failed to insert some new paths: {insertion_results.get('failed_paths', [])}")
@@ -650,14 +650,12 @@ def generate_path_ids(parent_path_ids: str, node_id: int) -> str:
 
 #todo implement hierarchical inserts
 def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileInfo]):
-    """
-    Insert missing hierarchy for all simulation filepaths.
-    This function only creates the folder structure, attributes will be updated separately.
-    """
+    # Insert missing hierarchy for all simulation filepaths.
+    # This function only creates the folder structure, attributes will be updated separately.
     if not simulations:
         return {"inserted_hierarchy_count": 0, "failed_path_count": 0, "failed_paths": []}
         
-    print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
+    #print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
     nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
     #innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
@@ -685,10 +683,8 @@ def insert_simulations_in_db(rootfolder: RootFolderDTO, simulations: list[FileIn
         count = session.exec(select(func.count()).select_from(FolderNodeDTO).where(
             FolderNodeDTO.rootfolder_id == rootfolder.id
         )).first()
-        str =f"Total records in DB for rootfolder {rootfolder.id}: {count}"
-        print(str)
-
-        print(f"end insert_simulations rootfolder_id {rootfolder.id} - successfully inserted hierarchy for {inserted_count}/{len(simulations)} paths, {len(failed_paths)} failed")
+        #print(f"Total records in DB for rootfolder {rootfolder.id}: {count}")
+        #print(f"end insert_simulations rootfolder_id {rootfolder.id} - successfully inserted hierarchy for {inserted_count}/{len(simulations)} paths, {len(failed_paths)} failed")
         
     return {"inserted_hierarchy_count": inserted_count, "failed_path_count": len(failed_paths), "failed_paths": failed_paths}
 

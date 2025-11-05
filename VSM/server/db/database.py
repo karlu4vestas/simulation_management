@@ -85,9 +85,9 @@ class Database:
             db_file = self.sqlite_url.replace("sqlite:///", "")
             if os.path.exists(db_file):
                 os.remove(db_file)
-                print(f"Database file {db_file} deleted.")
-            else:
-                print(f"Database file {db_file} does not exist.")
+                #print(f"Database file {db_file} deleted.")
+            #else:
+            #    print(f"Database file {db_file} does not exist.")
         else:
             print("Database deletion is only supported for SQLite databases.")
 

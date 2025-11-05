@@ -52,7 +52,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     #commit in order to initialize the root_folder in the db and get a valid id
     #session.commit()
     #session.refresh(root_folder)
-    print(f"Root folder created. id={root_folder.id} path={root_folder.path}")
+    #print(f"Root folder created. id={root_folder.id} path={root_folder.path}")
     
     # Create cleanup config (NEW)
     cleanup_config = CleanupConfigurationDTO(
@@ -211,7 +211,7 @@ def generate_folder_tree(session:Session, root_folder_id:int, root_folder_name:s
     else:
         raise ValueError("Root folder was not created properly")
 
-    print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {id_counter}, maxLevel = {max_level}")
+    #print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {id_counter}, maxLevel = {max_level}")
     return root_id
 
 

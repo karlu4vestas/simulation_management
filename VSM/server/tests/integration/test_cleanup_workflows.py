@@ -1,20 +1,24 @@
 import os
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import timedelta
 import pytest
 
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, FolderRetention, RootFolderDTO, ExternalRetentionTypes
 
+from app.web_api import run_scheduler_tasks
 from db.db_api import change_retentions, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
 from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import insert_rootfolder,insert_cleanup_configuration
 from db.db_api import FileInfo
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, CleanupProgress
-from app.web_api import run_scheduler_tasks
 from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNodeDTOList
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
+from tests import test_storage
+
+TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 # DataIOSet structure is setup in initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy for reuse in other tests
 @dataclass
@@ -88,8 +92,8 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             
             # Insert simulations (the leaves). The return will be all folders in the db
             output: RootFolderWithFolderNodeDTOList = self.insert_simulations(integration_session, input)
-            str_summary = f"key:{key}, input rootfolder ids: {input.rootfolder.id}, output rootfolder ids: {output.rootfolder.id}"
-            print(str_summary)
+            #str_summary = f"key:{key}, input rootfolder ids: {input.rootfolder.id}, output rootfolder ids: {output.rootfolder.id}"
+            #print(str_summary)
 
             data_set:DataIOSet = DataIOSet(key=key,input=input,output=output)
             data_set.nodetype_leaf        = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
@@ -268,7 +272,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
 
     # import simulation using self.import_simulations_and_test_retentions
     # Then start a cleanup round and verify that retentions are updated correctly due to the start of the cleanup round  
-    def import_and_start_cleanup_round_with_test_of_retentions(self, integration_session, cleanup_scenario_data) -> list[DataIOSet]:
+    def import_and_start_cleanup_round_with_test_of_retentions(self, integration_session, cleanup_scenario_data, data_keys:list[str]=["second_rootfolder_part_one"]) -> list[DataIOSet]:
         #initialize the db and then verify attributes of the inserted simulations
         #   step 1 call the "import_simulations_and_test_db_folder_hierarchy" with "second_rootfolder_part_one" to initialize the data
         #       step 1.1: start the cleanup round and
@@ -276,7 +280,7 @@ class TestCleanupWorkflows(BaseIntegrationTest):
 
 
         #   step 1 call the "import_simulations_and_test_retentions" with "second_rootfolder_part_one" to initialize and validate folder hierarchy and retentions
-        second_part_one_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, ["second_rootfolder_part_one"], cleanup_scenario_data)[0]
+        second_part_one_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, data_keys, cleanup_scenario_data)[0]
 
         path_or_endstage_retention_ids = {second_part_one_data_set.path_retention.id, *[retention.id for retention in second_part_one_data_set.retention_calculator.get_endstage_retentions()]}
         
@@ -338,9 +342,9 @@ class TestCleanupWorkflows(BaseIntegrationTest):
                     
         return [second_part_one_data_set]
 
-    def import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(self, integration_session, cleanup_scenario_data) -> list[DataIOSet]:
+    def import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(self, integration_session, cleanup_scenario_data, data_keys:list[str]=["second_rootfolder_part_one"]) -> list[DataIOSet]:
         #this will import the second rootfolders first part and start a cleanup round
-        second_part_one_data_set:DataIOSet = self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, cleanup_scenario_data)[0]
+        second_part_one_data_set:DataIOSet = self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys)[0]
 
         marked_retention_id = second_part_one_data_set.marked_retention.id
 
@@ -394,15 +398,18 @@ class TestCleanupWorkflows(BaseIntegrationTest):
 
     def test_integrationphase_3_retentions_of_insertions_after_start_of_cleanup_round(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
-        self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data)
+        data_keys:list[str] = ["second_rootfolder_part_one"]
+        self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys)
 
     def test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
+
         # the following is all based on the second_rootfolder from cleanup_scenario_data 
-        data_set:list[DataIOSet] = self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data)
-        rootfolder:RootFolderDTO = data_set[-1].output.rootfolder  # second part two data set
-        marked_folders:list[FolderNodeDTO] = read_folders_marked_for_cleanup(rootfolder.id)
-        cleanup_config = rootfolder.get_cleanup_configuration(integration_session)
+        data_keys:list[str]                     = ["second_rootfolder_part_one"]
+        data_set:list[DataIOSet]                = self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys=data_keys)
+        rootfolder:RootFolderDTO                = data_set[-1].output.rootfolder  # second part two data set
+        marked_folders:list[FolderNodeDTO]      = read_folders_marked_for_cleanup(rootfolder.id)
+        cleanup_config:CleanupConfigurationDTO  = rootfolder.get_cleanup_configuration(integration_session)
         assert cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW, \
             f"cleanup_config.cleanup_progress should be RETENTION_REVIEW but is {cleanup_config.cleanup_progress}"
 
@@ -454,8 +461,8 @@ class TestCleanupWorkflows(BaseIntegrationTest):
             os.makedirs(dir_path, exist_ok=True)
             with open(full_path, 'w') as f:
                 f.write(content)
-    
-    def ignore_test_full_cleanup_cycle(self, integration_session, cleanup_scenario_data):
+
+    def test_integrationphase_5_scheduler_and_agents(self, integration_session, cleanup_scenario_data):
         #self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data)
 
         #Create one rootfolders that is configured for cleanup. retrieve keys_to_run_in_order = ["first_rootfolder"] and possibly
@@ -463,7 +470,8 @@ class TestCleanupWorkflows(BaseIntegrationTest):
         #write the folder to the storage so that we can scan for it 
 
         #start by getting the current working directory
-        io_dir_for_storage_test: str = os.path.normpath("/workspaces/simulation_management/VSM/io_dir_for_storage_test")
+
+        io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
         if not os.path.exists(io_dir_for_storage_test):
             os.makedirs(io_dir_for_storage_test)
         

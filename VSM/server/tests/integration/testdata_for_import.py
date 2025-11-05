@@ -1,12 +1,10 @@
-from dataclasses import dataclass
-from datetime import date, timedelta, datetime
-from typing import Optional
 import random
 from enum import Enum
+from typing import Optional
+from dataclasses import dataclass
+from datetime import date, timedelta, datetime
 from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
-
-
 
 # In-memory dataclass for test data setup - not persisted to database
 # Used by test fixtures to configure cleanup settings before database insertion
@@ -32,9 +30,9 @@ class CleanupConfiguration:
 
 class InMemoryFolderNode:
     class TestCaseEnum(str, Enum):
-        BEFORE = "start_end_before_cleanup_start"
+        BEFORE       = "start_end_before_cleanup_start"
         BEFORE_AFTER = "start_before_end_after_cleanup_start"
-        AFTER = "start_end_after_cleanup_start"
+        AFTER        = "start_end_after_cleanup_start"
 
     """In-memory representation of a folder node using pointers for parent-child relationships"""
     def __init__(self, name: str, is_leaf: bool, external_retentiontype: ExternalRetentionTypes):
@@ -125,7 +123,7 @@ def generate_node_name(
 def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InMemoryFolderNode:
     rand: random.Random = random.Random(42)
     random_retentiontype: RandomInternalRetentionType = RandomInternalRetentionType(42)
-    print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
+    #print(f"Start GenerateTreeRecursivelyAsync: maxLevel = {max_level}")
 
     # Generate the root node
     current_parent_name: str = root_folder_name
@@ -174,7 +172,7 @@ def generate_folder_tree_names(root_folder_name: str, max_level: int = 1) -> InM
 
             current_level_nodes = next_level_nodes
         
-    print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}, maxLevel = {max_level}")
+    #print(f"GenerateTreeRecursivelyAsync: Total nodes generated = {nodes_generated}, maxLevel = {max_level}")
     return root
 
 def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
@@ -322,7 +320,7 @@ def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int
             path=path
     )
 
-    print(f"Root folder created. path={rootfolder.path}")
+    #print(f"Root folder created. path={rootfolder.path}")
     folder = generate_folder_tree_names(path, levels)
     return RootFolderWithMemoryFolderTree(rootfolder=rootfolder, folder_tree=folder)
 
