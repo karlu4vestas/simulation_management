@@ -196,7 +196,7 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
 
 #-----------------Scheduler API -------------------
 from cleanup_cycle.cleanup_scheduler import CleanupScheduler
-from cleanup_cycle.internal_agents import InternalAgentFactory
+from cleanup_cycle.agent_runner import InternalAgentFactory
 
 def run_scheduler_tasks():
     """Background task to run internal agents and update calendars/tasks"""

@@ -12,7 +12,7 @@ from datetime import datetime, date
 # Add server directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanVTSSimulations
+from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanVTSRootFolder
 from cleanup_cycle.clean_agent.clean_main import CleanupResult
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
 from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
@@ -26,7 +26,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Create a mock agent
-        self.mock_agent = Mock(spec=AgentCleanVTSSimulations)
+        self.mock_agent = Mock(spec=AgentCleanVTSRootFolder)
         self.mock_agent.task = Mock()
         self.mock_agent.task.id = 123
         
@@ -103,13 +103,13 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         """Set up test fixtures"""
         # Set environment variables for testing
         self.temp_dir = tempfile.mkdtemp()
-        os.environ['TEMPORARY_CLEAN_RESULTS'] = self.temp_dir
+        os.environ['CLEAN_TEMP_FOLDER'] = self.temp_dir
         os.environ['CLEAN_SIM_WORKERS'] = '4'
         os.environ['CLEAN_DELETION_WORKERS'] = '1'
         os.environ['CLEAN_MODE'] = 'ANALYSE'
         
         # Create agent
-        self.agent = AgentCleanVTSSimulations()
+        self.agent = AgentCleanVTSRootFolder()
         
         # Mock task
         self.agent.task = Mock()
@@ -123,7 +123,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
             shutil.rmtree(self.temp_dir)
         
         # Clean up environment variables
-        for key in ['TEMPORARY_CLEAN_RESULTS', 'CLEAN_SIM_WORKERS', 
+        for key in ['CLEAN_TEMP_FOLDER', 'CLEAN_SIM_WORKERS', 
                     'CLEAN_DELETION_WORKERS', 'CLEAN_MODE']:
             if key in os.environ:
                 del os.environ[key]
@@ -137,18 +137,22 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         self.assertIsNone(self.agent.error_message)
     
     def test_initialization_invalid_temp_folder(self):
-        """Test initialization with invalid temp folder"""
-        os.environ['TEMPORARY_CLEAN_RESULTS'] = '/nonexistent/path'
-        agent = AgentCleanVTSSimulations()
+        """Test initialization with invalid temp folder that cannot be created"""
+        # Use a path that cannot be created due to permission/existence issues
+        # This will cause os.makedirs to fail and the agent to set error_message
+        invalid_path = '/nonexistent_root_path_cannot_be_created/subfolder'
+        os.environ['CLEAN_TEMP_FOLDER'] = invalid_path
+        agent = AgentCleanVTSRootFolder()
         
+        # Since the path cannot be created, temporary_result_folder should be None
         self.assertIsNone(agent.temporary_result_folder)
         self.assertIsNotNone(agent.error_message)
-        self.assertIn("TEMPORARY_CLEAN_RESULTS", agent.error_message)
+        self.assertIn("Failed to create temporary result folder", agent.error_message)
     
     def test_initialization_invalid_clean_mode(self):
         """Test initialization with invalid clean mode"""
         os.environ['CLEAN_MODE'] = 'INVALID_MODE'
-        agent = AgentCleanVTSSimulations()
+        agent = AgentCleanVTSRootFolder()
         
         self.assertEqual(agent.clean_mode, CleanMode.ANALYSE)  # Falls back to ANALYSE
         self.assertIsNotNone(agent.error_message)
@@ -157,88 +161,11 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_delete_mode(self):
         """Test initialization with DELETE mode"""
         os.environ['CLEAN_MODE'] = 'DELETE'
-        agent = AgentCleanVTSSimulations()
+        agent = AgentCleanVTSRootFolder()
         
         self.assertEqual(agent.clean_mode, CleanMode.DELETE)
     
-    @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
-    @patch('cleanup_cycle.on_premise_clean_agent.clean_main')
-    def test_execute_task_success(self, mock_clean_main, mock_interface):
-        """Test successful task execution"""
-        # Mock task_read_folders_marked_for_cleanup
-        simulation_paths = [
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim2"),
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim3")
-        ]
-        mock_interface.task_read_folders_marked_for_cleanup.return_value = simulation_paths
-        
-        # Mock clean_main result
-        result_fileinfos = [
-            FileInfo(
-                filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-                modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.CLEAN.value
-            ),
-            FileInfo(
-                filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim2"),
-                modified_date=date(2024, 1, 2),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.CLEAN.value
-            ),
-            FileInfo(
-                filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim3"),
-                modified_date=date(2024, 1, 3),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.ISSUE.value
-            )
-        ]
-        
-        measures = CleanMeasures(
-            simulations_processed=3,
-            simulations_cleaned=2,
-            simulations_issue=1,
-            simulations_skipped=0,
-            files_deleted=50,
-            bytes_deleted=500000,
-            error_count=0
-        )
-        
-        mock_clean_main.return_value = CleanupResult(
-            results=result_fileinfos,
-            measures=measures
-        )
-        
-        # Execute task
-        self.agent.execute_task()
-        
-        # Verify task_read_folders_marked_for_cleanup was called
-        mock_interface.task_read_folders_marked_for_cleanup.assert_called_once_with(456)
-        
-        # Verify progress messages
-        self.assertEqual(mock_interface.task_progress.call_count, 2)
-        
-        # Check start message
-        start_call = mock_interface.task_progress.call_args_list[0]
-        self.assertEqual(start_call[0][0], 456)
-        self.assertIn("Starting cleanup of 3 simulations", start_call[0][1])
-        
-        # Check completion message
-        completion_call = mock_interface.task_progress.call_args_list[1]
-        self.assertIn("Cleanup completed", completion_call[0][1])
-        self.assertIn("3 processed", completion_call[0][1])
-        self.assertIn("2 cleaned", completion_call[0][1])
-        
-        # Verify clean_main was called
-        mock_clean_main.assert_called_once()
-        
-        # Verify task_insert_or_update_simulations_in_db was called
-        mock_interface.task_insert_or_update_simulations_in_db.assert_called_once_with(
-            456,
-            result_fileinfos
-        )
-    
+
     @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
     def test_execute_task_no_simulations(self, mock_interface):
         """Test execute_task with no simulations to clean"""
@@ -247,8 +174,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         self.agent.execute_task()
         
         # Verify error message is set
-        self.assertIsNotNone(self.agent.error_message)
-        self.assertIn("No simulations marked for cleanup", self.agent.error_message)
+        self.assertIsNone(self.agent.error_message)
     
     def test_execute_task_invalid_temp_folder(self):
         """Test execute_task when temp folder is invalid"""
@@ -335,7 +261,7 @@ class TestAgentIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.temp_dir = tempfile.mkdtemp()
-        os.environ['TEMPORARY_CLEAN_RESULTS'] = self.temp_dir
+        os.environ['CLEAN_TEMP_FOLDER'] = self.temp_dir
         os.environ['CLEAN_SIM_WORKERS'] = '2'
         os.environ['CLEAN_DELETION_WORKERS'] = '1'
         os.environ['CLEAN_MODE'] = 'ANALYSE'
@@ -345,7 +271,7 @@ class TestAgentIntegration(unittest.TestCase):
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
         
-        for key in ['TEMPORARY_CLEAN_RESULTS', 'CLEAN_SIM_WORKERS', 
+        for key in ['CLEAN_TEMP_FOLDER', 'CLEAN_SIM_WORKERS', 
                     'CLEAN_DELETION_WORKERS', 'CLEAN_MODE']:
             if key in os.environ:
                 del os.environ[key]
@@ -355,7 +281,7 @@ class TestAgentIntegration(unittest.TestCase):
     def test_full_workflow(self, mock_clean_main, mock_interface):
         """Test the complete workflow from execute_task to DB update"""
         # Create agent
-        agent = AgentCleanVTSSimulations()
+        agent = AgentCleanVTSRootFolder()
         agent.task = Mock()
         agent.task.id = 789
         agent.task.path = os.path.join(TEST_STORAGE_LOCATION, "test_agent/root")

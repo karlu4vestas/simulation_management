@@ -14,7 +14,7 @@ def as_date_time(timestamp): return datetime.fromtimestamp(timestamp).strftime('
 
 # The purpose of this class is to reuse the CleanProgressReporter to report progress to the task
 class AgentCleanProgressWriter(CleanProgressWriter):
-    def __init__(self, agentCleanRootFolder: "AgentCleanVTSSimulations", seconds_between_update: int, seconds_between_filelog: int):
+    def __init__(self, agentCleanRootFolder: "AgentCleanVTSRootFolder", seconds_between_update: int, seconds_between_filelog: int):
         self.agentCleanRootFolder = agentCleanRootFolder
         self.seconds_between_update = seconds_between_update
         self.seconds_between_filelog = seconds_between_filelog
@@ -53,9 +53,13 @@ class AgentCleanVTSRootFolder(AgentTemplate):
             self.error_message = f"CLEAN_TEMP_FOLDER environment variable is not set or the path does not exist: {self.temporary_result_folder}"
             self.temporary_result_folder = None
         else:
-            os.makedirs(self.temporary_result_folder, exist_ok=True)
-            if not os.path.exists(self.temporary_result_folder):
-                self.error_message = f"Failed to create temporary result folder for scans: {self.temporary_result_folder}"
+            try:
+                os.makedirs(self.temporary_result_folder, exist_ok=True)
+                if not os.path.exists(self.temporary_result_folder):
+                    self.error_message = f"Failed to create temporary result folder for scans: {self.temporary_result_folder}"
+                    self.temporary_result_folder = None
+            except (PermissionError, OSError) as e:
+                self.error_message = f"Failed to create temporary result folder for scans: {self.temporary_result_folder}. Error: {str(e)}"
                 self.temporary_result_folder = None
        
         self.nb_clean_sim_workers: int = int(os.getenv('CLEAN_SIM_WORKERS', 32))

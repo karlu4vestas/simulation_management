@@ -21,13 +21,13 @@ from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
 from cleanup_cycle.cleanup_dtos import ActionType, CleanupConfigurationDTO, CleanupTaskDTO, TaskStatus
 from cleanup_cycle.internal_agents import (
     AgentTemplate,
-    InternalAgentFactory,
     AgentCalendarCreation,
     AgentCleanupCycleStart,
     AgentNotification,
     AgentCleanupCycleFinishing,
     AgentCleanupCyclePrepareNext
 )
+from cleanup_cycle.agent_runner import InternalAgentFactory
 from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods, CleanupScheduler
 
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
@@ -55,7 +55,7 @@ TEST_STORAGE_LOCATION = test_storage.LOCATION
 #         os.makedirs(dir_path, exist_ok=True)
 #         with open(full_path, 'w') as f:
 #             f.write(content)
-class TestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
+class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
     def __init__(self):
         super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
 
@@ -66,7 +66,7 @@ class TestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
         cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id} but the Cleanup cycle is stopped here by setting cleanup_start_date=None"
 
-class TestAgentCalendarCreation(AgentTemplate):
+class ForTestAgentCalendarCreation(AgentTemplate):
     # this ia a fake agent because it does not require a task and will always be run when called
     # In fact the agent calls the scheduler to create calendars and tasks for rootfolder that are ready to start cleanup cycles
     def __init__(self):
@@ -184,14 +184,14 @@ class TestSchedulerAndAgents:
 
         # Create test-specific agents (they will pick up the environment variables set above)
         test_agents = [
-            TestAgentCalendarCreation(),
+            ForTestAgentCalendarCreation(),
             AgentScanVTSRootFolder(),       # Uses SCAN_TEMP_FOLDER, SCAN_THREADS env vars
             AgentCleanupCycleStart(),
             AgentNotification(),
             AgentCleanVTSRootFolder(),      # Uses CLEAN_TEMP_FOLDER, CLEAN_SIM_WORKERS, etc. env vars
             AgentCleanupCycleFinishing(),
             #AgentCleanupCyclePrepareNext(),
-            TestAgentCleanupCyclePrepareNextAndStop()
+            ForTestAgentCleanupCyclePrepareNextAndStop()
         ]
 
         # Use context manager to inject test agents
