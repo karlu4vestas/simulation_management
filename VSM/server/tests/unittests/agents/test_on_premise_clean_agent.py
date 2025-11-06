@@ -12,7 +12,7 @@ from datetime import datetime, date
 # Add server directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanRootFolder
+from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanVTSSimulations
 from cleanup_cycle.clean_agent.clean_main import CleanupResult
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
 from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
@@ -26,7 +26,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Create a mock agent
-        self.mock_agent = Mock(spec=AgentCleanRootFolder)
+        self.mock_agent = Mock(spec=AgentCleanVTSSimulations)
         self.mock_agent.task = Mock()
         self.mock_agent.task.id = 123
         
@@ -109,7 +109,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         os.environ['CLEAN_MODE'] = 'ANALYSE'
         
         # Create agent
-        self.agent = AgentCleanRootFolder()
+        self.agent = AgentCleanVTSSimulations()
         
         # Mock task
         self.agent.task = Mock()
@@ -139,7 +139,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_invalid_temp_folder(self):
         """Test initialization with invalid temp folder"""
         os.environ['TEMPORARY_CLEAN_RESULTS'] = '/nonexistent/path'
-        agent = AgentCleanRootFolder()
+        agent = AgentCleanVTSSimulations()
         
         self.assertIsNone(agent.temporary_result_folder)
         self.assertIsNotNone(agent.error_message)
@@ -148,7 +148,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_invalid_clean_mode(self):
         """Test initialization with invalid clean mode"""
         os.environ['CLEAN_MODE'] = 'INVALID_MODE'
-        agent = AgentCleanRootFolder()
+        agent = AgentCleanVTSSimulations()
         
         self.assertEqual(agent.clean_mode, CleanMode.ANALYSE)  # Falls back to ANALYSE
         self.assertIsNotNone(agent.error_message)
@@ -157,7 +157,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_delete_mode(self):
         """Test initialization with DELETE mode"""
         os.environ['CLEAN_MODE'] = 'DELETE'
-        agent = AgentCleanRootFolder()
+        agent = AgentCleanVTSSimulations()
         
         self.assertEqual(agent.clean_mode, CleanMode.DELETE)
     
@@ -355,7 +355,7 @@ class TestAgentIntegration(unittest.TestCase):
     def test_full_workflow(self, mock_clean_main, mock_interface):
         """Test the complete workflow from execute_task to DB update"""
         # Create agent
-        agent = AgentCleanRootFolder()
+        agent = AgentCleanVTSSimulations()
         agent.task = Mock()
         agent.task.id = 789
         agent.task.path = os.path.join(TEST_STORAGE_LOCATION, "test_agent/root")

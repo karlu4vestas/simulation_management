@@ -5,10 +5,10 @@ from db.database import Database
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
 from cleanup_cycle.cleanup_dtos import CleanupProgress, CleanupConfigurationDTO
 from datamodel.retention_validators import RetentionCalculator
-from db.db_api import read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
+from db.db_api import get_cleanup_configuration_by_rootfolder_id, read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
  
 
-# This function put the cleanup cycle into CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW in order to recalcualte all numeric retentions
+# This function put the cleanup cycle into CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW in order to recalculate all numeric retentions
 # This is also the only progress state where retentions can be marked for cleanup
 # before exit it advances to CleanupProgress.ProgressEnum.RETENTION_REVIEW
 def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
@@ -79,8 +79,27 @@ def cleanup_cycle_finishing(rootfolder_id: int) -> dict[str, str]:
         session.commit()
         return {"message": f"Finished cleanup cycle for rootfolder {rootfolder_id}"}
 
+def register_cleanup_done(rootfolder_id: int) :
+    with Session(Database.get_engine()) as session:
+        rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+
+        cleanup_configuration = rootfolder.get_cleanup_configuration(session)
+        if not cleanup_configuration:
+            raise HTTPException(status_code=404, detail="cleanup_configuration not found")
+
+        #if not cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.CLEANING:
+        #    raise HTTPException(status_code=400, detail="RootFolder is not in CLEANING state")
+        if not cleanup_configuration.transition_to_next():
+            raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_configuration.cleanup_progress} to the next phase")
+
+        session.add(cleanup_configuration)
+        session.commit()
+
+
 #this function will be called by the cleanup agents to update the marked folders after cleanup attempt
-def cleanup_cycle_prepare_next_cycle(rootfolder_id: int) -> dict[str, str]:
+def cleanup_cycle_prepare_next_cycle(rootfolder_id: int, prepare_next_cycle_and_stop: bool=False) -> dict[str, str]:
     #Advance the cleanup startdate to today to ensure that the next round will be calculated from today
     with Session(Database.get_engine()) as session:
         rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
@@ -88,14 +107,22 @@ def cleanup_cycle_prepare_next_cycle(rootfolder_id: int) -> dict[str, str]:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        if not cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.DONE:
-            raise HTTPException(status_code=400, detail="RootFolder is not in DONE state")
+        #if not cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.DONE:
+        if not cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.FINISHING:
+            raise HTTPException(status_code=400, detail="RootFolder is not in FINISHING state")
 
-        cleanup_config.cleanup_start_date = cleanup_config.cleanup_start_date + timedelta(days=cleanup_config.cleanupfrequency_days)
 
         if not cleanup_config.transition_to_next():
             raise HTTPException(status_code=400, detail=f"Failed to transition from {cleanup_config.cleanup_progress} to the next phase")
+
+        # cleanup_config.cleanup_start_date = None will make it impossible to go to next transition so it has to be done after transition_to_next.
+        # We need prepare_next_cycle_and_stop=True this for the integration test
+        if prepare_next_cycle_and_stop:
+            cleanup_config.cleanup_start_date = None
+        else:    
+            cleanup_config.cleanup_start_date = cleanup_config.cleanup_start_date + timedelta(days=cleanup_config.cleanupfrequency)
+        
         session.add(cleanup_config)
         session.commit()
 
-    return {"message": f"Cleanup cycle cleaning done for rootfolder {rootfolder_id} new cleanup_start_date {cleanup_config.cleanup_start_date}"}
+        return {"message": f"Cleanup cycle cleaning done for rootfolder {rootfolder_id} new cleanup_start_date {cleanup_config.cleanup_start_date if cleanup_config.cleanup_start_date else 'None'}"}

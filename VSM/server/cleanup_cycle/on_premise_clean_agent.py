@@ -14,7 +14,7 @@ def as_date_time(timestamp): return datetime.fromtimestamp(timestamp).strftime('
 
 # The purpose of this class is to reuse the CleanProgressReporter to report progress to the task
 class AgentCleanProgressWriter(CleanProgressWriter):
-    def __init__(self, agentCleanRootFolder: "AgentCleanRootFolder", seconds_between_update: int, seconds_between_filelog: int):
+    def __init__(self, agentCleanRootFolder: "AgentCleanVTSSimulations", seconds_between_update: int, seconds_between_filelog: int):
         self.agentCleanRootFolder = agentCleanRootFolder
         self.seconds_between_update = seconds_between_update
         self.seconds_between_filelog = seconds_between_filelog
@@ -38,21 +38,26 @@ class AgentCleanProgressWriter(CleanProgressWriter):
         super().close()
 
 
-class AgentCleanRootFolder(AgentTemplate):
+class AgentCleanVTSRootFolder(AgentTemplate):
     temporary_result_folder: str | None
 
     def __init__(self):
-        super().__init__("AgentCleanRootFolder", [ActionType.CLEAN_ROOTFOLDER.value])
-        
+        super().__init__("AgentCleanVTSRootFolder", [ActionType.CLEAN_ROOTFOLDER.value], supported_storage_ids=["local"])
+
         # Initialize error_message
         self.error_message: str | None = None
         
         # Get temporary result folder for clean logs
-        self.temporary_result_folder: str = os.getenv('TEMPORARY_CLEAN_RESULTS', tempfile.gettempdir())
-        if len(self.temporary_result_folder) == 0 or not os.path.exists(self.temporary_result_folder):
-            self.error_message = f"TEMPORARY_CLEAN_RESULTS environment variable is not set or the path does not exist: {self.temporary_result_folder}"
+        self.temporary_result_folder: str = os.getenv('CLEAN_TEMP_FOLDER', tempfile.gettempdir())
+        if len(self.temporary_result_folder) == 0: # or not os.path.exists(self.temporary_result_folder):
+            self.error_message = f"CLEAN_TEMP_FOLDER environment variable is not set or the path does not exist: {self.temporary_result_folder}"
             self.temporary_result_folder = None
-        
+        else:
+            os.makedirs(self.temporary_result_folder, exist_ok=True)
+            if not os.path.exists(self.temporary_result_folder):
+                self.error_message = f"Failed to create temporary result folder for scans: {self.temporary_result_folder}"
+                self.temporary_result_folder = None
+       
         self.nb_clean_sim_workers: int = int(os.getenv('CLEAN_SIM_WORKERS', 32))
         self.nb_clean_deletion_workers: int = int(os.getenv('CLEAN_DELETION_WORKERS', 2))
         self.clean_mode_str: str = os.getenv('CLEAN_MODE', 'ANALYSE')  # ANALYSE or DELETE
@@ -74,26 +79,23 @@ class AgentCleanRootFolder(AgentTemplate):
         simulations: list[FileInfo] = AgentInterfaceMethods.task_read_folders_marked_for_cleanup(self.task.id)
         AgentInterfaceMethods.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
         
-        if len(simulations) == 0:
-            self.error_message = "No simulations marked for cleanup"
-            return
+        clean_result: CleanupResult = None
+        if len(simulations) > 0:
+            clean_result: CleanupResult = self.clean_simulations(simulations)
+            # Report summary
+            measures = clean_result.measures
+            AgentInterfaceMethods.task_progress( self.task.id,
+                f"Cleanup completed: {measures.simulations_processed} processed, "
+                f"{measures.simulations_cleaned} cleaned, {measures.simulations_issue} issues, "
+                f"{measures.simulations_skipped} skipped"
+            )
+            # Update simulations in database with cleanup results
+            if len(clean_result.results) > 0:
+                result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
+
+                AgentInterfaceMethods.task_progress( self.task.id, f"Insertion completed: {len(clean_result.results)} simulations inserted" )
         
-        clean_result: CleanupResult = self.clean_simulations(simulations)
-        if clean_result is None:
-            return
-        
-        # Report summary
-        measures = clean_result.measures
-        AgentInterfaceMethods.task_progress(
-            self.task.id,
-            f"Cleanup completed: {measures.simulations_processed} processed, "
-            f"{measures.simulations_cleaned} cleaned, {measures.simulations_issue} issues, "
-            f"{measures.simulations_skipped} skipped"
-        )
-        
-        # Update simulations in database with cleanup results
-        if len(clean_result.results) > 0:
-            result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
+        return
 
     def clean_simulations(self, simulations: list[FileInfo]) -> CleanupResult | None:
         

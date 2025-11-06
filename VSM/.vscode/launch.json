@@ -256,19 +256,19 @@
       }
     },
     {
-      "name": "Debug Integration Phase 5 Test",
+      "name": "Debug test_scheduler_and_agents_with_full_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_5_scheduler_and_agents",
+        "tests/integration/test_scheduler_and_agents.py::TestSchedulerAndAgents::test_scheduler_and_agents_with_full_cleanup_round",
         "-v",
         "-s",
         "--tb=short"
       ],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
-      "justMyCode": false,
+      "justMyCode": true,
       "env": {
         "PYTHONUNBUFFERED": "1",
         "PYTHONPATH": "${workspaceFolder}/server"

@@ -22,11 +22,14 @@ class GeneratedSimulationsResult(NamedTuple):
     validation_csv_file: str  # Path to CSV file with expected cleanup validation
     validations: dict[str, CleanStatus]  # Dict mapping file paths to expected cleanup status
 
+class SimulationTestSpecification(NamedTuple): 
+    fullpath: str
+    sim_type: SimulationType
 
-def generate_simulations(base_path:str, simulation_folders: dict[str, SimulationType], loadcases_ranges_filepath:str) -> GeneratedSimulationsResult:
+def generate_simulations(base_path:str, simulation_folders: SimulationTestSpecification, loadcases_ranges_filepath:str) -> GeneratedSimulationsResult:
 
     simulations = []
-    for p, sim_type in simulation_folders.items():
+    for p, sim_type in simulation_folders:
         simulations.append( GenerateSimulation( 
             base_path=p, 
             loadcase_ranges_filepath=loadcases_ranges_filepath, 
@@ -42,6 +45,8 @@ def generate_simulations(base_path:str, simulation_folders: dict[str, Simulation
 
 
     #save alle the folders to a file that we can use for the clean up
+    if not os.path.exists(base_path):
+        os.makedirs(base_path, exist_ok=True)
     file_with_simulation_folders = os.path.join(base_path, "simulations.csv")
     with open(file_with_simulation_folders, "w", encoding = "utf-8") as file:
         writer = csv.writer(file,delimiter=";", lineterminator="\n", quoting=csv.QUOTE_ALL)
@@ -63,7 +68,7 @@ def generate_simulations(base_path:str, simulation_folders: dict[str, Simulation
             writer.writerow(row)
 
     return GeneratedSimulationsResult(
-        simulation_paths=list(simulation_folders.keys()),
+        simulation_paths=[ path for path,sim_type in simulation_folders],
         simulations_csv_file=file_with_simulation_folders,
         validation_csv_file=file_clean_up_validation,
         validations=validations
@@ -84,9 +89,10 @@ def initialize_generate_simulations (n_simulations:int, base_path:str, loadcases
     # create a number of simulations
     start_time = time.perf_counter()
     #create two simulations with different structure
-    simulation_folders: dict[str, SimulationType] = {  os.path.join(base_path, "loadrelease",  "LOADS"):SimulationType.VTS,
-                                os.path.join(base_path, "sim_without_htc", "LOADS"):SimulationType.VTS  
-                             }
+    simulation_folders: SimulationTestSpecification = [
+        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS),
+        (os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
+    ]
 
     result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders, loadcases_ranges_filepath )
     print(f"{time.perf_counter() - start_time:.2f} seconds to create {n_simulations} simulations with files:{len(result.validations)}")
@@ -116,12 +122,10 @@ def main():
     # create a number of simulations
     start_time = time.perf_counter()
 
-    #initialize_generate_simulations (n_simulations=timeseries_count,base_path=base_path, loadcases_ranges_filepath=path_to_loadcases_ranges_json)
-
-    simulation_folders: dict[str, SimulationType] = {  
-                                os.path.join(base_path, "loadrelease",  "LOADS"):SimulationType.VTS,
-                                #os.path.join(base_path, "sim_without_htc", "LOADS"):SimulationType.VTS  
-                             }
+    simulation_folders: SimulationTestSpecification = [  
+        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS),
+        #(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
+    ]
 
     result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders, path_to_loadcases_configuration_file )
 

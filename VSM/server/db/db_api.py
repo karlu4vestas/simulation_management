@@ -154,7 +154,7 @@ def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> CleanupConf
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
 
-        cleanup_configuration = rootfolder.get_cleanup_configuration()
+        cleanup_configuration = rootfolder.get_cleanup_configuration(session)
         if not cleanup_configuration:
             raise HTTPException(status_code=404, detail="cleanup_configuration not found")
 

@@ -186,6 +186,8 @@ def collect_all_nodes(root: InMemoryFolderNode) -> list[InMemoryFolderNode]:
 
 class RootFolderWithMemoryFolders:
     """Named tuple for a root folder and its flattened list of folder nodes"""
+    rootfolder: RootFolderDTO
+    folders: list[InMemoryFolderNode]
     def __init__(self, rootfolder: RootFolderDTO, folders: list[InMemoryFolderNode]):
         self.rootfolder = rootfolder
         self.folders = folders

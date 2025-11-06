@@ -88,10 +88,11 @@ class CycleTimeDTO(CycleTimeBase, table=True):
 #      - finished: the cleanup round is finished and we wait for the next round
 
 
+#storage_id:  @TODO the default = "local" must eb fixed when moving to other remote platofrms
 class RootFolderBase(SQLModel):
     simulationdomain_id: int              = Field(foreign_key="simulationdomaindto.id") 
     folder_id: int | None                 = Field(default=None, foreign_key="foldernodedto.id") 
-    storage_id: str                       = Field(default="")     # storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system 
+    storage_id: str                       = Field(default="local")     # storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system.
     owner: str                            = Field(default="")
     approvers: str                        = Field(default="")     # comma separated approvers
     path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername

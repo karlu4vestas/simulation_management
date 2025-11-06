@@ -34,13 +34,17 @@ class AgentScanVTSRootFolder(AgentTemplate):
     htc_word:str = "htc" #if this word is found in any of the immediate folder names the ignore the sumulaiton because we are not ready for htc-simulation yes
 
     def __init__(self):
-        super().__init__("AgentScanRootfolder", [ActionType.SCAN_ROOTFOLDER.value])
+        super().__init__("AgentScanRootfolder",  action_types=[ActionType.SCAN_ROOTFOLDER.value], supported_storage_ids=["local"])
 
         #get a temporary result folder as default location for scan results
-        self.temporary_result_folder: str = os.getenv('TEMPORARY_SCAN_RESULTS', tempfile.gettempdir())  # where should the file and folder meta data be placed
-        if len(self.temporary_result_folder) == 0 or not os.path.exists(self.temporary_result_folder):
-            self.error_message = f"TEMPORARY_SCAN_RESULTS environment variable is not set or the path does not exist: {self.temporary_result_folder}"
-            self.temporary_result_folder = None
+        self.temporary_result_folder: str = os.getenv('SCAN_TEMP_FOLDER', "")# tempfile.gettempdir())  # where should the file and folder meta data be placed
+        if len(self.temporary_result_folder) == 0:  # or not os.path.exists(self.temporary_result_folder):
+            self.error_message = f"SCAN_TEMP_FOLDER environment variable is not set or the path does not exist: {self.temporary_result_folder}"
+        else:
+            os.makedirs(self.temporary_result_folder, exist_ok=True)
+            if not os.path.exists(self.temporary_result_folder):
+                self.error_message = f"Failed to create temporary result folder for scans: {self.temporary_result_folder}"
+                self.temporary_result_folder = None
         
         self.nb_scan_thread: int = int(os.getenv('SCAN_THREADS', 256))  # number of scanning threads
 
@@ -49,7 +53,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
             return
 
         root_folder_name: str  = os.path.basename(self.task.path)
-        date_time_str: str     = date.today().strftime("%Y%m%d:%H%M%S")
+        date_time_str: str     = date.today().strftime("%Y%m%d-%H%M%S")
         metadata_file: str     = os.path.join(self.temporary_result_folder, date_time_str+"_"+root_folder_name+"_metadata.csv")
 
         scan_result:ScanResult = self.scan_metadata(self.task.path, metadata_file, self.nb_scan_thread)

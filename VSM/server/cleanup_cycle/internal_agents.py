@@ -1,5 +1,7 @@
 import asyncio
-from datetime import date, timedelta 
+from contextlib import contextmanager
+from datetime import date, timedelta
+from typing import Callable
 from cleanup_cycle.cleanup_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, cleanup_cycle_finishing, cleanup_cycle_prepare_next_cycle
 from cleanup_cycle.cleanup_scheduler import CleanupScheduler, AgentInterfaceMethods
@@ -15,6 +17,9 @@ class AgentTemplate(ABC):
 
     def __init__(self, agent_id: str, action_types: list[str], supported_storage_ids: list[str]|None = None):
         self.agent_info = AgentInfo(agent_id=agent_id, action_types=action_types, supported_storage_ids=supported_storage_ids)
+        self.task = None
+        self.error_message = None
+        self.success_message = None
 
     def __repr__(self):
         return f"AgentTemplate(agent_info={self.agent_info})"
@@ -22,7 +27,8 @@ class AgentTemplate(ABC):
     def run(self):
         self.reserve_task()
         if self.task is not None:
-            asyncio.run(self.execute_task())
+            self.execute_task()
+            #asyncio.run(self.execute_task())
         self.complete_task()
 
     def reserve_task(self):
@@ -36,16 +42,24 @@ class AgentTemplate(ABC):
                 AgentInterfaceMethods.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
 
     @abstractmethod
-    async def execute_task(self):
+    def execute_task(self):
         # Subclasses must implement this method to execute their specific task logic.
         pass
 
 
 # ----------------- internal agents implementations -----------------
 class AgentCalendarCreation(AgentTemplate):
-
+    # this ia a fake agent because it does not require a task and will always be run when called
+    # In fact the agent calls the scheduler to create calendars and tasks for rootfolder that are ready to start cleanup cycles
     def __init__(self):
         super().__init__("AgentCalendarCreation", [ActionType.CREATE_CLEANUP_CALENDAR.value])
+
+    def run(self):
+        #self.reserve_task()
+        #if self.task is not None:
+        #asyncio.run(self.execute_task())
+        asyncio.run( self.execute_task())
+        #self.complete_task()
 
     def execute_task(self):
         msg: str = CleanupScheduler.create_calendars_for_cleanup_configuration_ready_to_start()
@@ -78,6 +92,7 @@ class AgentCleanupCyclePrepareNext(AgentTemplate):
         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id}"
 
 
+
 class AgentNotification(AgentTemplate):
     def __init__(self):
         super().__init__("AgentNotification", [ActionType.SEND_INITIAL_NOTIFICATION.value, ActionType.SEND_FINAL_NOTIFICATION.value])
@@ -97,7 +112,8 @@ class AgentNotification(AgentTemplate):
         # Consider moving email configuration to environment variables or a config file
         # Add the email configuration to your application settings for better maintainability
         # The method will set self.error_message if sending fails, which will cause the task to be marked as FAILED when complete_task() is called.            
-        self.error_message = f"sending email + to {receivers} receivers.\nEmail content: {message} "    
+        
+        #self.error_message = f"sending email + to {receivers} receivers.\nEmail content: {message} "    
         return 
     
 
@@ -145,7 +161,7 @@ class AgentNotification(AgentTemplate):
 
     def execute_task(self):
         from db.database import Database
-        from datamodel.dtos import RootFolderDTO, CleanupConfigurationDTO, CleanupProgress
+        from datamodel.dtos import RootFolderDTO, CleanupConfigurationDTO 
         from sqlmodel import Session, func, select
         with Session(Database.get_engine()) as session:
             rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == self.task.rootfolder_id)).first()
@@ -156,15 +172,16 @@ class AgentNotification(AgentTemplate):
                 enddate_for_cleanup_cycle: date = config.cleanup_start_date + timedelta(days=config.cleanupfrequency-1)
                 initial_message: str = f"The review has started. Use it to review and adjust the retention of your simulation in particular those marked for cleanup \n" + \
                                     f"You have configure the cleanup rutine as follow " + \
-                                    f"Duration of the review periode is {config.cleanupfrequency_days} days; ending on {enddate_for_cleanup_cycle}." + \
+                                    f"Duration of the review periode is {config.cleanupfrequency} days; ending on {enddate_for_cleanup_cycle}." + \
                                     f"Simulations will be marked for cleanup {config.cycletime} days from last modification date unless otherwise specified by retention settings."
                 final_message: str   = f"The retention review is about to end in {config.cleanupfrequency-self.task.task_offset-1} days."
 
                 message: str = initial_message if self.task.action_type == ActionType.SEND_INITIAL_NOTIFICATION.value else final_message
 
                 receivers: list[str] = [] if rootfolder.owner is None else [rootfolder.owner+f"@vestas.com"]
-                if rootfolder.approvers is not None:
-                    for approver in rootfolder.approvers:
+                approvers: list[str] = rootfolder.approvers.split(",") if rootfolder.approvers is not None else []
+                if approvers:
+                    for approver in approvers:
                         receivers.append(approver+f"@vestas.com")
                 if len(receivers) == 0:
                     self.error_message = f"No receivers found for RootFolder with ID {self.task.rootfolder_id}."                
@@ -173,21 +190,108 @@ class AgentNotification(AgentTemplate):
 
 
 from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
+from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
+
 class InternalAgentFactory:
+    # Factory for managing internal agents with support for dependency injection.   
+    
+    # By default, agents auto-register themselves. For testing, you can provide
+    # a custom list of agents using the context manager or register methods.
+
+    # Example usage in tests:
+    #     with InternalAgentFactory.with_agents(test_agents):
+    #         run_scheduler_tasks()
+    
+    # Class-level registry that can be overridden for testing
+    _agent_registry: list[AgentTemplate] | None = None
+    _default_agents_factory: Callable[[], list[AgentTemplate]] | None = None
+    
     @staticmethod
-    def get_internal_agents() -> list[AgentTemplate]:
+    def _create_default_agents() -> list[AgentTemplate]:
+        # Create the default set of production agents.
         return [
             AgentCalendarCreation(),
             AgentScanVTSRootFolder(),
             AgentCleanupCycleStart(),
             AgentNotification(),
+            AgentCleanVTSRootFolder(),
             AgentCleanupCycleFinishing(),
             AgentCleanupCyclePrepareNext(),
-    ]
-
+        ]
+    
     @staticmethod
-    def run_internal_agents() -> dict[str, any]:
-        agents: list[AgentTemplate] = InternalAgentFactory.get_internal_agents()
-        for agent in agents:
+    def get_internal_agents() -> list[AgentTemplate]:
+        # Returns the registered agents if set, otherwise creates default agents.
+        # This allows for dependency injection in tests while maintaining default behavior in production.
+        if InternalAgentFactory._agent_registry is not None:
+            return InternalAgentFactory._agent_registry
+        
+        if InternalAgentFactory._default_agents_factory is not None:
+            return InternalAgentFactory._default_agents_factory()
+        
+        return InternalAgentFactory._create_default_agents()
+    
+    @staticmethod
+    def register_agents(agents: list[AgentTemplate]) -> None:
+        # Register a custom list of agents (for testing) to use instead of defaults
+        InternalAgentFactory._agent_registry = agents
+    
+    @staticmethod
+    def register_agents_factory(factory: Callable[[], list[AgentTemplate]]) -> None:
+        # Register a factory function for advanced testing. It must return a list of AgentTemplate instances.
+        
+        InternalAgentFactory._default_agents_factory = factory
+    
+    @staticmethod
+    def reset_to_defaults() -> None:
+        # Reset to default agent configuration (useful for reverting to production setup after a test).
+        InternalAgentFactory._agent_registry = None
+        InternalAgentFactory._default_agents_factory = None
+    
+    @staticmethod
+    @contextmanager
+    def with_agents(agents: list[AgentTemplate]):
+        # Context manager for temporarily using custom agents.
+        # This is the recommended approach for testing as it ensures proper cleanup.
+        
+        # Args:
+        #     agents: List of agent instances to use temporarily
+            
+        # Usage:
+        #     test_agents = [AgentCalendarCreation(), AgentScanVTSRootFolder()]
+        #     with InternalAgentFactory.with_agents(test_agents):
+        #         run_scheduler_tasks()
+        #         # ... test assertions ...
+
+        old_registry = InternalAgentFactory._agent_registry
+        old_factory = InternalAgentFactory._default_agents_factory
+        
+        try:
+            InternalAgentFactory.register_agents(agents)
+            yield
+        finally:
+            InternalAgentFactory._agent_registry = old_registry
+            InternalAgentFactory._default_agents_factory = old_factory
+    
+    @staticmethod
+    def run_internal_agents(
+        agents: list[AgentTemplate] | None = None,
+        run_randomized: bool = False
+    ) -> dict[str, any]:
+        # Run internal agents.        
+        # Args:
+        #     agents: Optional list of agents to run. If None, uses registered/default agents.
+        #     run_randomized: If True, shuffle agent execution order            
+        # Returns:
+        #     Dictionary with execution results
+
+        agent_list = agents if agents is not None else InternalAgentFactory.get_internal_agents()
+        
+        if run_randomized:
+            import random
+            random.shuffle(agent_list)
+        
+        for agent in agent_list:
             agent.run()
-        return {"message": "Internal agents called successfully"}
+        
+        return {"message": f"Internal agents called successfully ({len(agent_list)} agents)"}
