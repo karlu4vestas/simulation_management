@@ -40,7 +40,7 @@ class FolderTree:
     def get_ascii_tree(self, attr_list:list)-> str:
         return self.root.show(attr_list=attr_list)
 
-    def mark_vts_simulations(self, vts_label:str, vts_names:set[str], vts_hierarchical_label:str, has_vts_children_label:str):
+    def mark_vts_simulations(self, vts_label:str, vts_names:set[str], htc_word:str, vts_hierarchical_label:str, has_vts_children_label:str):
         # Marks folder with:
         # vts_label: does it contain a VTS-simulation. 
         # has_vts_children_label: does it have children that are VTS-simulations.
@@ -50,9 +50,13 @@ class FolderTree:
 
         # To produce "vts_hierarchical_label" and "has_vts_children_label" the iteration must go from the leafs to the root
         for node in bigtree.postorder_iter(self.root):
-            has_children:bool      = node.get_attr(has_vts_children_label,False)           
-            is_vts_simulation:bool = len([c.name for c in node.children if c.name.lower() in vts_names]) == len(vts_names)
-            is_hierarchical:bool   = is_vts_simulation and has_children
+            has_children:bool        = node.get_attr(has_vts_children_label,False)
+            
+            # we have a simulation if all vts_names are present and no folder name contains the htc_word
+            children_names:set[str]  = set([c.name.lower() for c in node.children])
+            is_vts_simulation:bool   = len(children_names & vts_names) == len(vts_names) and 0==len([htc_word in name for name in children_names])
+
+            is_hierarchical:bool     = is_vts_simulation and has_children
             
             if is_vts_simulation:
                 node.set_attrs({vts_label: node.path_name[len(self.internal_root):]})

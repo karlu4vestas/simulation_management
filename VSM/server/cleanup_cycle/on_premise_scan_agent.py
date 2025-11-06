@@ -31,6 +31,7 @@ class AgentScanProgressWriter(ProgressWriter):
 class AgentScanVTSRootFolder(AgentTemplate):
     temporary_result_folder: str | None
     vts_name_set:set[str]  = set( [name.casefold() for name in ["INPUTS","DETWIND","EIG","INT","LOG", "OUT","PARTS","PROG","STA"] ] )    
+    htc_word:str = "htc" #if this word is found in any of the immediate folder names the ignore the sumulaiton because we are not ready for htc-simulation yes
 
     def __init__(self):
         super().__init__("AgentScanRootfolder", [ActionType.SCAN_ROOTFOLDER.value])
@@ -98,7 +99,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
         prefix: str = ""
         tree:FolderTree = FolderTree(folder_modified_date_dict.keys(), prefix=prefix, path_separator="\\")
         
-        tree.mark_vts_simulations(vts_label, AgentScanVTSRootFolder.vts_name_set, vts_hierarchical_label, has_vts_children_label)
+        tree.mark_vts_simulations(vts_label, AgentScanVTSRootFolder.vts_name_set, AgentScanVTSRootFolder.htc_word, vts_hierarchical_label, has_vts_children_label)
         simulations_with_sub_simulations:tuple[FolderTreeNode,...]    = tree.findall(lambda node: node.get_attr(vts_hierarchical_label,False))
 
         simulations_without_sub_simulations:tuple[FolderTreeNode,...] = tree.findall(lambda node: len(node.get_attr(vts_label,"")) > 0 and not node.get_attr(vts_hierarchical_label,False))
