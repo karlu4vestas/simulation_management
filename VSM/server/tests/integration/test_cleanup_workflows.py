@@ -1,12 +1,15 @@
 import os
 from dataclasses import dataclass
+from typing import NamedTuple
 from datetime import timedelta
+from sqlmodel import Session
 import pytest
 
 from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, FolderRetention, RootFolderDTO, ExternalRetentionTypes
 
 from app.web_api import run_scheduler_tasks
+from db.db_api import FileInfo, insert_or_update_simulations_in_db, read_folders, normalize_path, read_rootfolders_by_domain_and_initials
 from db.db_api import change_retentions, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
 from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import insert_rootfolder,insert_cleanup_configuration
@@ -14,9 +17,14 @@ from db.db_api import FileInfo
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, CleanupProgress
 from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNodeDTOList
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 from tests import test_storage
+
+class RootFolderWithFolderNodeDTOList(NamedTuple):
+    """Named tuple for a root folder and its flattened list of folder nodes"""
+    rootfolder: RootFolderDTO
+    folders: list[FolderNodeDTO]
 
 # DataIOSet structure is setup in initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy for reuse in other tests
 @dataclass
@@ -36,12 +44,37 @@ class DataIOSet:
     nodetype_inner: int = None # the folder type id for inner nodes
 
 
+
+
 TEST_STORAGE_LOCATION = test_storage.LOCATION
 
 @pytest.mark.integration
 @pytest.mark.cleanup_workflow
 @pytest.mark.slow
-class TestCleanupWorkflows(BaseIntegrationTest):
+class TestCleanupWorkflows:
+    def setup_new_db_with_vts_metadata(self, session: Session) -> None:
+        insert_vts_metadata_in_db(session)
+
+    def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders) -> RootFolderWithFolderNodeDTOList:
+        #Step 2.2: Insert simulations into database and return all the rootfolder database folders for validation
+        
+        rootfolder:RootFolderDTO=rootfolder_with_folders.rootfolder
+        assert rootfolder.id is not None and rootfolder.id > 0
+
+        # extract and convert the leaves to FileInfo (the leaves  are the simulations) 
+        file_info_list:list[FileInfo] = [ FileInfo( filepath=folder.path, modified_date=folder.modified_date, nodetype=FolderTypeEnum.VTS_SIMULATION, external_retention=folder.retention) 
+                                            for folder in rootfolder_with_folders.folders if folder.is_leaf ]
+       
+        insert_or_update_simulations_in_db(rootfolder.id, file_info_list)
+
+        # get all rootfolders and folders in the db for validation
+        rootfolders: List[RootFolderDTO] = read_rootfolders_by_domain_and_initials(rootfolder.simulationdomain_id)
+        rootfolders = [r for r in rootfolders if r.id == rootfolder.id] 
+        assert len(rootfolders) == 1
+        rootfolder: RootFolderDTO = rootfolders[0]
+
+        folders: List[FolderNodeDTO] = read_folders(rootfolder.id)
+        return RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=folders)
 
     # initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy is in it self a comprehensive test focused on testing
     # whether the simulations are properly imported and the folder structure in the db is built correctly. It does however not test the simulation attributes

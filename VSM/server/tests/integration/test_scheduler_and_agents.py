@@ -33,7 +33,6 @@ from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods, CleanupSchedu
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations
-from .base_integration_test import BaseIntegrationTest, RootFolderWithFolderNodeDTOList
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 from tests import test_storage
 
