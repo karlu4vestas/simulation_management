@@ -58,8 +58,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=row[0],
                 modified_date=row[1],
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
             for row in db_results
         ]
@@ -96,8 +96,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=row["path"],
                 modified_date=row["modified_date"],
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
             for row in db_results_dict
         ]
@@ -137,8 +137,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=sim.path,
                 modified_date=sim.modified_date,
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
             for sim in db_simulations
         ]
@@ -161,14 +161,14 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, "test/sim1"),
                 modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             ),
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, "test/sim2"),
                 modified_date=date(2024, 2, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             ),
         ]
         
@@ -206,8 +206,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, f"test/project{i//5}/sim_{i:03d}"),
                 modified_date=date(2024, (i % 12) + 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
             for i in range(20)
         ]
@@ -232,8 +232,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, "test/sim"),
                 modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
         ]
         
@@ -265,8 +265,8 @@ class TestCleanMainDatabaseUsage:
             FileInfo(
                 filepath=test_path,
                 modified_date=test_date,
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
-                external_retention=ExternalRetentionTypes.UNDEFINED
+                nodetype=FolderTypeEnum.SIMULATION,
+                external_retention=ExternalRetentionTypes.NUMERIC
             )
         ]
         

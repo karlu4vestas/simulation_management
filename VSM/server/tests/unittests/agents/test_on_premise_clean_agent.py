@@ -208,7 +208,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
                 modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
+                nodetype=FolderTypeEnum.SIMULATION,
                 external_retention=ExternalRetentionTypes.CLEAN.value
             )
         ]
@@ -297,7 +297,7 @@ class TestAgentIntegration(unittest.TestCase):
             FileInfo(
                 filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
                 modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
+                nodetype=FolderTypeEnum.SIMULATION,
                 external_retention=ExternalRetentionTypes.CLEAN.value
             )
         ]

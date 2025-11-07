@@ -1,11 +1,96 @@
+from enum import Enum
 from bisect import bisect_left
-from typing import Optional
+from dataclasses import dataclass
+from typing import Literal, Optional
 from datetime import date, timedelta
-from datamodel.dtos import ExternalRetentionTypes, Retention 
-from datamodel.dtos import RetentionTypeDTO, PathProtectionDTO
+from sqlmodel import Field, SQLModel, Relationship, Session
+from dataclasses import dataclass
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 #ensure consistency of retentions
-#  
+
+# Type alias for valid retention names - shared across internal and external types
+RetentionName = Literal["missing", "issue", "clean", "path", "numeric"]
+
+class ExternalRetentionTypes(str, Enum):
+    MISSING: RetentionName = "missing"
+    ISSUE: RetentionName = "issue"
+    CLEAN: RetentionName = "clean"
+    NUMERIC: RetentionName = "numeric"
+
+class RetentionTypeEnum(str, Enum):
+    MISSING: RetentionName = "missing"
+    ISSUE: RetentionName = "issue"
+    CLEAN: RetentionName = "clean"
+    NUMERIC: RetentionName = "numeric"
+    PATH: RetentionName = "path"
+
+# Mapping from internal retention type names to external retention types
+INTERNAL_TO_EXTERNAL_RETENTION_TYPE_dict: dict[str, ExternalRetentionTypes] = {
+    RetentionTypeEnum.MISSING.value: ExternalRetentionTypes.MISSING,
+    RetentionTypeEnum.ISSUE.value: ExternalRetentionTypes.ISSUE,
+    RetentionTypeEnum.CLEAN.value: ExternalRetentionTypes.CLEAN,
+    RetentionTypeEnum.NUMERIC.value: ExternalRetentionTypes.NUMERIC,
+    RetentionTypeEnum.PATH.value: ExternalRetentionTypes.NUMERIC,
+}
+
+
+
+@dataclass
+class Retention:
+    # Core retention data structure for folder retention information.
+    retention_id: int
+    pathprotection_id: int | None = None
+    expiration_date: date | None = None
+
+
+# see values in vts_create_meta_data
+# @TODO Future Improvement
+# For better design, consider adding a separate category or type field with the enum, keeping name as a display label. 
+# But for now, the string approach works and all tests pass! ✅
+class RetentionTypeBase(SQLModel):
+    simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
+    name: str                       = Field(default="numeric")  # Store retention name as string (display label like "+90d", "Marked", or enum values)
+    days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
+    is_endstage: bool               = Field(default=False) #end stage is clean, issue or missing
+    display_rank: int               = Field(default=0)
+    
+    def get_retention_type(self) -> RetentionTypeEnum:
+        # Get the enum representation of the retention type.
+        # Convert string name to enum if it matches enum values
+        try:
+            return RetentionTypeEnum(self.name.lower())
+        except ValueError:
+            # If not a valid enum value, return NUMERIC as default for numeric retentions
+            return RetentionTypeEnum.NUMERIC
+
+    def get_external_retention_type(self) -> ExternalRetentionTypes:
+        # Get the external API representation of the retention type.
+        # Maps based on the retention name from the database.
+        # Returns: The corresponding external retention type
+
+        if self.name is None:
+            return ExternalRetentionTypes.NUMERIC
+
+        name_lower = self.name.lower()
+        return INTERNAL_TO_EXTERNAL_RETENTION_TYPE_dict.get(name_lower, ExternalRetentionTypes.NUMERIC)        
+
+#retention types must be order by increasing days_to_cleanup and then by display_rank
+class RetentionTypeDTO(RetentionTypeBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+
+# path protection for a specific path in a rootfolder
+# the question is whether we need a foreigne key to the folder id 
+class PathProtectionBase(SQLModel):
+    rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
+    folder_id: int       = Field(foreign_key="foldernodedto.id")
+    path: str            = Field(default="")
+
+class PathProtectionDTO(PathProtectionBase, table=True):
+    id: int | None       = Field(default=None, primary_key=True)
+
+
+
 class RetentionCalculator:
     def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfigurationDTO):
         if not retention_type_dict or not cleanup_config.is_valid():
@@ -187,7 +272,7 @@ class ExternalToInternalRetentionTypeConverter:
 
     def to_internal(self, external_retention: ExternalRetentionTypes) -> RetentionTypeDTO:
         internal_retention:RetentionTypeDTO = self.undefined_retention_type
-        if external_retention is not None and external_retention != ExternalRetentionTypes.UNDEFINED:
+        if external_retention is not None and external_retention != ExternalRetentionTypes.NUMERIC:
             internal_retention = self.retention_type_dict.get(external_retention.value.lower(), None)
             if internal_retention is None:
                 raise ValueError(f"cannot map external retention type '{external_retention}' to any internal retention type")

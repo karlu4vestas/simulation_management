@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from sqlmodel import Session
 
-from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator
+from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, FolderRetention, RootFolderDTO, ExternalRetentionTypes
 
 from app.web_api import run_scheduler_tasks

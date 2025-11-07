@@ -11,7 +11,7 @@ class RandomRetention:
         self.rand_int_generator = random.Random(seed)
 
         with Session(Database.get_engine()) as session:
-            self.retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.name != "Path")).all()
+            self.retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.name != "path")).all()
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]
@@ -25,7 +25,7 @@ class RandomNodeType:
                 raise ValueError("No folder types found")
 
         # Fix: use next() with a generator expression to find the "vts_simulation" folder type
-        self.simulation_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.VTS_SIMULATION), None)
+        self.simulation_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.SIMULATION), None)
         self.inner_node_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.INNERNODE), None)
         if self.simulation_type is None or self.inner_node_type is None:
             raise ValueError("Required folder types are not found")
@@ -106,7 +106,7 @@ def generate_node( session: Session,
     child: Optional[FolderNodeDTO] = None
     if node_type is None: 
         return None
-    elif node_type.name==FolderTypeEnum.VTS_SIMULATION:
+    elif node_type.name==FolderTypeEnum.SIMULATION:
         child = FolderNodeDTO(
             rootfolder_id=root_folder_id,
             parent_id=parent_id,

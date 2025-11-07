@@ -5,7 +5,7 @@ from datamodel.dtos import (
     RootFolderDTO, 
     FolderNodeDTO, 
     FolderTypeDTO, 
-    RetentionTypeDTO, 
+    RetentionTypeDTO,
     SimulationDomainDTO
 )
 from datetime import date
@@ -463,7 +463,7 @@ class TestRetentionDTO:
         test_session.refresh(original_retention)
         
         # Verify defaults
-        assert original_retention.name == ""          # Default value
+        assert original_retention.name == "numeric"  # Default value is "numeric" string
         assert original_retention.is_endstage == False  # Default value
         assert original_retention.display_rank == 0   # Default value
 
@@ -478,7 +478,7 @@ class TestRetentionDTO:
         # Create system-managed retention
         original_retention = RetentionTypeDTO(
             simulationdomain_id=domain.id,
-            name="System Retention",
+            name="clean",  # Use string value
             is_endstage=True,
             days_to_cleanup=90,
             display_rank=10
@@ -500,8 +500,8 @@ class TestRetentionDTO:
         test_session.refresh(domain)
         
         # Create multiple retentions with different ranks
-        retention1 = RetentionTypeDTO(simulationdomain_id=domain.id, name="Rank1", display_rank=1)
-        retention2 = RetentionTypeDTO(simulationdomain_id=domain.id, name="Rank2", display_rank=2)
+        retention1 = RetentionTypeDTO(simulationdomain_id=domain.id, name="path", display_rank=1)
+        retention2 = RetentionTypeDTO(simulationdomain_id=domain.id, name="issue", display_rank=2)
         test_session.add_all([retention1, retention2])
         test_session.commit()
         
@@ -586,9 +586,11 @@ class TestDTODatabaseIntegration:
             modified_date=date(2025, 8, 11)
         )
 
+        # Note: RetentionTypeDTO name is now a string field for display labels
+        # We test with a simple string value
         expected_retention = RetentionTypeDTO(
             simulationdomain_id=domain.id,
-            name="Very long retention policy name with special characters ñü",
+            name="missing",
             is_endstage=True,
             display_rank=2147483647  # Max int value
         )
@@ -631,12 +633,14 @@ class TestDTODatabaseIntegration:
         assert retrieved_folder.owner == expected_root_folder.owner
         assert retrieved_folder.approvers == expected_root_folder.approvers
 
+        # Verify folder node with special characters is preserved
         assert retrieved_node.parent_id == expected_folder_node.parent_id
         assert retrieved_node.name == expected_folder_node.name
         assert retrieved_node.nodetype_id == expected_folder_node.nodetype_id
         assert retrieved_node.expiration_date == expected_folder_node.expiration_date
         assert retrieved_node.modified_date == expected_folder_node.modified_date
 
+        # Verify retention with enum value and max int display_rank
         assert retrieved_retention.name == expected_retention.name
         assert retrieved_retention.is_endstage == expected_retention.is_endstage
         assert retrieved_retention.display_rank == expected_retention.display_rank

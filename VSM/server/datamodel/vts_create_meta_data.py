@@ -44,7 +44,7 @@ def insert_vts_metadata_in_db(session:Session):
     #    print(f" - {retention.name} (ID: {retention.id})")
 
     session.add(FolderTypeDTO(name=FolderTypeEnum.INNERNODE, simulationdomain_id=sim_id ))
-    session.add(FolderTypeDTO(name=FolderTypeEnum.VTS_SIMULATION, simulationdomain_id=sim_id ))
+    session.add(FolderTypeDTO(name=FolderTypeEnum.SIMULATION, simulationdomain_id=sim_id ))
     session.commit()
     #folder_types = session.exec(select(FolderTypeDTO)).all()
     #print("Test data for folder_types inserted successfully:")

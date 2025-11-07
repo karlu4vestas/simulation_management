@@ -210,8 +210,8 @@ class Simulation(BaseSimulation):
                 file_info = FileInfo(
                     filepath=self.root_path,
                     modified_date=filestats.max_date,
-                    nodetype=FolderTypeEnum.VTS_SIMULATION,
-                    external_retention=ExternalRetentionTypes.UNDEFINED
+                    nodetype=FolderTypeEnum.SIMULATION,
+                    external_retention=ExternalRetentionTypes.NUMERIC
                 )
                 return SimulationEvalResult(file_info, [], 0, 0)
 
@@ -235,7 +235,7 @@ class Simulation(BaseSimulation):
             file_info = FileInfo(
                 filepath=self.root_path,
                 modified_date=filestats.max_date,
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
+                nodetype=FolderTypeEnum.SIMULATION,
                 external_retention=external_retention
             )
 
@@ -252,7 +252,7 @@ class Simulation(BaseSimulation):
             file_info = FileInfo(
                 filepath=self.root_path,
                 modified_date=self.old_modified_date,
-                nodetype=FolderTypeEnum.VTS_SIMULATION,
+                nodetype=FolderTypeEnum.SIMULATION,
                 external_retention=ExternalRetentionTypes.ISSUE
             )
             all_cleaners_files = []

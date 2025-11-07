@@ -113,8 +113,8 @@ class AgentScanVTSRootFolder(AgentTemplate):
         #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
         simulations_without_sub_simulations:list[FileInfo] = [ FileInfo( filepath = prefix+n.get_attr(vts_label),
                                                                          modified_date = modified_date,
-                                                                         nodetype = FolderTypeEnum.VTS_SIMULATION,
-                                                                         external_retention = ExternalRetentionTypes.UNDEFINED.value
+                                                                         nodetype = FolderTypeEnum.SIMULATION,
+                                                                         external_retention = ExternalRetentionTypes.NUMERIC.value
                                                                         )
                                                                 for n, modified_date in zip(simulations_without_sub_simulations, simulations_without_sub_simulations_modified_date)]
         

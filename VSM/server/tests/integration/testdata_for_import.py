@@ -68,7 +68,7 @@ class InMemoryFolderNode:
 class RandomInternalRetentionType:
     def __init__(self, seed:int):
         self.rand_int_generator = random.Random(seed)
-        self.retention_types = [ ExternalRetentionTypes.UNDEFINED, ExternalRetentionTypes.ISSUE, ExternalRetentionTypes.CLEAN]
+        self.retention_types = [ ExternalRetentionTypes.NUMERIC, ExternalRetentionTypes.ISSUE, ExternalRetentionTypes.CLEAN]
 
     def next(self):
         return self.retention_types[self.rand_int_generator.randint(0, len(self.retention_types) - 1)]
@@ -79,7 +79,7 @@ class RandomNodeTypeNames:
         self.folder_types = folder_types
 
         # Fix: use next() with a generator expression to find the "vts_simulation" folder type
-        self.simulation_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.VTS_SIMULATION), None)
+        self.simulation_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.SIMULATION), None)
         self.inner_node_type = next((x for x in self.folder_types if x.name == FolderTypeEnum.INNERNODE), None)
         if self.simulation_type is None or self.inner_node_type is None:
             raise ValueError("Required folder types are not found")
@@ -103,7 +103,7 @@ def generate_node_name(
                    random_internal_retention: RandomInternalRetentionType
                  ) -> InMemoryFolderNode:
 
-    external_retentiontype: ExternalRetentionTypes = ExternalRetentionTypes.UNDEFINED # default retention is None for inner nodes and can be None for leaf nodes
+    external_retentiontype: ExternalRetentionTypes = ExternalRetentionTypes.NUMERIC # default retention is None for inner nodes and can be None for leaf nodes
     if is_leaf:
         name = f"VTS_{parent_name}_{sibling_counter + 1}" if parent is not None else f"VTS_{parent_name}"
         external_retentiontype = random_internal_retention.next()

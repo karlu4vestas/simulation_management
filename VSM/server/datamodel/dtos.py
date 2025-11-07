@@ -1,11 +1,12 @@
 from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Relationship, Session
+from dataclasses import dataclass
 from typing import Optional
 from datetime import date, datetime
 from typing import Optional
-from dataclasses import dataclass
 from enum import Enum
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, RetentionTypeEnum, Retention, PathProtectionDTO
 
 # see values in vts_create_meta_data
 class SimulationDomainDTO(SQLModel, table=True):
@@ -15,21 +16,8 @@ class SimulationDomainDTO(SQLModel, table=True):
 class FolderTypeEnum(str, Enum):
     #Enumeration of legal folder type names for simulation domains.
     #'innernode' must exist for all domains and will be applied to all folders that are not simulations.
-    INNERNODE       = "innernode"
-    VTS_SIMULATION  = "vts_simulation"
-
-class RetentionTypeEnum(str, Enum):
-    NUMERIC = None
-    PATH = "Path"
-    ISSUE = "Issue"
-    CLEAN = "Clean"
-    MISSING = "Missing"
-
-class ExternalRetentionTypes(str, Enum):
-    UNDEFINED = None
-    ISSUE = "Issue"
-    CLEAN = "Clean"
-    MISSING = "Missing"
+    INNERNODE   = "innernode"
+    SIMULATION  = "simulation"
 
 
 
@@ -43,17 +31,7 @@ class FolderTypeDTO(FolderTypeBase, table=True):
     id: int | None                  = Field(default=None, primary_key=True)
 
 
-# see values in vts_create_meta_data
-class RetentionTypeBase(SQLModel):
-    simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
-    name: str                       = Field(default="")
-    days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
-    is_endstage: bool               = Field(default=False) #end stage is clean, issue or missing
-    display_rank: int               = Field(default=0)
 
-#retention types must be order by increasing days_to_cleanup and then by display_rank
-class RetentionTypeDTO(RetentionTypeBase, table=True):
-    id: int | None = Field(default=None, primary_key=True)
 
 
 # time from initialization of the simulation til cleanup of the simulation
@@ -169,35 +147,8 @@ class FileInfo:
     id: int = None   # will be used during updates
 
 
-def retention_type_dto_to_external(retention_dto: RetentionTypeDTO | None) -> ExternalRetentionTypes:
-    # Convert RetentionTypeDTO to ExternalRetentionTypes.
-    # Maps based on the retention name from the database.
-    # Args:
-    #     retention_dto: The internal retention type DTO from database       
-
-    if retention_dto is None:
-        return ExternalRetentionTypes.UNDEFINED
-    
-    retention_name = retention_dto.name.lower()
-    
-    # Map specific retention names to external types
-    if retention_name == "issue":
-        return ExternalRetentionTypes.ISSUE
-    elif retention_name == "clean":
-        return ExternalRetentionTypes.CLEAN
-    elif retention_name == "missing":
-        return ExternalRetentionTypes.MISSING
-    else:
-        # All numeric retentions and other types map to UNDEFINED
-        return ExternalRetentionTypes.UNDEFINED
 
 
-@dataclass
-class Retention:
-    """Core retention data structure for folder retention information."""
-    retention_id: int
-    pathprotection_id: int | None = None
-    expiration_date: date | None = None
 
 @dataclass
 class FolderRetention(Retention):
@@ -255,7 +206,7 @@ class FolderNodeBase(SQLModel):
         
         # Get retention type and convert to external retention
         retention_dto = retention_dict.get(self.retention_id)
-        external_retention = retention_type_dto_to_external(retention_dto)
+        external_retention = retention_dto.get_external_retention_type() 
         
         return FileInfo(
             filepath=self.path,
@@ -266,16 +217,3 @@ class FolderNodeBase(SQLModel):
 
 class FolderNodeDTO(FolderNodeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
-
-
-
-# path protection for a specific path in a rootfolder
-# the question is whether we need a foreigne key to the folder id 
-class PathProtectionBase(SQLModel):
-    rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
-    folder_id: int       = Field(foreign_key="foldernodedto.id")
-    path: str            = Field(default="")
-
-class PathProtectionDTO(PathProtectionBase, table=True):
-    id: int | None       = Field(default=None, primary_key=True)
-

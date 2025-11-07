@@ -91,8 +91,8 @@ class TestCleanupWithOnDiskSimulations:
         file_info = FileInfo(
             filepath=simulation_path,
             modified_date=modified_date,
-            nodetype=FolderTypeEnum.VTS_SIMULATION,
-            external_retention=ExternalRetentionTypes.UNDEFINED
+            nodetype=FolderTypeEnum.SIMULATION,
+            external_retention=ExternalRetentionTypes.NUMERIC
         )
         
         return file_info, file_registry

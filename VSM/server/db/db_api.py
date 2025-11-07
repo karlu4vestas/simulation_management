@@ -7,13 +7,13 @@ from fastapi import Query, HTTPException
 from db.database import Database
 from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, FolderNodeDTO
 from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention, FolderTypeEnum, Retention, FileInfo 
-from datamodel.retention_validators import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
+from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
 simulation_domain_name: Literal["vts"]
 simulation_domain_names = ["vts"]  # Define the allowed domain names
 
-def read_simulation_domains():
+def read_simulation_domains() -> list[SimulationDomainDTO]:
     with Session(Database.get_engine()) as session:
         simulation_domains = session.exec(select(SimulationDomainDTO)).all()
         if not simulation_domains:
@@ -422,7 +422,7 @@ def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         marked_retention_id:int = read_rootfolder_retentiontypes_dict(rootfolder.id)["marked"].id
-        leaf_nodetype_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+        leaf_nodetype_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
 
         # Get all folders marked for cleanup. FolderNodeDTO.nodetype_id == leaf_nodetype_id is not required but
         # should we in the future handle hierarchies of simulation then we must refactor and test any way
@@ -731,7 +731,7 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
                     rootfolder_id=rootfolder_id,
                     parent_id=current_parent_id,
                     name=segment,
-                    nodetype_id=nodetypes[FolderTypeEnum.VTS_SIMULATION].id,
+                    nodetype_id=nodetypes[FolderTypeEnum.SIMULATION].id,
                     path="/".join(current_path_segments),  # Full path up to this segment
                 )            
             try:

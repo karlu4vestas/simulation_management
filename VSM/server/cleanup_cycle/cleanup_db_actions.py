@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from db.database import Database
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
 from cleanup_cycle.cleanup_dtos import CleanupProgress, CleanupConfigurationDTO
-from datamodel.retention_validators import RetentionCalculator
+from datamodel.retentions import RetentionCalculator
 from db.db_api import get_cleanup_configuration_by_rootfolder_id, read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
  
 
@@ -30,7 +30,7 @@ def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
 
             # extract all leafs with rootfolder_id.
             # We can possibly optimise by limiting the selection to folders with a numeric retentiontypes
-            nodetype_leaf_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.VTS_SIMULATION].id
+            nodetype_leaf_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
             folders = session.exec( select(FolderNodeDTO).where( (FolderNodeDTO.rootfolder_id == rootfolder_id) & \
                                                                  (FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
 

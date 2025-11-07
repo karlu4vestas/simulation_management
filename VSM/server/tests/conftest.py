@@ -211,7 +211,7 @@ def sample_retention_data(test_session):
     
     return {
         "simulationdomain_id": domain.id,
-        "name": "30 days",
+        "name": "numeric",  # Use string value
         "is_system_managed": False,
         "display_rank": 1
     }
