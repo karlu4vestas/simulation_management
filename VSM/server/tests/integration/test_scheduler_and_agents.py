@@ -7,15 +7,14 @@ from datetime import timedelta
 
 from sqlmodel import Session
 
-from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator
-from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, FolderRetention, RootFolderDTO, ExternalRetentionTypes
+from datamodel.dtos import RootFolderDTO
 
 from app.web_api import run_scheduler_tasks
-from db.db_api import change_retentions, get_cleanup_configuration_by_rootfolder_id, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
-from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
+from db.db_api import get_cleanup_configuration_by_rootfolder_id
+from db.db_api import read_simulation_domains   
 from db.db_api import insert_rootfolder,insert_cleanup_configuration
-from db.db_api import FileInfo
-from cleanup_cycle.cleanup_db_actions import cleanup_cycle_prepare_next_cycle, cleanup_cycle_start, CleanupProgress
+
+from cleanup_cycle.cleanup_db_actions import cleanup_cycle_prepare_next_cycle, CleanupProgress
 from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
 from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
 from cleanup_cycle.cleanup_dtos import ActionType, CleanupConfigurationDTO, CleanupTaskDTO, TaskStatus

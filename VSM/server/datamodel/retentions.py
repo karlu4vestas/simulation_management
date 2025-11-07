@@ -43,6 +43,19 @@ class Retention:
     expiration_date: date | None = None
 
 
+@dataclass
+class FolderRetention(Retention):
+    # DTO for updating folder retention from client.
+    # Inherits all retention fields and adds folder_id for API routing.
+    # Since this IS-A Retention, it can be passed directly to functions expecting Retention objects.
+    folder_id: int = 0
+    
+    def update_retention_fields(self, retention: Retention) -> None:
+        # Update the retention fields from a Retention object.
+        self.retention_id = retention.retention_id
+        self.pathprotection_id = retention.pathprotection_id
+        self.expiration_date = retention.expiration_date
+
 # see values in vts_create_meta_data
 # @TODO Future Improvement
 # For better design, consider adding a separate category or type field with the enum, keeping name as a display label. 

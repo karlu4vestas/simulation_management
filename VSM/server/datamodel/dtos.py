@@ -1,9 +1,7 @@
 from fastapi import HTTPException
-from sqlmodel import Field, SQLModel, Relationship, Session
+from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
-from typing import Optional
 from datetime import date, datetime
-from typing import Optional
 from enum import Enum
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, RetentionTypeEnum, Retention, PathProtectionDTO
@@ -122,21 +120,6 @@ class RootFolderBase(SQLModel):
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
     
-    # Relationship to CleanupConfigurationDTO (one-to-one)
-    # lazy="noload" prevents automatic loading when accessing this attribute,
-    # avoiding DetachedInstanceError when session is closed
-    #cleanup_config: Optional["CleanupConfigurationDTO"] = Relationship(
-    #    back_populates="rootfolder",
-    #    sa_relationship_kwargs={"uselist": False, "lazy": "noload"}
-    #)
-    
-    #def ensure_cleanup_config(self, session) -> "CleanupConfigurationDTO":
-    #    """Get or create cleanup configuration."""
-    #    if self.cleanup_config is None:
-    #        self.cleanup_config = CleanupConfigurationDTO(rootfolder_id=self.id)
-    #        session.add(self.cleanup_config)
-    #    return self.cleanup_config
-
 
 @dataclass
 class FileInfo:
@@ -147,23 +130,6 @@ class FileInfo:
     id: int = None   # will be used during updates
 
 
-
-
-
-@dataclass
-class FolderRetention(Retention):
-    """
-    DTO for updating folder retention from client.
-    Inherits all retention fields and adds folder_id for API routing.
-    Since this IS-A Retention, it can be passed directly to functions expecting Retention objects.
-    """
-    folder_id: int = 0
-    
-    def update_retention_fields(self, retention: Retention) -> None:
-        """Update the retention fields from a Retention object."""
-        self.retention_id = retention.retention_id
-        self.pathprotection_id = retention.pathprotection_id
-        self.expiration_date = retention.expiration_date
 
 
 class FolderNodeBase(SQLModel):

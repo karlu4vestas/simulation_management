@@ -6,8 +6,8 @@ from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
 from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, FolderNodeDTO
-from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention, FolderTypeEnum, Retention, FileInfo 
-from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine
+from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, FolderTypeEnum, Retention, FileInfo 
+from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator, PathProtectionEngine, FolderRetention
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
 simulation_domain_name: Literal["vts"]

@@ -2,9 +2,10 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import Session, func, select
+from sqlmodel import Session
 from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO, FolderRetention 
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO
+from datamodel.retentions import FolderRetention 
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id

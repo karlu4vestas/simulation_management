@@ -5,7 +5,7 @@ from db.database import Database
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
 from cleanup_cycle.cleanup_dtos import CleanupProgress, CleanupConfigurationDTO
 from datamodel.retentions import RetentionCalculator
-from db.db_api import get_cleanup_configuration_by_rootfolder_id, read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
+from db.db_api import read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
  
 
 # This function put the cleanup cycle into CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW in order to recalculate all numeric retentions
