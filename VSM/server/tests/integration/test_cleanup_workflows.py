@@ -4,7 +4,7 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from datamodel.retentions import ExternalToInternalRetentionTypeConverter, RetentionCalculator, FolderRetention
+from datamodel.retentions import Extern2InternRetentionTypeConverter, RetentionCalculator, FolderRetention, RetentionTypeEnum
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RootFolderDTO, ExternalRetentionTypes
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
@@ -34,7 +34,6 @@ class DataIOSet:
     input_leafs_to_be_marked_dict: dict[str, InMemoryFolderNode]=None
     output_for_input_leafs: list[FolderNodeDTO] = None # output leafs (the simulations) extracted from output and ordered as input leafs
     retention_calculator: RetentionCalculator = None # retention calculator for the rootfolder  
-    externalToInternalRetentionTypeConverter: ExternalToInternalRetentionTypeConverter = None # converter for external to internal retention types for the rootfolder   
     path_retention: RetentionTypeDTO = None # the path retention for the rootfolder
     marked_retention: RetentionTypeDTO = None # the marked retention for the rootfolder
     undefined_retention: RetentionTypeDTO = None # the undefined retention for the rootfolder
@@ -132,7 +131,7 @@ class TestCleanupWorkflows:
             data_set.path_retention        = data_set.retention_calculator.retention_type_str_dict["path"]
             data_set.marked_retention      = data_set.retention_calculator.retention_type_str_dict["marked"]
             data_set.undefined_retention   = data_set.retention_calculator.retention_type_str_dict["?"]
-            data_set.externalToInternalRetentionTypeConverter = ExternalToInternalRetentionTypeConverter(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id))
+            data_set.externalToInternalRetentionConverter = Extern2InternRetentionTypeConverter(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id))
 
             dataio_sets.append(data_set)
 
@@ -273,24 +272,34 @@ class TestCleanupWorkflows:
                 # Therefore, external retentions should just be converted to an internal retention and assigned to the db_folder 
                 #   - unless the db folder is under a path retention
                 #   - unless the user have previously define a retention. This is not the case now because we just imported the simulations
-                sim_retention_type:RetentionTypeDTO = data_set.externalToInternalRetentionTypeConverter.to_internal(sim_folder.retention)
-                if sim_retention_type is None:
-                    if folder.retention_id == data_set.path_retention.id:
-                        assert folder.pathprotection_id is not None
-                    else:
-                        #so the retention must be numeric. verify that the pathprotection_id is None
-                        assert folder.pathprotection_id is None
+                if folder.retention_id == data_set.path_retention.id: #path protections take precedence
+                    assert folder.pathprotection_id is not None
+                else:
+                    #so the retention must be numeric, clean, Issue or missing. verify that the pathprotection_id is None
+                    assert folder.pathprotection_id is None
 
-                        # and retention is numeric
-                        assert data_set.retention_calculator.is_numeric(folder.retention_id) or folder.retention_id == data_set.undefined_retention.id, \
+
+                    sim_retention_type_id: int | None = data_set.retention_calculator.to_internal_type_id(sim_folder.retention)
+
+                    if sim_folder.retention == ExternalRetentionTypes.NUMERIC and not data_set.retention_calculator.is_starting_cleanup_round:
+                        # NUMERIC RETENTION must be assigned undefined so it can be imported even if it the cleanup configuration is incomplete
+                        assert folder.retention_id == data_set.undefined_retention.id
+                    elif sim_folder.retention == ExternalRetentionTypes.NUMERIC:
+                        if data_set.retention_calculator.cleanup_progress == CleanupProgress.INITIAL:
+                            # if the cleanup configuration is incomplete then the external NUMERIC retention must be converted to undefined retention
+                            assert folder.retention_id == data_set.undefined_retention.id,  \
                                 f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been numeric or undefined but is {folder.retention_id}"
+                        else:
+                            assert data_set.retention_calculator.is_numeric(folder.retention_id), \
+                                f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been numeric or undefined but is {folder.retention_id}"
+                    else:
+                        assert not data_set.retention_calculator.is_numeric(folder.retention_id), \
+                                f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been NOT numeric but is {folder.retention_id}"
 
-                        if not data_set.retention_calculator.is_starting_cleanup_round:
-                            assert folder.retention_id != data_set.marked_retention.id, \
-                                f"data_set.key={data_set.key}, folder={folder.path}. Retention is marked for cleanup outside starting cleanup round"
-                else: # the retention must be the converted retention
-                    assert folder.retention_id == sim_retention_type.id
-            
+                        assert folder.retention_id == sim_retention_type_id, \
+                            f"data_set.key={data_set.key}, folder={folder.path}. NOT retention is not corrrect {folder.retention_id}"
+
+
             #validate that retention is none for inner nodes
             for folder in data_set.output.folders:
                 if folder.nodetype_id != data_set.nodetype_leaf:

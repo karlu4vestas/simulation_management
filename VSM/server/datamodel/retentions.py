@@ -55,6 +55,7 @@ class FolderRetention(Retention):
         self.retention_id = retention.retention_id
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
+        self.folder_id = 0
 
 # see values in vts_create_meta_data
 # @TODO Future Improvement
@@ -90,6 +91,28 @@ class RetentionTypeBase(SQLModel):
 #retention types must be order by increasing days_to_cleanup and then by display_rank
 class RetentionTypeDTO(RetentionTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
+
+
+
+# class Extern2InternRetentionTypeConverter:
+#     def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO]):
+#         if not retention_type_dict :
+#             raise ValueError("missing retentention_type_dict")
+
+#         self.undefined_retention_type:RetentionTypeDTO                    = retention_type_dict.get('?')
+
+#         valid_values:set[str]                                             = set([e.value for e in ExternalRetentionTypes])
+#         self.ext2Internal_retention_dto_dict: dict[str, RetentionTypeDTO] = { key: retentiontype_dto for key, retentiontype_dto in retention_type_dict.items() if key in valid_values }
+
+#     def to_internal_type_id(self, external_retention: ExternalRetentionTypes) -> int|None:
+#         if external_retention is None:
+#             raise ValueError(f"External retention type is None")
+#         elif external_retention == ExternalRetentionTypes.NUMERIC:
+#             # if numeric then assign undefined retention so the its numeric retention gets calculated
+#             internal_retention:RetentionTypeDTO = self.undefined_retention_type
+#         else:
+#             internal_retention:RetentionTypeDTO = self.ext2Internal_retention_dto_dict.get(external_retention.value, None)
+#         return internal_retention.id
 
 
 # path protection for a specific path in a rootfolder
@@ -130,6 +153,7 @@ class RetentionCalculator:
         self.path_retention_id           = self.retention_type_str_dict["path"].id   if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
         self.undefined_retention_id      = self.retention_type_str_dict["?"].id      if self.retention_type_str_dict.get("?", None) is not None else 0  
+        self.cleanup_progress            = cleanup_config.cleanup_progress
         self.is_in_cleanup_round         = cleanup_config.is_in_cleanup_round()
         self.is_starting_cleanup_round   = cleanup_config.is_starting_cleanup_round()
 
@@ -245,6 +269,22 @@ class RetentionCalculator:
         # and 2) numeric_retention_ids is sorted in ascending days_to_cleanup
         return self.numeric_retention_ids[1]
 
+
+    def to_internal_type_id(self, external_retention: ExternalRetentionTypes) -> int|None:
+        internal_retention_id:int|None = None
+        if external_retention is None:
+            raise ValueError(f"External retention type is None")
+        elif external_retention == ExternalRetentionTypes.NUMERIC:
+            # if numeric then assign undefined retention so the its numeric retention gets calculated
+            internal_retention_id = self.undefined_retention_id
+        else:
+            # this lookup work due because the all retentions type string names, external and internal, are guaranteed to be the same string due to the Literal type RetentionName
+            # the default None is defensive programming; this should never happen because the dict' keys are a superset of the ExternalRetentionTypes values
+            internal_retention:RetentionTypeDTO = self.retention_type_str_dict.get(external_retention.value, None)
+            internal_retention_id = internal_retention.id if internal_retention else None
+        return internal_retention_id
+
+
 #ensure consistency of path retentions
 class PathProtectionEngine:
     sorted_protections:list[tuple[str, int]]
@@ -272,22 +312,3 @@ class PathProtectionEngine:
                 return Retention( self.path_retention_id, pid)
         return None
 
-class ExternalToInternalRetentionTypeConverter:
-    retention_type_dict: dict[str, RetentionTypeDTO]
-
-    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO]):
-        if not retention_type_dict :
-            raise ValueError("missing retentention_type_dict for ExternalRetentionTypeConverter")
-
-        valid_values = [e.value.lower() for e in ExternalRetentionTypes if e.value is not None]
-        self.retention_type_dict = { key: retentiontype for key, retentiontype in retention_type_dict.items() if key in valid_values }
-        self.undefined_retention_type = self.retention_type_dict.get('?', None)
-
-    def to_internal(self, external_retention: ExternalRetentionTypes) -> RetentionTypeDTO:
-        internal_retention:RetentionTypeDTO = self.undefined_retention_type
-        if external_retention is not None and external_retention != ExternalRetentionTypes.NUMERIC:
-            internal_retention = self.retention_type_dict.get(external_retention.value.lower(), None)
-            if internal_retention is None:
-                raise ValueError(f"cannot map external retention type '{external_retention}' to any internal retention type")
-
-        return internal_retention
