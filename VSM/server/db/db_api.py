@@ -1,13 +1,13 @@
-from datetime import date
 from typing import Literal, Optional
-from dataclasses import dataclass
 from sqlalchemy import func
 from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
-from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO, FolderNodeDTO
-from datamodel.dtos import RootFolderDTO, PathProtectionDTO, SimulationDomainDTO, FolderTypeEnum, Retention, FileInfo 
-from datamodel.retentions import RetentionCalculator, PathProtectionEngine, FolderRetention
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO
+from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO
+from datamodel.retentions import RetentionCalculator, FolderRetention
+from datamodel.dtos import FolderTypeDTO, FolderNodeDTO
+from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeEnum, FileInfo 
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
 simulation_domain_name: Literal["vts"]
@@ -208,9 +208,6 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, Retentio
         if not retention_types:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         
-        #if not retention_types.get("+next",None):
-        #    raise HTTPException(status_code=404, detail="retentiontypes does not contain 'next' retention type")
-
         if not retention_types.get("path", None):
             raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=vts_simulation for {rootfolder.id}")
         
@@ -525,49 +522,27 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         raise HTTPException(status_code=500, detail=f"Ordering of existing folders does not match simulations for rootfolder {rootfolder.id}")
 
 
-    #Prepare calculation of retention: non-numeric including pathprotection and pnumeric retentions.  
+    #Prepare calculation of retention: non-numeric including pathprotection and numeric retentions.  
     retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, rootfolder.cleanup_config_id, session)
 
     # Prepare bulk update data for existing folders
     bulk_updates = []
     for db_folder, sim in zip(existing_folders, simulations):
-        db_modified_date:date    = db_folder.modified_date   # initialise with existing
-        db_retention:Retention   = db_folder.get_retention() # initialise with existing
-        sim_retention_id:RetentionTypeDTO  = retention_calculator.to_internal_type_id(sim.external_retention)
-        path_retention:Retention = retention_calculator.match(db_folder.path)
-
-
-        # path retention takes priority over other retentions
-        if path_retention is not None:
-            db_retention = path_retention
-        elif sim_retention_id is not None: #then it must be an endstage retention (clean, issue or missing) so we apply it
-            db_retention = Retention(sim_retention_id)
-        elif db_retention.retention_id is not None and retention_calculator.is_endstage(db_retention.retention_id): 
-            # The retention (possibly set by the user) must not overwrite unless the db_retention is in endstage
-
-            # sim_retention is None and the db_retention is in endstage. This means that the newly scanned simulation must be in another stage than endstage. 
-            # We must therefore reset it to None so that the retention_calculator can calculate the correct retention if cleanup is active 
-            db_retention = Retention(retention_id=None) 
-        else:
-            pass # keep existing retention
-
-        if db_modified_date != sim.modified_date:
-            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date, sim.modified_date)
-            db_modified_date = sim.modified_date
-        else:
-            # Evaluate the retention state if retention_calculator exist (valid cleanconfiguration)
-            db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-            #if db_retention.retention_id is None:
-            #    # TODO this is strange because we already calculated db_retention above. must be a debug statement
-            #    db_retention = retention_calculator.adjust_from_cleanup_configuration_and_modified_date(db_retention, db_modified_date)
-            #    print(f"Folder {db_folder.id} has no retention ID")
+        # Calculate retention using consolidated logic in RetentionCalculator
+        new_retention, new_modified_date = retention_calculator.calculate_retention_from_scan(
+            db_retention=db_folder.get_retention(),
+            db_modified_date=db_folder.modified_date,
+            sim_external_retention=sim.external_retention,
+            sim_modified_date=sim.modified_date,
+            folder_path=db_folder.path
+        )
 
         bulk_updates.append({
             "id": db_folder.id,
-            "modified_date": db_modified_date,
-            "expiration_date": db_retention.expiration_date,
-            "retention_id": db_retention.retention_id,
-            "pathprotection_id": db_retention.pathprotection_id
+            "modified_date": new_modified_date,
+            "expiration_date": new_retention.expiration_date,
+            "retention_id": new_retention.retention_id,
+            "pathprotection_id": new_retention.pathprotection_id
         })
     
     # Execute bulk update

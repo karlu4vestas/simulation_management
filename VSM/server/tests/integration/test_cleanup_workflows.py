@@ -4,18 +4,18 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from datamodel.retentions import RetentionCalculator, FolderRetention
-from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RootFolderDTO, ExternalRetentionTypes
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start
+
+from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
+from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
 from db.db_api import FileInfo
-from db.db_api import insert_or_update_simulations_in_db, read_folders, normalize_path, read_rootfolders_by_domain_and_initials
-from db.db_api import change_retentions, insert_or_update_simulations_in_db, normalize_path, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_folders_marked_for_cleanup, read_rootfolder_retentiontypes_dict
-from db.db_api import read_retentiontypes_by_domain_id, read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
-from db.db_api import insert_rootfolder,insert_cleanup_configuration, read_simulation_domain_by_name
+from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
+from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
+from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder,insert_cleanup_configuration
 
-from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, CleanupProgress
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 
 from tests.integration.testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 

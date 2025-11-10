@@ -45,9 +45,12 @@ class Database:
         if self._engine is None:
             return True
             
+        # The foillowing import is placed here to avoid circular imports. 
         # List of all table models that should be checked (including metadata tables). 
-        # The import is placed here to avoid circular imports. 
-        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
+        # even if the below doess not containt all DTO mapped to a table the check is solid enough
+        from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
+        from datamodel.retentions import RetentionTypeDTO
+        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO
         table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO]
         
         try:

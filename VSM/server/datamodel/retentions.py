@@ -299,30 +299,71 @@ class RetentionCalculator:
                 return Retention( self.path_retention_id, pid)
         return None
 
-#ensure consistency of path retentions
-class PathProtectionEngine:
-    sorted_protections:list[tuple[str, int]]
-    def __init__(self, protections: list[PathProtectionDTO], path_retention_id:int, default_path_protection_id: int = 0):
-        #self.match_prefix_id = make_prefix_id_matcher(protections)
-        self.sorted_protections = [(dto.path.lower().replace('\\', '/').rstrip('/'), dto.id) for dto in protections]
-        self.path_retention_id = path_retention_id
-        self.default_protection_id = default_path_protection_id
-
-        self.sorted_protections: list[tuple[str, int]] = sorted(
-            self.sorted_protections,
-            key=lambda item: item[0].count('/'),
-            reverse=True
+    def calculate_retention_from_scan(self, db_retention: Retention, db_modified_date: date, sim_external_retention, sim_modified_date: date, folder_path: str) -> tuple[Retention, date]:
+        """
+        Calculate the retention and modified_date for a folder based on scanned simulation data.
+        This consolidates all the complex retention priority logic when updating from a scan.
+        
+        Priority order:
+        1. Path protection (highest priority)
+        2. Simulation's external retention (if endstage: clean, issue, missing)
+        3. Existing DB retention (if not endstage, keep it)
+        4. Calculate numeric retention based on modified_date
+        
+        Args:
+            db_retention: Current retention from database
+            db_modified_date: Current modified date from database
+            sim_external_retention: External retention type from scanned simulation (can be None)
+            sim_modified_date: Modified date from scanned simulation
+            folder_path: Path for checking path protection
+            
+        Returns:
+            Tuple of (new_retention, new_modified_date)
+        """
+        from datamodel.retentions import ExternalRetentionTypes  # avoid circular import if needed
+        
+        # Initialize with existing values
+        new_retention = Retention(
+            retention_id=db_retention.retention_id,
+            pathprotection_id=db_retention.pathprotection_id,
+            expiration_date=db_retention.expiration_date
         )
+        new_modified_date = db_modified_date
+        
+        # Convert external retention to internal type ID (if provided)
+        sim_retention_id = self.to_internal_type_id(sim_external_retention) if sim_external_retention is not None else None
+        
+        # Check for path protection (highest priority)
+        path_retention = self.match(folder_path)
+        
+        # Apply retention priority logic
+        if path_retention is not None:
+            # Path retention takes priority over all other retentions
+            new_retention = path_retention
+        elif sim_retention_id is not None and self.is_endstage(sim_retention_id):
+            # Simulation has an endstage retention (clean, issue, or missing) - apply it
+            new_retention = Retention(sim_retention_id)
+        elif db_retention.retention_id is not None and self.is_endstage(db_retention.retention_id):  #@TODO fishy . Have to review the logic
+            # DB retention is in endstage 
 
-    # returns: Retention(retention_id, pathprotection_id) or None if not found
-    def match(self, path:str) -> Optional[Retention]:
-        """
-        Returns a function that, given a path, returns the id of the longest
-        protection that is a prefix of the path (with '/' boundary) or None.
-        """
-        path = (path or "").rstrip('/').lower().replace('\\', '/')
-        for pat, pid in self.sorted_protections:  # short-circuits on first (longest) match
-            if path == pat or path.startswith(pat + "/"):  # avoids "R1" matching "R10/..."
-                return Retention( self.path_retention_id, pid)
-        return None
-    
+            # This means the newly scanned simulation is in a non-endstage state
+            # Reset to None so retention_calculator can calculate the correct retention
+            new_retention = Retention(retention_id=None)
+        else:
+            # Keep existing retention (pass - already initialized with db_retention)
+            pass
+        
+        # Handle modified_date changes and calculate numeric retentions
+        if db_modified_date != sim_modified_date:
+            # Modified date changed - recalculate retention with new date
+            new_retention = self.adjust_from_cleanup_configuration_and_modified_date(
+                new_retention, db_modified_date, sim_modified_date
+            )
+            new_modified_date = sim_modified_date
+        else:
+            # Modified date unchanged - evaluate retention state with current date
+            new_retention = self.adjust_from_cleanup_configuration_and_modified_date(
+                new_retention, db_modified_date
+            )
+        
+        return new_retention, new_modified_date

@@ -159,7 +159,8 @@ class AgentNotification(AgentTemplate):
 
     def execute_task(self):
         from db.database import Database
-        from datamodel.dtos import RootFolderDTO, CleanupConfigurationDTO 
+        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+        from datamodel.dtos import RootFolderDTO
         from sqlmodel import Session, func, select
         with Session(Database.get_engine()) as session:
             rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == self.task.rootfolder_id)).first()

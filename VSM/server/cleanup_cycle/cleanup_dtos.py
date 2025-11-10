@@ -36,6 +36,28 @@ class CleanupProgress:
         ProgressEnum.DONE: ProgressEnum.STARTING_RETENTION_REVIEW,
     }
 
+# time from initialization of the simulation til cleanup of the simulation
+class CleanupFrequencyBase(SQLModel):
+    simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
+    name: str                 = Field(default="")
+    days: int                 = Field(default=0)
+
+class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
+    id: int | None            = Field(default=None, primary_key=True)
+
+
+# how long time does the engineer require to analyse a simulation before it expires and can be cleaned
+# see values in vts_create_meta_data
+class CycleTimeBase(SQLModel):
+    simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
+    name: str                 = Field(default="")
+    days: int                 = Field(default=0)
+
+class CycleTimeDTO(CycleTimeBase, table=True):
+    id: int | None            = Field(default=None, primary_key=True)
+
+
+
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting cleanupfrequency to None
 #   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. 

@@ -3,20 +3,17 @@ from typing import Optional
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
-from datamodel.dtos import CleanupFrequencyDTO, CycleTimeDTO, RetentionTypeDTO, FolderTypeDTO
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, PathProtectionDTO, SimulationDomainDTO
-from datamodel.retentions import FolderRetention 
+from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
+from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, FolderRetention
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
 from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials, update_rootfolder_cleanup_configuration
-from db.db_api import read_rootfolder_retentiontypes, read_folders
-from db.db_api import read_pathprotections, add_path_protection, delete_path_protection
+from db.db_api import read_rootfolder_retentiontypes, read_folders, read_pathprotections, add_path_protection, delete_path_protection
 from db.db_api import change_retentions, FileInfo 
 
 from app.app_config import AppConfig
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
 
 
 @asynccontextmanager
@@ -31,6 +28,7 @@ async def lifespan(app: FastAPI):
         if AppConfig.is_client_test():
             with Session(engine) as session:
                 insert_vts_metadata_in_db(session)
+                from server.testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
                 insert_test_folder_hierarchy_in_db(session)
     #else:
     #    db.clear_all_tables_and_schemas()

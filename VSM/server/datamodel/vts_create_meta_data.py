@@ -1,6 +1,7 @@
-from enum import Enum
 from sqlmodel import Session, select
-from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, RetentionTypeDTO, RetentionTypeEnum, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO 
+from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, FolderTypeDTO
+from datamodel.retentions import RetentionTypeEnum, RetentionTypeDTO
+from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO 
 
 def insert_vts_metadata_in_db(session:Session):
     # ensure that redundant metadata is not present 

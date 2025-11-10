@@ -6,8 +6,8 @@ import sys
 import shutil
 import tempfile
 import unittest
-from unittest.mock import Mock, MagicMock, patch, call
-from datetime import datetime, date
+from unittest.mock import Mock, patch
+from datetime import date
 
 # Add server directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))

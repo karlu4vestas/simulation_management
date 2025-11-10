@@ -1,6 +1,8 @@
 import random
 from sqlmodel import Session, select
-from datamodel.dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, FolderTypeEnum, RetentionTypeDTO, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupFrequencyDTO
+from datamodel.retentions import RetentionTypeDTO
+from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
 from db.db_api import insert_rootfolder, read_cleanupfrequency_name_dict_by_domain_id
 

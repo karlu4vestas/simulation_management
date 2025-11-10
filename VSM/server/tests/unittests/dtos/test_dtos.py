@@ -1,7 +1,5 @@
-import pytest
-from sqlmodel import Field, Session, select, asc
+from sqlmodel import Session, select, asc
 from datamodel.dtos import (
-    FolderTypeEnum, 
     RootFolderDTO, 
     FolderNodeDTO, 
     FolderTypeDTO, 
@@ -14,7 +12,7 @@ from datetime import date
 class TestRootFolderDTO:
     """Test RootFolderDTO database operations"""
 
-    def test_root_folder_create_and_retrieve(self, test_session, sample_root_folder_data):
+    def test_root_folder_create_and_retrieve(self, test_session: Session, sample_root_folder_data):
         """Test creating, saving, and retrieving a RootFolderDTO"""
         # Create and save
         original_folder = RootFolderDTO(**sample_root_folder_data)
@@ -104,7 +102,7 @@ class TestRootFolderDTO:
         assert len(owner1_folders) == 1
         assert owner1_folders[0].folder_id == 1
 
-    def test_create_and_retrieve_root_folder(self, test_session, sample_root_folder_data):
+    def test_create_and_retrieve_root_folder(self, test_session: Session, sample_root_folder_data):
         """Test creating and retrieving a RootFolderDTO from database"""
 
         # Create and save
@@ -128,7 +126,7 @@ class TestRootFolderDTO:
 class TestFolderNodeDTO:
     """Test FolderNodeDTO database operations"""
 
-    def test_folder_node_create_and_retrieve(self, test_session, sample_folder_node_data):
+    def test_folder_node_create_and_retrieve(self, test_session: Session, sample_folder_node_data):
         """Test creating, saving, and retrieving a FolderNodeDTO"""
         # Create and save
         original_node = FolderNodeDTO(**sample_folder_node_data)
@@ -150,7 +148,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.name == original_node.name
         assert retrieved_node.nodetype_id == original_node.nodetype_id
 
-    def test_folder_node_with_defaults_create_and_retrieve(self, test_session, test_root_folder):
+    def test_folder_node_with_defaults_create_and_retrieve(self, test_session: Session, test_root_folder):
         """Test creating FolderNodeDTO with minimal data using defaults"""
         # Create simulation domain and folder type
         domain = SimulationDomainDTO(name="TestDomain")
@@ -190,7 +188,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.expiration_date is None # Default value
         assert retrieved_node.retention_id is None    # Default value
 
-    def test_folder_node_with_attributes_create_and_retrieve(self, test_session, test_root_folder):
+    def test_folder_node_with_attributes_create_and_retrieve(self, test_session: Session, test_root_folder):
         """Test creating and retrieving a FolderNodeDTO with attributes"""
         # Create simulation domain and folder type
         domain = SimulationDomainDTO(name="TestDomain")
@@ -234,7 +232,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.expiration_date == original_node.expiration_date
         assert retrieved_node.retention_id == original_node.retention_id
 
-    def test_folder_node_attributes_update_and_retrieve(self, test_session, test_root_folder):
+    def test_folder_node_attributes_update_and_retrieve(self, test_session: Session, test_root_folder: RootFolderDTO):
         """Test updating and retrieving FolderNodeDTO attributes"""
         # Create simulation domain and folder type
         domain = SimulationDomainDTO(name="TestDomain")
@@ -278,7 +276,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.expiration_date == date(2026, 1, 15)
         assert retrieved_node.nodetype_id == expected_folder_type_id
 
-    def test_folder_node_hierarchy_creation(self, test_session, test_root_folder):
+    def test_folder_node_hierarchy_creation(self, test_session: Session, test_root_folder: RootFolderDTO):
         """Test creating folder node hierarchies"""
         # Create simulation domain and folder type
         domain = SimulationDomainDTO(name="TestDomain")
@@ -348,7 +346,7 @@ class TestFolderNodeDTO:
 class TestFolderTypeDTO:
     """Test FolderTypeDTO database operations"""
 
-    def test_folder_type_create_and_retrieve(self, test_session):
+    def test_folder_type_create_and_retrieve(self, test_session: Session):
         """Test creating, saving, and retrieving a FolderTypeDTO"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -375,7 +373,7 @@ class TestFolderTypeDTO:
         assert retrieved_type.name == original_type.name
         assert retrieved_type.simulationdomain_id == original_type.simulationdomain_id
 
-    def test_folder_type_with_defaults_create_and_retrieve(self, test_session):
+    def test_folder_type_with_defaults_create_and_retrieve(self, test_session: Session):
         """Test creating FolderTypeDTO with default values"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -400,7 +398,7 @@ class TestFolderTypeDTO:
         assert retrieved_type is not None
         assert retrieved_type.name == ""  # Default value
 
-    def test_folder_type_query_by_name(self, test_session):
+    def test_folder_type_query_by_name(self, test_session: Session):
         """Test querying FolderTypeDTO by name"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -426,7 +424,7 @@ class TestFolderTypeDTO:
 class TestRetentionDTO:
     """Test RetentionTypeDTO database operations"""
 
-    def test_retention_create_and_retrieve(self, test_session, sample_retention_data):
+    def test_retention_create_and_retrieve(self, test_session: Session, sample_retention_data):
         """Test creating, saving, and retrieving a RetentionTypeDTO"""
         # Create and save
         original_retention = RetentionTypeDTO(**sample_retention_data)
@@ -448,7 +446,7 @@ class TestRetentionDTO:
         assert retrieved_retention.is_endstage == original_retention.is_endstage
         assert retrieved_retention.display_rank == original_retention.display_rank
 
-    def test_retention_with_defaults_create_and_retrieve(self, test_session):
+    def test_retention_with_defaults_create_and_retrieve(self, test_session: Session):
         """Test creating RetentionTypeDTO with default values"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -467,7 +465,7 @@ class TestRetentionDTO:
         assert original_retention.is_endstage == False  # Default value
         assert original_retention.display_rank == 0   # Default value
 
-    def test_retention_system_managed_create_and_retrieve(self, test_session):
+    def test_retention_system_managed_create_and_retrieve(self, test_session: Session):
         """Test creating system-managed RetentionTypeDTO"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -491,7 +489,7 @@ class TestRetentionDTO:
         assert original_retention.is_endstage == True
         assert original_retention.days_to_cleanup == 90
 
-    def test_retention_query_by_display_rank(self, test_session):
+    def test_retention_query_by_display_rank(self, test_session: Session):
         """Test querying RetentionTypeDTO by display_rank"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
@@ -517,7 +515,7 @@ class TestRetentionDTO:
 class TestDTODatabaseIntegration:
     """Test integration scenarios across multiple DTOs"""
 
-    def test_all_dtos_table_creation(self, test_session):
+    def test_all_dtos_table_creation(self, test_session: Session):
         """Test that all DTO table schemas work together"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="IntegrationTestDomain")
@@ -560,7 +558,7 @@ class TestDTODatabaseIntegration:
         assert root_folder.id is not None
         assert folder_node.id is not None
 
-    def test_dto_field_data_integrity(self, test_session, test_root_folder):
+    def test_dto_field_data_integrity(self, test_session: Session, test_root_folder: RootFolderDTO):
         """Test that all field types preserve data correctly through database round-trip"""
         # Create simulation domain first
         domain = SimulationDomainDTO(name="TestDomain")
