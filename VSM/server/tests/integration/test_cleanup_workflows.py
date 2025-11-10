@@ -11,7 +11,7 @@ from datamodel.retentions import RetentionCalculator, FolderRetention, Retention
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
-from db.db_api import FileInfo
+from db.db_api import FileInfo, exist_rootfolder
 from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
 from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder,insert_cleanup_configuration
@@ -25,22 +25,43 @@ class RootFolderWithFolderNodeDTOList(NamedTuple):
     folders: list[FolderNodeDTO]
 
 # DataIOSet structure is setup in initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy for reuse in other tests
-@dataclass
+#@dataclass
 class DataIOSet:
     key:    str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
-    input:  RootFolderWithMemoryFolders #input rootfolder
-    output: RootFolderWithFolderNodeDTOList #output rootfolder and folders from db after insertion of simulations
-    input_leafs: list[InMemoryFolderNode] = None # input leafs (the simulations) extracted from input 
-    input_leafs_to_be_marked_dict: dict[str, InMemoryFolderNode]=None
-    output_for_input_leafs: list[FolderNodeDTO] = None # output leafs (the simulations) extracted from output and ordered as input leafs
-    retention_calculator: RetentionCalculator = None # retention calculator for the rootfolder  
+    input:  RootFolderWithMemoryFolders #input taken directly from the test data fixture
+
+    input_leafs: list[InMemoryFolderNode] = None # input leafs (the simulations) extracted from input
+    input_leafs_to_be_marked_dict: dict[str, InMemoryFolderNode] = None
+    
+    # output
+    #rootfolder:RootFolderDTO = None
+    output: RootFolderWithFolderNodeDTOList = None  # output rootfolder and folders from db after insertion of simulations
+    output_for_input_leafs: list[FolderNodeDTO] = None  # output leafs (the simulations) extracted from output and ordered as input leafs
+    retention_calculator: RetentionCalculator = None  # retention calculator for the rootfolder
+
+    # retentions
     path_retention: RetentionTypeDTO = None # the path retention for the rootfolder
     marked_retention: RetentionTypeDTO = None # the marked retention for the rootfolder
     undefined_retention: RetentionTypeDTO = None # the undefined retention for the rootfolder
+    # nodetypes
     nodetype_leaf: int = None # the folder type id for leaf nodes (simulations)
     nodetype_inner: int = None # the folder type id for inner nodes
 
-
+    def __init__(self, key:str, input:RootFolderWithMemoryFolders):#, rootfolder:RootFolderDTO):
+        self.key = key
+        self.input = input
+        self.input_leafs = []
+        self.input_leafs_to_be_marked_dict = {}
+        self.output = None
+        self.output_for_input_leafs = []
+        self.retention_calculator = None
+        self.path_retention = None
+        self.marked_retention = None
+        self.undefined_retention = None
+        self.nodetype_leaf = None
+        self.nodetype_inner = None
+                
+        #self.rootfolder = rootfolder
 
 
 from tests import test_storage
@@ -64,6 +85,66 @@ class TestCleanupWorkflows:
         assert len(read_cleanupfrequency_by_domain_id(simulation_domain_id)) > 0
         assert len(read_cycle_time_by_domain_id(simulation_domain_id)) > 0
 
+    def setup_basic_dataset_io( self, integration_session, scenario_key:str, cleanup_scenario_data) -> DataIOSet:
+        simulation_domain_id:int = read_simulation_domain_by_name(domain_name="vts").id
+        # validate that the folder hierarchy is inserted correctly
+
+        # start by getting the input and the output data for the db simulation for each scenarios before procedding to validation
+        # The input data is in cleanup_scenario_data fixture in conftest.py
+        # The output data is the return from insert_simulations
+        # The input data is three parts:
+        # part one with one root folder and a list of all its subfolders in random order
+        # part two and three with a random split of the second rootfolders list of folders
+
+        dataset_io:DataIOSet = None
+        for key in [scenario_key]:
+            #insert add the simulation domain to the rootfolder and inser the rootfolder in the db
+            input: RootFolderWithMemoryFolders = cleanup_scenario_data[key]
+            # set the simulation domain, save the rootfolder to the db and then create first_rootfolder_tuple with the rootfolder from the db
+            input.rootfolder.simulationdomain_id = simulation_domain_id
+
+            # Its about messy that we are keeping the the rootfolder both in input and output.
+            # test if we have already assigne the db_root to the input rootfolder. ifo so then do not change it
+            if not exist_rootfolder(input.rootfolder):
+                rootfolder:RootFolderDTO = insert_rootfolder(input.rootfolder)
+                input.rootfolder = rootfolder
+                #verify that the rootfolder was saved correctly
+                assert input.rootfolder is not None
+                assert input.rootfolder.id is not None and input.rootfolder.id > 0
+                assert input.rootfolder.path == input.rootfolder.path
+                
+                # Create CleanupConfigurationDTO from the in-memory CleanupConfiguration
+                # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
+                # Now we create the corresponding CleanupConfigurationDTO database record
+                cleanup_config_dto:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
+
+                in_memory_config:CleanupConfiguration   = cleanup_scenario_data.get("cleanup_configuration", None)
+                cleanup_config_dto.cycletime            = in_memory_config.cycletime
+                cleanup_config_dto.cleanupfrequency     = in_memory_config.cleanupfrequency
+                cleanup_config_dto.cleanup_start_date   = in_memory_config.cleanup_start_date
+                cleanup_config_dto.cleanup_progress     = in_memory_config.cleanup_progress
+                integration_session.add(cleanup_config_dto)
+                integration_session.commit()
+            else:
+                rootfolder:RootFolderDTO = insert_rootfolder(input.rootfolder) # insert return existing rootfolder it it exists 
+                input.rootfolder = rootfolder
+                cleanup_config_dto:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
+                
+            #cleanup_config_dto = insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
+            
+            dataset_io:DataIOSet = DataIOSet(key=key,input=input)#, rootfolder=input.rootfolder)
+            dataset_io.nodetype_leaf        = read_folder_type_dict_pr_domain_id(dataset_io.input.rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+            dataset_io.nodetype_inner       = read_folder_type_dict_pr_domain_id(dataset_io.input.rootfolder.simulationdomain_id)[FolderTypeEnum.INNERNODE].id
+            # Use the CleanupConfigurationDTO we just created for the RetentionCalculator
+            if cleanup_config_dto:
+                #data_set.retention_calculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id), cleanup_config_dto)
+                dataset_io.retention_calculator = RetentionCalculator(dataset_io.input.rootfolder.id, dataset_io.input.rootfolder.cleanup_config_id, integration_session)
+
+            dataset_io.path_retention        = dataset_io.retention_calculator.retention_type_str_dict["path"]
+            dataset_io.marked_retention      = dataset_io.retention_calculator.retention_type_str_dict["marked"]
+            dataset_io.undefined_retention   = dataset_io.retention_calculator.retention_type_str_dict["?"]
+
+        return dataset_io
 
     def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders) -> RootFolderWithFolderNodeDTOList:
         # Insert simulations into database and return all the rootfolder database folders for validation 
@@ -86,8 +167,7 @@ class TestCleanupWorkflows:
     # initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy is in it self a comprehensive test focused on testing
     # whether the simulations are properly imported and the folder structure in the db is built correctly. It does however not test the simulation attributes
     # Other tests can do that by starting to call initialization_with_import_of_simulations_and_test_of_db_folder_hierarchy and then use list[DataIOSet] for further testing
-    def import_simulations_and_test_db_folder_hierarchy(self, integration_session, keys_to_run_in_order:list[str], cleanup_scenario_data) -> list[DataIOSet]:
-        simulation_domain_id:int = read_simulation_domain_by_name(domain_name="vts").id
+    def import_simulations_and_test_db_folder_hierarchy(self, integration_session, dataio_sets: list[DataIOSet]) -> list[DataIOSet]:
         # validate that the folder hierarchy is inserted correctly
 
         # start by getting the input and the output data for the db simulation for each scenarios before procedding to validation
@@ -97,55 +177,16 @@ class TestCleanupWorkflows:
         # part one with one root folder and a list of all its subfolders in random order
         # part two and three with a random split of the second rootfolders list of folders
 
-        in_memory_config:CleanupConfiguration = cleanup_scenario_data.get("cleanup_configuration", None)
-        assert in_memory_config is not None, "cleanup_configuration is missing in cleanup_scenario_data fixture in conftest.py"
-        dataio_sets: list[DataIOSet] = []
-        for key in keys_to_run_in_order:
-            #insert add the simulation domain to the rootfolder and inser the rootfolder in the db
-            input: RootFolderWithMemoryFolders = cleanup_scenario_data[key]
-            # set the simulation domain, save the rootfolder to the db and then create first_rootfolder_tuple with the rootfolder from the db
-            input.rootfolder.simulationdomain_id = simulation_domain_id
-            input.rootfolder = insert_rootfolder(input.rootfolder)
-            #verify that the rootfolder was saved correctly
-            assert input.rootfolder is not None
-            assert input.rootfolder.id is not None and input.rootfolder.id > 0
-            assert input.rootfolder.path == input.rootfolder.path
-            
-            # Create CleanupConfigurationDTO from the in-memory CleanupConfiguration
-            # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
-            # Now we create the corresponding CleanupConfigurationDTO database record
-            cleanup_config_dto = in_memory_config.to_dto(rootfolder_id=input.rootfolder.id)
-            cleanup_config_dto = insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
-            
-            # Insert simulations (the leaves). The return will be all folders in the db
-            output: RootFolderWithFolderNodeDTOList = self.insert_simulations(integration_session, input)
-            #str_summary = f"key:{key}, input rootfolder ids: {input.rootfolder.id}, output rootfolder ids: {output.rootfolder.id}"
-            #print(str_summary)
-
-            data_set:DataIOSet = DataIOSet(key=key,input=input,output=output)
-            data_set.nodetype_leaf        = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
-            data_set.nodetype_inner       = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.INNERNODE].id
-            # Use the CleanupConfigurationDTO we just created for the RetentionCalculator
-            if cleanup_config_dto:
-                #data_set.retention_calculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id), cleanup_config_dto)
-                data_set.retention_calculator: RetentionCalculator = RetentionCalculator(data_set.output.rootfolder.id, data_set.output.rootfolder.cleanup_config_id, integration_session)
-                
-            data_set.path_retention        = data_set.retention_calculator.retention_type_str_dict["path"]
-            data_set.marked_retention      = data_set.retention_calculator.retention_type_str_dict["marked"]
-            data_set.undefined_retention   = data_set.retention_calculator.retention_type_str_dict["?"]
-
-            dataio_sets.append(data_set)
-
 
         # Step 2 validate the output data
-        leaf_node_type:int = read_folder_type_dict_pr_domain_id(simulation_domain_id)[FolderTypeEnum.SIMULATION].id
         for data_set in dataio_sets:
+            data_set.output = self.insert_simulations(integration_session, data_set.input)
+
             assert data_set.input.rootfolder.id == data_set.output.rootfolder.id  # should never fail because we just got back what we input to insert_simulations
 
             # extract the the list of leaf in input and output so that it is easy to validate them. Leafs are the vts simulations
-            input_leafs  = sorted( [ folder for folder in data_set.input.folders  if folder.is_leaf ], key=lambda f: normalize_path(f.path) )
-            output_leafs = sorted( [ folder for folder in data_set.output.folders if folder.nodetype_id == leaf_node_type ], key=lambda f: normalize_path(f.path) )
-            data_set.input_leafs = input_leafs
+            data_set.input_leafs  = sorted( [ folder for folder in data_set.input.folders  if folder.is_leaf ], key=lambda f: normalize_path(f.path) )
+            output_leafs = sorted( [ folder for folder in data_set.output.folders if folder.nodetype_id == data_set.nodetype_leaf ], key=lambda f: normalize_path(f.path) )
 
             #select and order output simulations so that they match the order of input
             output_leaf_path_dict:dict[str,InMemoryFolderNode] = {normalize_path(f.path): f for f in output_leafs}
@@ -157,8 +198,8 @@ class TestCleanupWorkflows:
                     #part one: consist of the same rootfolder that is not shared with other scenarios
 
                     #check that the all leaves (the simulations) were inserted
-                    assert len(input_leafs) == len(output_leafs)
-                    input_leaf_set  = set([normalize_path(f.path).lower() for f in input_leafs])
+                    assert len(data_set.input_leafs) == len(output_leafs)
+                    input_leaf_set  = set([normalize_path(f.path).lower() for f in data_set.input_leafs])
                     output_leaf_set = set([normalize_path(f.path).lower() for f in output_leafs])
                     diff = input_leaf_set.difference( output_leaf_set )
                     assert len(diff) == 0
@@ -201,8 +242,8 @@ class TestCleanupWorkflows:
 
                     # Likewise the number of input and output leafs must be the same because the insertions in case "second_rootfolder_part_one"
                     # is the first for the rootfolder
-                    assert len(input_leafs) == len(output_leafs)
-                    input_leaf_set  = set([normalize_path(f.path).lower() for f in input_leafs])
+                    assert len(data_set.input_leafs) == len(output_leafs)
+                    input_leaf_set  = set([normalize_path(f.path).lower() for f in data_set.input_leafs])
                     output_leaf_set = set([normalize_path(f.path).lower() for f in output_leafs])
                     diff = input_leaf_set.difference( output_leaf_set )
                     assert len(diff) == 0
@@ -224,10 +265,10 @@ class TestCleanupWorkflows:
 
                     # the number of input leafs must be smaller or equal to the number of output leafs.
                     # Equality can happen if the split of folders between the two cases allocates all leafs to "second_rootfolder_part_two"
-                    assert len(input_leafs) <= len(output_leafs)
+                    assert len(data_set.input_leafs) <= len(output_leafs)
 
                     # Verify all input leaves exist in output
-                    input_leaf_set  = set([normalize_path(f.path).lower() for f in input_leafs])
+                    input_leaf_set  = set([normalize_path(f.path).lower() for f in data_set.input_leafs])
                     output_leaf_set = set([normalize_path(f.path).lower() for f in output_leafs])
                     assert input_leaf_set.issubset( output_leaf_set )
 
@@ -255,9 +296,11 @@ class TestCleanupWorkflows:
 
     # import simulation using self.import_simulations_and_test_db_folder_hierarchy
     # Then test that the retentions of the inserted simulations are correct
-    def import_simulations_and_test_retentions(self, integration_session, keys_to_run_in_order:list[str], cleanup_scenario_data) -> list[DataIOSet]:
+    def import_simulations_and_test_retentions(self, integration_session, data_io_sets: list[DataIOSet]) -> list[DataIOSet]:
+
         #initialize the db and then verify attributes of the inserted simulations
-        data_io_sets:list[DataIOSet] = self.import_simulations_and_test_db_folder_hierarchy(integration_session, keys_to_run_in_order, cleanup_scenario_data)
+        data_io_sets = self.import_simulations_and_test_db_folder_hierarchy(integration_session, data_io_sets)
+
         #test the attributes of the inserted simulations
         for data_set in data_io_sets:
 
@@ -309,8 +352,8 @@ class TestCleanupWorkflows:
         return data_io_sets
 
     # import simulation using self.import_simulations_and_test_retentions
-    # Then start a cleanup round and verify that retentions are updated correctly due to the start of the cleanup round  
-    def import_and_start_cleanup_round_with_test_of_retentions(self, integration_session, cleanup_scenario_data, data_keys:list[str]=["second_rootfolder_part_one"]) -> list[DataIOSet]:
+    # Then start a cleanup round and verify that retentions are updated correctly due to the start of the cleanup round
+    def import_and_start_cleanup_round_with_test_of_retentions(self, integration_session, data_io_sets: list[DataIOSet]) -> list[DataIOSet]:
         #initialize the db and then verify attributes of the inserted simulations
         #   step 1 call the "import_simulations_and_test_db_folder_hierarchy" with "second_rootfolder_part_one" to initialize the data
         #       step 1.1: start the cleanup round and
@@ -318,7 +361,7 @@ class TestCleanupWorkflows:
 
 
         #   step 1 call the "import_simulations_and_test_retentions" with "second_rootfolder_part_one" to initialize and validate folder hierarchy and retentions
-        second_part_one_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, data_keys, cleanup_scenario_data)[0]
+        second_part_one_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, data_io_sets)[0]
 
         path_or_endstage_retention_ids = {second_part_one_data_set.path_retention.id, *[retention.id for retention in second_part_one_data_set.retention_calculator.get_endstage_retentions()]}
         
@@ -380,9 +423,9 @@ class TestCleanupWorkflows:
                     
         return [second_part_one_data_set]
 
-    def import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(self, integration_session, cleanup_scenario_data, data_keys:list[str]=["second_rootfolder_part_one"]) -> list[DataIOSet]:
+    def import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(self, integration_session, data_io_set_part_one:DataIOSet, data_io_set_part_two:DataIOSet) -> list[DataIOSet]:
         #this will import the second rootfolders first part and start a cleanup round
-        second_part_one_data_set:DataIOSet = self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys)[0]
+        second_part_one_data_set:DataIOSet = self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, [data_io_set_part_one])[0]
 
         marked_retention_id = second_part_one_data_set.marked_retention.id
 
@@ -393,7 +436,7 @@ class TestCleanupWorkflows:
         assert len(marked_folders) == len(second_part_one_data_set.input_leafs_to_be_marked_dict), f"before insertion number of input_leafs_to_be_marked_dict should be the same as in the db"
 
         # step 2: insert more folders into the same rootfolder by calling "import_simulations_and_test_db_folder_hierarchy" with "second_rootfolder_part_two"
-        second_part_two_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, ["second_rootfolder_part_two"], cleanup_scenario_data)[0]
+        second_part_two_data_set:DataIOSet= self.import_simulations_and_test_retentions(integration_session, [data_io_set_part_two])[0]
         second_part_two_input_leafs_lookup: dict[str, InMemoryFolderNode] =  {normalize_path(folder.path): folder for folder in second_part_two_data_set.input_leafs } 
         second_part_two_output: RootFolderWithFolderNodeDTOList = second_part_two_data_set.output 
         # this part contains ALL the rootfolders folders
@@ -427,25 +470,35 @@ class TestCleanupWorkflows:
 
     def test_integrationphase_1_simulation_import_and_its_retention_settings(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
-        keys_to_run_in_order = ["first_rootfolder", "second_rootfolder_part_one", "second_rootfolder_part_two"]
-        self.import_simulations_and_test_retentions(integration_session, keys_to_run_in_order, cleanup_scenario_data)
+        data_keys = ["first_rootfolder", "second_rootfolder_part_one", "second_rootfolder_part_two"]       
+        dataio_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+
+        self.import_simulations_and_test_retentions(integration_session, dataio_sets)
 
     def test_integrationphase_2_import_and_start_cleanup_round_with_test_of_retentions(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
-        self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, cleanup_scenario_data)
+
+        data_keys = ["first_rootfolder", "second_rootfolder_part_one", "second_rootfolder_part_two"]       
+        dataio_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+        self.import_and_start_cleanup_round_with_test_of_retentions(integration_session, dataio_sets)
 
     def test_integrationphase_3_retentions_of_insertions_after_start_of_cleanup_round(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
-        data_keys:list[str] = ["second_rootfolder_part_one"]
-        self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys)
+        data_keys:list[str] = ["second_rootfolder_part_one", "second_rootfolder_part_two"]
+        dataio_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+        self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, dataio_sets[0], dataio_sets[1])
 
     def test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions(self, integration_session, cleanup_scenario_data):
         self.setup_new_db_with_vts_metadata(integration_session)
 
-        # the following is all based on the second_rootfolder from cleanup_scenario_data 
-        data_keys:list[str]                     = ["second_rootfolder_part_one"]
-        data_set:list[DataIOSet]                = self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, cleanup_scenario_data, data_keys=data_keys)
-        rootfolder:RootFolderDTO                = data_set[-1].output.rootfolder  # second part two data set
+        # the following is all based on the second_rootfolder from cleanup_scenario_data
+        data_keys:list[str] = ["second_rootfolder_part_one", "second_rootfolder_part_two"]
+        dataio_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+        self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, dataio_sets[0], dataio_sets[1])
+
+
+        #data_set:list[DataIOSet]                = self.import_and_start_cleanup_round_and_import_more_simulations_with_test_of_retentions(integration_session, dataio_sets)
+        rootfolder:RootFolderDTO                = dataio_sets[-1].output.rootfolder  # second part two data set
         marked_folders:list[FolderNodeDTO]      = read_folders_marked_for_cleanup(rootfolder.id)
         cleanup_config:CleanupConfigurationDTO  = rootfolder.get_cleanup_configuration(integration_session)
         assert cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW, \

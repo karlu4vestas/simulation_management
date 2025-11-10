@@ -101,6 +101,18 @@ def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: 
         return rootfolders
 
 
+def exist_rootfolder(rootfolder:RootFolderDTO):
+    if (rootfolder is None) or (rootfolder.simulationdomain_id is None) or (rootfolder.simulationdomain_id == 0):
+        raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
+
+    with Session(Database.get_engine()) as session:
+        #verify if the rootfolder already exists
+        existing_rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(
+                (RootFolderDTO.simulationdomain_id == rootfolder.simulationdomain_id) & 
+                (RootFolderDTO.path == rootfolder.path)
+            )).first()
+        return existing_rootfolder is not None
+
 def insert_rootfolder(rootfolder:RootFolderDTO):
     if (rootfolder is None) or (rootfolder.simulationdomain_id is None) or (rootfolder.simulationdomain_id == 0):
         raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
@@ -332,6 +344,8 @@ def read_pathprotections( rootfolder_id: int )-> list[PathProtectionDTO]:
         paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
         return paths
 
+# @TODO we should consider to enforce the changed path protection on existing folders
+# at present it is the clients responsibility to so and communicate it in "def change_retentions"
 def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
     #print(f"Adding path protection {path_protection}")
     with Session(Database.get_engine()) as session:
@@ -357,7 +371,9 @@ def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
         session.commit()
         return {"id": new_protection.id,
             "message": f"Path protection added id '{new_protection.id}' for path '{new_protection.path}'"}
-    
+
+# @TODO we should consider to enforce the changed path protection on existing folders
+# at present it is the clients responsibility to so and communicate it in "def change_retentions"
 def delete_path_protection(rootfolder_id: int, protection_id: int):
     with Session(Database.get_engine()) as session:
         # Find the path protection by ID and rootfolder_id

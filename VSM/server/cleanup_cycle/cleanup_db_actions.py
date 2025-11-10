@@ -44,6 +44,7 @@ def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
 
             if not cleanup_config.transition_to(CleanupProgress.ProgressEnum.RETENTION_REVIEW):
                 return {"message": f"For rootfolder {rootfolder_id}: failed to transition to CleanupProgress.ProgressEnum.RETENTION_REVIEW"}
+            session.add(cleanup_config)
 
             session.commit()
 

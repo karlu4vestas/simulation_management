@@ -1,3 +1,4 @@
+import os
 import random
 from enum import Enum
 from typing import Optional
@@ -192,6 +193,17 @@ class RootFolderWithMemoryFolders:
         self.rootfolder = rootfolder
         self.folders = folders
 
+    def get_path_with_most_children(self, n_paths: int=2) -> list[str]:
+        # return n_paths paths with most children in the flattened folder list
+        # 1) find all nodes with child nodes each containing multiple children. exclude the first folder level
+        # 2) sort by number of children descending
+        # 3) return the paths of the first n_paths folders
+        root_base_name = os.path.basename(self.rootfolder.path)
+        multiple_child_folders = [folder for folder in self.folders if any(child for child in folder.children) and folder.name != root_base_name]
+        multiple_child_folders.sort(key=lambda f: len(f.children), reverse=True)
+        paths_with_multiple_children = [folder.path for folder in multiple_child_folders[:min(n_paths, len(multiple_child_folders))]]
+        return paths_with_multiple_children
+
 class RootFolderWithMemoryFolderTree:
     """Named tuple for a root folder and its hierarchical tree structure"""
     def __init__(self, rootfolder: RootFolderDTO, folder_tree: InMemoryFolderNode):
@@ -315,14 +327,7 @@ def export_all_folders_to_csv(rootfolders: list[RootFolderWithMemoryFolderTree],
     print(f"   -> Total rows: {len(all_rows)} (including {len([r for r in all_rows if r[3]])} leaf nodes)")
 
 def generate_root_folder_name(owner: str, approvers: str, path: str, levels: int) -> RootFolderWithMemoryFolderTree:
-    
-    rootfolder = RootFolderDTO(
-            owner=owner,
-            approvers=approvers,
-            path=path
-    )
-
-    #print(f"Root folder created. path={rootfolder.path}")
+    rootfolder = RootFolderDTO( owner=owner, approvers=approvers, path=path)
     folder = generate_folder_tree_names(path, levels)
     return RootFolderWithMemoryFolderTree(rootfolder=rootfolder, folder_tree=folder)
 

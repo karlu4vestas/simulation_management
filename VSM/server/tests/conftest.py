@@ -228,9 +228,10 @@ def cleanup_scenario_data():
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0
 
-    #Split the two root folder in three parts:
+    # Split the two root folder in three parts:
     # first rootfolder with all its folders randomized
     first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
+
     #first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
     randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, cleanup_configuration, first_rootfolder.folders)
 
