@@ -4,7 +4,7 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from datamodel.retentions import Extern2InternRetentionTypeConverter, RetentionCalculator, FolderRetention, RetentionTypeEnum
+from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeEnum
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RootFolderDTO, ExternalRetentionTypes
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
@@ -131,7 +131,6 @@ class TestCleanupWorkflows:
             data_set.path_retention        = data_set.retention_calculator.retention_type_str_dict["path"]
             data_set.marked_retention      = data_set.retention_calculator.retention_type_str_dict["marked"]
             data_set.undefined_retention   = data_set.retention_calculator.retention_type_str_dict["?"]
-            data_set.externalToInternalRetentionConverter = Extern2InternRetentionTypeConverter(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id))
 
             dataio_sets.append(data_set)
 

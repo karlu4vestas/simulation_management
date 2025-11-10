@@ -55,7 +55,6 @@ class FolderRetention(Retention):
         self.retention_id = retention.retention_id
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
-        self.folder_id = 0
 
 # see values in vts_create_meta_data
 # @TODO Future Improvement
@@ -93,28 +92,6 @@ class RetentionTypeDTO(RetentionTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
 
-
-# class Extern2InternRetentionTypeConverter:
-#     def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO]):
-#         if not retention_type_dict :
-#             raise ValueError("missing retentention_type_dict")
-
-#         self.undefined_retention_type:RetentionTypeDTO                    = retention_type_dict.get('?')
-
-#         valid_values:set[str]                                             = set([e.value for e in ExternalRetentionTypes])
-#         self.ext2Internal_retention_dto_dict: dict[str, RetentionTypeDTO] = { key: retentiontype_dto for key, retentiontype_dto in retention_type_dict.items() if key in valid_values }
-
-#     def to_internal_type_id(self, external_retention: ExternalRetentionTypes) -> int|None:
-#         if external_retention is None:
-#             raise ValueError(f"External retention type is None")
-#         elif external_retention == ExternalRetentionTypes.NUMERIC:
-#             # if numeric then assign undefined retention so the its numeric retention gets calculated
-#             internal_retention:RetentionTypeDTO = self.undefined_retention_type
-#         else:
-#             internal_retention:RetentionTypeDTO = self.ext2Internal_retention_dto_dict.get(external_retention.value, None)
-#         return internal_retention.id
-
-
 # path protection for a specific path in a rootfolder
 # the question is whether we need a foreigne key to the folder id 
 class PathProtectionBase(SQLModel):
@@ -124,7 +101,6 @@ class PathProtectionBase(SQLModel):
 
 class PathProtectionDTO(PathProtectionBase, table=True):
     id: int | None       = Field(default=None, primary_key=True)
-
 
 
 class RetentionCalculator:
@@ -311,4 +287,4 @@ class PathProtectionEngine:
             if path == pat or path.startswith(pat + "/"):  # avoids "R1" matching "R10/..."
                 return Retention( self.path_retention_id, pid)
         return None
-
+    

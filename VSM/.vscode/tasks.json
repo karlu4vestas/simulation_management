@@ -44,7 +44,7 @@
     {
       "label": "Run Integration Tests (Debug)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -61,14 +61,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run API Unit Tests (Debug)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -85,14 +90,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run DB Unit Tests (Debug)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -109,14 +119,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run DTOs Unit Tests (Debug)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -133,14 +148,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run All Unit Tests (Debug)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -157,14 +177,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run Integration Tests (Normal)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "run_integration_test.py"
       ],
@@ -176,14 +201,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run API Unit Tests (Normal)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "run_api_unittests.py"
       ],
@@ -195,14 +225,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run DB Unit Tests (Normal)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "run_db_unittests.py"
       ],
@@ -214,14 +249,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run DTOs Unit Tests (Normal)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "run_dtos_unittests.py"
       ],
@@ -233,14 +273,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Run All Unit Tests (Normal)",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "run_all_unittests.py"
       ],
@@ -252,14 +297,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Debug DB Unit Tests",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -276,15 +326,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
-      "problemMatcher": [],
-      "dependsOn": "Install debugpy"
+      "problemMatcher": []
     },
     {
       "label": "Install debugpy",
       "type": "shell",
-      "command": "pip",
+      "command": "${workspaceFolder}/.venv/bin/pip",
       "args": [
         "install",
         "debugpy"
@@ -297,14 +351,18 @@
         "panel": "shared"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": []
     },
     {
       "label": "Debug Integration Tests",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -321,15 +379,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
-      "problemMatcher": [],
-      "dependsOn": "Install debugpy"
+      "problemMatcher": []
     },
     {
       "label": "Debug API Unit Tests",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -346,15 +408,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
-      "problemMatcher": [],
-      "dependsOn": "Install debugpy"
+      "problemMatcher": []
     },
     {
       "label": "Debug DTOs Unit Tests",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -371,15 +437,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
-      "problemMatcher": [],
-      "dependsOn": "Install debugpy"
+      "problemMatcher": []
     },
     {
       "label": "Debug All Unit Tests",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "debugpy",
@@ -396,15 +466,19 @@
         "panel": "new"
       },
       "options": {
-        "cwd": "${workspaceFolder}/server"
+        "cwd": "${workspaceFolder}/server",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
-      "problemMatcher": [],
-      "dependsOn": "Install debugpy"
+      "problemMatcher": []
     },
     {
       "label": "Run scan.py in debug mode",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-m",
         "pdb",
@@ -414,7 +488,12 @@
         "--nScanners=1"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan"
+        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": [],
       "presentation": {
@@ -431,7 +510,7 @@
     {
       "label": "Run scan.py with verbose output",
       "type": "shell",
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/bin/python",
       "args": [
         "-u",
         "-v",
@@ -441,7 +520,12 @@
         "--nScanners=1"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan"
+        "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
+        "env": {
+          "PYTHONPATH": "${workspaceFolder}/server",
+          "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+          "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+        }
       },
       "problemMatcher": [],
       "presentation": {

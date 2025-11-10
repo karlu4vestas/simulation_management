@@ -129,11 +129,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_db_unittests.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -141,11 +144,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_api_unittests.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -153,11 +159,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_dtos_unittests.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -165,11 +174,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_all_unittests.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -177,11 +189,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_integration_test.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -189,11 +204,14 @@
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/integration/testdata_for_import.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/integration/",
       "justMyCode": false,
       "env": {
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -206,12 +224,15 @@
         "/workspaces/simulation_management/VSM/io_dir_for_storage_test/TEMP_testdata/scan_output/_Temp",
         "--nScanners=1"
       ],
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -220,11 +241,14 @@
       "request": "launch",
       "program": "${workspaceFolder}/server/cleanup_cycle/scan/folder_tree.py",
       "args": [],
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
       "justMyCode": false,
       "env": {
-        "PYTHONUNBUFFERED": "1"
+        "PYTHONUNBUFFERED": "1",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -233,12 +257,15 @@
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_GenerateSimulation.py",
       "args": [],
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -247,12 +274,15 @@
       "request": "launch",
       "program": "${workspaceFolder}/server/tests/generate_vts_simulations/main_validate_cleanup.py",
       "args": [],
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
       "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     },
     {
@@ -266,12 +296,37 @@
         "-s",
         "--tb=short"
       ],
+      "python": "${workspaceFolder}/.venv/bin/python",
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": true,
       "env": {
         "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "${workspaceFolder}/server"
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    },
+    {
+      "name": "Debug test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": true,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
     }
   ],
