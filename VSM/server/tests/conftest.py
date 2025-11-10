@@ -2,14 +2,13 @@ from collections import deque
 import random
 import pytest
 from sqlmodel import Session
-import os
+
 from datetime import date
-from dataclasses import dataclass
-from app.app_config import AppConfig
 from db.database import Database
 from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
-from .integration.testdata_for_import import RootFolderWithMemoryFolders, RootFolderWithMemoryFolderTree, flatten_folder_structure 
-from .integration.testdata_for_import import generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders,CleanupConfiguration
+from tests.integration.testdata_for_import import flatten_folder_structure, generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
+from tests.integration.testdata_for_import import RootFolderWithMemoryFolders, RootFolderWithMemoryFolderTree 
+from tests.integration.testdata_for_import import CleanupConfiguration
 
 
 @pytest.fixture(scope="function")

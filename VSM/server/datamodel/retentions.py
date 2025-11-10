@@ -3,7 +3,7 @@ from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Literal, Optional
 from datetime import date, timedelta
-from sqlmodel import Field, SQLModel, Relationship, Session
+from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 #ensure consistency of retentions
@@ -104,7 +104,33 @@ class PathProtectionDTO(PathProtectionBase, table=True):
 
 
 class RetentionCalculator:
-    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfigurationDTO):
+    #    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfigurationDTO):
+
+    # use ids for __init__ in order to avoid circular import due to RootFolderDTO
+    def __init__(self, rootfolder_id: int, cleanup_config_id: int, session:Session):
+        from db.db_api import read_pathprotections, read_rootfolder_retentiontypes_dict # avoid circular import
+        # info for path retentions
+        self.path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
+        self.path_retention_id:int = self.path_retention_dict["path"].id if "path" in self.path_retention_dict else 0
+        self.default_path_protection_id: int = 0 # @TODO wil this be used?
+
+        #self.match_prefix_id = make_prefix_id_matcher(protections)
+        protections:list[PathProtectionDTO] = read_pathprotections(rootfolder_id)
+        self.sorted_protections: list[tuple[str, int]] = [(dto.path.lower().replace('\\', '/').rstrip('/'), dto.id) for dto in protections]
+
+        self.sorted_protections: list[tuple[str, int]] = sorted(
+            self.sorted_protections,
+            key=lambda item: item[0].count('/'),
+            reverse=True
+        )
+
+
+        # Info for all other retentions
+        if not cleanup_config_id or cleanup_config_id <= 0:
+            raise ValueError("The cleanup_config_id:{cleanup_config_id} must be valid")
+        cleanup_config:CleanupConfigurationDTO = session.get(CleanupConfigurationDTO, cleanup_config_id)
+        retention_type_dict: dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
+
         if not retention_type_dict or not cleanup_config.is_valid():
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
 
@@ -124,7 +150,7 @@ class RetentionCalculator:
 
         self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
 
-        self.retention_type_str_dict     = retention_type_dict
+        self.retention_type_str_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
         self.path_retention_id           = self.retention_type_str_dict["path"].id   if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
@@ -260,6 +286,18 @@ class RetentionCalculator:
             internal_retention_id = internal_retention.id if internal_retention else None
         return internal_retention_id
 
+    # returns: Retention(retention_id, pathprotection_id) or None if not found
+    #it returns the id to the PathProtectionDTO and prioritizes the most specific path (most segments) if any.
+    def match(self, path:str) -> Optional[Retention]:
+        """
+        Returns a function that, given a path, returns the id of the longest
+        protection that is a prefix of the path (with '/' boundary) or None.
+        """
+        path = (path or "").rstrip('/').lower().replace('\\', '/')
+        for pat, pid in self.sorted_protections:  # short-circuits on first (longest) match
+            if path == pat or path.startswith(pat + "/"):  # avoids "R1" matching "R10/..."
+                return Retention( self.path_retention_id, pid)
+        return None
 
 #ensure consistency of path retentions
 class PathProtectionEngine:

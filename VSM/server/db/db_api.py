@@ -330,7 +330,7 @@ def read_folders( rootfolder_id: int ):
 #     )
 # # --------------- end start not in use now - will be used for optimization -------------------
 
-def read_pathprotections( rootfolder_id: int ):
+def read_pathprotections( rootfolder_id: int )-> list[PathProtectionDTO]:
     with Session(Database.get_engine()) as session:
         paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
         return paths
@@ -380,14 +380,15 @@ def change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
-        cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        #cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
         # However, when a cleanup round is started they have time at "rootfolder.cycletime" to adjust retention
-        if not cleanup_config.is_valid():
-            raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
+        #if not cleanup_config.is_valid():
+        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
 
         # Get retention types for calculations
-        retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
+        #retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
+        retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, rootfolder.cleanup_config_id, session)
 
         # Update expiration dates. 
         # Since RetentionUpdateDTO IS-A Retention, we can pass it directly to the calculator
@@ -524,13 +525,8 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         raise HTTPException(status_code=500, detail=f"Ordering of existing folders does not match simulations for rootfolder {rootfolder.id}")
 
 
-    # prepare the path_protection_engine. it returns the id to the PathProtectionDTO and prioritizes the most specific path (most segments) if any.
-    path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder.id)
-    path_matcher:PathProtectionEngine = PathProtectionEngine(read_pathprotections(rootfolder.id), path_retention_dict["path"].id)
-
-    #Prepare calculation of numeric retention_id.  
-    config:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-    retention_calculator = RetentionCalculator( read_rootfolder_retentiontypes_dict(rootfolder.id), config )
+    #Prepare calculation of retention: non-numeric including pathprotection and pnumeric retentions.  
+    retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, rootfolder.cleanup_config_id, session)
 
     # Prepare bulk update data for existing folders
     bulk_updates = []
@@ -538,7 +534,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: Ro
         db_modified_date:date    = db_folder.modified_date   # initialise with existing
         db_retention:Retention   = db_folder.get_retention() # initialise with existing
         sim_retention_id:RetentionTypeDTO  = retention_calculator.to_internal_type_id(sim.external_retention)
-        path_retention:Retention = path_matcher.match(db_folder.path)
+        path_retention:Retention = retention_calculator.match(db_folder.path)
 
 
         # path retention takes priority over other retentions

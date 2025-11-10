@@ -4,7 +4,7 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeEnum
+from datamodel.retentions import RetentionCalculator, FolderRetention
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, Retention, RetentionTypeDTO, RootFolderDTO, ExternalRetentionTypes
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
@@ -127,7 +127,9 @@ class TestCleanupWorkflows:
             data_set.nodetype_inner       = read_folder_type_dict_pr_domain_id(data_set.output.rootfolder.simulationdomain_id)[FolderTypeEnum.INNERNODE].id
             # Use the CleanupConfigurationDTO we just created for the RetentionCalculator
             if cleanup_config_dto:
-                data_set.retention_calculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id), cleanup_config_dto)
+                #data_set.retention_calculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(data_set.output.rootfolder.id), cleanup_config_dto)
+                data_set.retention_calculator: RetentionCalculator = RetentionCalculator(data_set.output.rootfolder.id, data_set.output.rootfolder.cleanup_config_id, integration_session)
+                
             data_set.path_retention        = data_set.retention_calculator.retention_type_str_dict["path"]
             data_set.marked_retention      = data_set.retention_calculator.retention_type_str_dict["marked"]
             data_set.undefined_retention   = data_set.retention_calculator.retention_type_str_dict["?"]

@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from enum import Enum
 from datetime import date, datetime
 from sqlmodel import SQLModel, Field
@@ -10,12 +9,12 @@ from pydantic import BaseModel
 class CleanupProgress:
     class ProgressEnum(str, Enum):
         """Enumeration of cleanup round progress states."""
-        INACTIVE = "inactive"    # No cleanup is active
+        INACTIVE                    = "inactive"    # No cleanup is active
         STARTING_RETENTION_REVIEW   = "starting_retention_review"      # This is the only phase where the backend is allowed to mark simulation for cleanup.
         RETENTION_REVIEW            = "retention_review"      # Markup phase - users can adjust what simulations will be cleaned. 
-        CLEANING = "cleaning"    # Actual cleaning is happening
-        FINISHING = "finish_cleanup_round"    # finish the cleanup round
-        DONE = "cleanup_is_done"    # Cleanup round is complete, waiting for next round
+        CLEANING                    = "cleaning"    # Actual cleaning is happening
+        FINISHING                   = "finish_cleanup_round"    # finish the cleanup round
+        DONE                        = "cleanup_is_done"    # Cleanup round is complete, waiting for next round
 
     # Define valid state transitions
     valid_transitions: dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]] = {

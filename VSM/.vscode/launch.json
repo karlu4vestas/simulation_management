@@ -308,12 +308,12 @@
       }
     },
     {
-      "name": "Debug test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
+      "name": "Debug test_integrationphase_1_simulation_import_and_its_retention_settings",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_1_simulation_import_and_its_retention_settings",
         "-v",
         "-s",
         "--tb=short"

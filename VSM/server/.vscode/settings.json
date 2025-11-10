@@ -13,6 +13,9 @@
     "python.linting.flake8Enabled": true,
     "python.formatting.provider": "black",
     "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/.venv/lib/python3.11/site-packages"
+    ],
     "files.exclude": {
         "**/__pycache__": true,
         "**/.pytest_cache": true,

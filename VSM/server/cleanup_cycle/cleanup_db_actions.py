@@ -5,7 +5,7 @@ from db.database import Database
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
 from cleanup_cycle.cleanup_dtos import CleanupProgress, CleanupConfigurationDTO
 from datamodel.retentions import RetentionCalculator
-from db.db_api import read_folder_type_dict_pr_domain_id, read_rootfolder_retentiontypes_dict, read_folders_marked_for_cleanup
+from db.db_api import read_folder_type_dict_pr_domain_id, read_folders_marked_for_cleanup
  
 
 # This function put the cleanup cycle into CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW in order to recalculate all numeric retentions
@@ -25,6 +25,7 @@ def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
                 return {"message": f"For rootfolder {rootfolder_id}: cleanup_config.can_start_cleanup_now() is valid but start_new_cleanup_cycle is failed to transition to CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW"}
             session.add(cleanup_config)
             session.commit()
+            session.refresh(cleanup_config)
 
             # recalculate numeric retentions
 
@@ -35,7 +36,7 @@ def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
                                                                  (FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
 
             # Update retentions 
-            retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config)
+            retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, rootfolder.cleanup_config_id, session)
             
             for folder in folders:          
                 folder.set_retention( retention_calculator.adjust_from_cleanup_configuration_and_modified_date( folder.get_retention(), folder.modified_date) )
@@ -66,7 +67,8 @@ def cleanup_cycle_finishing(rootfolder_id: int) -> dict[str, str]:
         marked_simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(rootfolder_id)
         if len(marked_simulations) > 0:
             # change the retention to the next retention after marked
-            retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
+            retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, cleanup_config.id, session)
+
             retention_id_after_marked:int = retention_calculator.get_retention_id_after_marked()
             for folder in marked_simulations:
                 folder.retention_id = retention_id_after_marked

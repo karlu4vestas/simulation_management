@@ -23,6 +23,9 @@
         "editor.defaultFormatter": "ms-dotnettools.csharp"
     },
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/.venv/lib/python3.11/site-packages"
+    ],
     "terminal.integrated.env.linux": {
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
