@@ -346,7 +346,7 @@ def read_pathprotections( rootfolder_id: int )-> list[PathProtectionDTO]:
 
 # @TODO we should consider to enforce the changed path protection on existing folders
 # at present it is the clients responsibility to so and communicate it in "def change_retentions"
-def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
+def add_pathprotection(rootfolder_id:int, path_protection:PathProtectionDTO):
     #print(f"Adding path protection {path_protection}")
     with Session(Database.get_engine()) as session:
         # Check if path protection already exists for this path in this rootfolder
@@ -372,9 +372,151 @@ def add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
         return {"id": new_protection.id,
             "message": f"Path protection added id '{new_protection.id}' for path '{new_protection.path}'"}
 
+def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
+    # step 1: find the folder nodes by path
+    # step 2: create list[PathProtectionDTO] with rootfolder_id, folder_id, path
+    # step 3: call add_path_protection for each PathProtectionDTO
+    # Note: Uses case-insensitive path matching and raises exceptions for errors
+    if not paths:
+        raise HTTPException(status_code=400, detail="No paths provided")
+    
+    with Session(Database.get_engine()) as session:
+        # Verify rootfolder exists
+        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
+        
+        # Step 1: Find the folder nodes by path (case-insensitive)
+        lower_case_paths = [path.lower() for path in paths]
+        existing_folders = session.exec(
+            select(FolderNodeDTO).where(
+                (FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                (func.lower(FolderNodeDTO.path).in_(lower_case_paths))
+            )
+        ).all()
+        
+        # Create a mapping from path to folder for fast lookup
+        path_to_folder = {folder.path.lower(): folder for folder in existing_folders}
+        
+        # Track results
+        added_protections = []
+        failed_paths = []
+        
+        # Step 2 & 3: Create and add path protections
+        for path in paths:
+            folder = path_to_folder.get(path.lower())
+            
+            if not folder:
+                failed_paths.append({"path": path, "reason": "Folder not found"})
+                continue
+            
+            # Check if path protection already exists
+            existing_protection = session.exec(
+                select(PathProtectionDTO).where(
+                    (PathProtectionDTO.rootfolder_id == rootfolder_id) & 
+                    (PathProtectionDTO.folder_id == folder.id)
+                )
+            ).first()
+            
+            if existing_protection:
+                # Use existing protection instead of creating a new one
+                added_protections.append({"path": folder.path, "folder_id": folder.id, "already_existed": True})
+                continue
+            
+            # Create new path protection
+            new_protection = PathProtectionDTO(
+                rootfolder_id=rootfolder_id,
+                folder_id=folder.id,
+                path=folder.path
+            )
+            
+            session.add(new_protection)
+            added_protections.append({"path": folder.path, "folder_id": folder.id, "already_existed": False})
+        
+        # Raise exception if any paths failed
+        if failed_paths:
+            raise HTTPException(status_code=400, detail=f"Failed to add path protection for {len(failed_paths)} path(s): {failed_paths}")
+        
+        # Commit all new protections
+        session.commit()
+        
+        return {
+            "message": f"Added {len(added_protections)} path protection(s) for rootfolder {rootfolder_id}",
+            "added_count": len(added_protections),
+            "added_protections": added_protections
+        }
+
+
+def apply_pathprotections(rootfolder_id:int):
+    # ensure that all existing path protections for the root folder has been applied to the folders
+    # step 1: find the path retention id
+    # step 2: get the simulation nodetype id (only simulation nodes get retention, not innernodes)
+    # step 3: find all path protections for the rootfolder
+    # step 4: sort them by path depth so the most specific path protections takes priority
+    #         Sort by increasing number of segments and apply in that order
+    #         Most specific protections are applied last, overriding higher-level path protections
+    # step 5: Apply path protection by setting retention_id to path retention id and pathprotection_id
+    # step 6: return number of folders modified
+    
+    with Session(Database.get_engine()) as session:
+        # Verify rootfolder exists
+        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
+        
+        # Step 1: Find the path retention id
+        path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
+        path_retention_id:int = path_retention_dict["path"].id if "path" in path_retention_dict else 0
+        if path_retention_id == 0:
+            raise HTTPException(status_code=500, detail=f"Path retention type not found for rootfolder {rootfolder_id}")
+        
+        # Step 2: Get the simulation nodetype id (only SIMULATION nodes, not INNERNODE)
+        nodetype_simulation_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+        
+        # Step 3: Find all path protections for the rootfolder
+        path_protections = session.exec( select(PathProtectionDTO).where( PathProtectionDTO.rootfolder_id == rootfolder_id) ).all()        
+        if not path_protections:
+            return {"message": f"No path protections found for rootfolder {rootfolder_id}", "folders_modified": 0}
+        
+        # Step 4: Sort by path depth (number of segments) - least specific first, most specific last
+        sorted_protections = sorted(path_protections, key=lambda p: p.path.count('/'))
+        
+        # Step 5: Apply path protections to all SIMULATION folders under each protected path
+        folders_modified = 0
+        
+        for protection in sorted_protections:
+            # Find all SIMULATION folders that start with this path (case-insensitive)
+            # Using LIKE with wildcards to match the path and all subpaths
+            matching_folders = session.exec(
+                select(FolderNodeDTO).where(
+                    (FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                    (FolderNodeDTO.nodetype_id == nodetype_simulation_id) &
+                    ((func.lower(FolderNodeDTO.path) == protection.path.lower()) |
+                     (func.lower(FolderNodeDTO.path).like(f"{protection.path.lower()}/%")))
+                )
+            ).all()
+            
+            # Apply protection to matching folders
+            for folder in matching_folders:
+                folder.retention_id = path_retention_id
+                folder.pathprotection_id = protection.id
+                session.add(folder)
+                folders_modified += 1
+        
+        # Commit all changes
+        session.commit()
+        
+        # Step 6: Return number of folders modified
+        return {
+            "message": f"Applied {len(path_protections)} path protection(s) to {folders_modified} folder(s) in rootfolder {rootfolder_id}",
+            "protections_applied": len(path_protections),
+            "folders_modified": folders_modified
+        }
+
+
 # @TODO we should consider to enforce the changed path protection on existing folders
 # at present it is the clients responsibility to so and communicate it in "def change_retentions"
-def delete_path_protection(rootfolder_id: int, protection_id: int):
+def delete_pathprotection(rootfolder_id: int, protection_id: int):
     with Session(Database.get_engine()) as session:
         # Find the path protection by ID and rootfolder_id
         protection = session.exec( select(PathProtectionDTO).where((PathProtectionDTO.id == protection_id) & (PathProtectionDTO.rootfolder_id == rootfolder_id)) ).first()

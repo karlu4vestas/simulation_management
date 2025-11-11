@@ -39,20 +39,6 @@ from tests import test_storage
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
     
-# class LocalFileStorage:
-#     def __init__(self, base_path: str):
-#         self.base_path = base_path
-
-#     def write_folder(self, folder_path: str):
-#         full_path = os.path.join(self.base_path, folder_path.lstrip("/"))
-#         os.makedirs(full_path, exist_ok=True)
-
-#     def write_file(self, file_path: str, content: str = ""):
-#         full_path = os.path.join(self.base_path, file_path.lstrip("/"))
-#         dir_path = os.path.dirname(full_path)
-#         os.makedirs(dir_path, exist_ok=True)
-#         with open(full_path, 'w') as f:
-#             f.write(content)
 class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
     def __init__(self):
         super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
@@ -240,6 +226,4 @@ class TestSchedulerAndAgents:
 
             assert cleanup_configuration is not None, "Cleanup configuration should be found"
             assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"
-
-            pass
-        
+       

@@ -7,11 +7,12 @@ import pytest
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start
 
-from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
+from datamodel.retentions import PathProtectionDTO, RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
-from db.db_api import FileInfo, exist_rootfolder
+from db import db_api
+from db.db_api import FileInfo, apply_pathprotections, exist_rootfolder
 from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
 from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder
@@ -23,12 +24,17 @@ class RootFolderWithFolderNodeDTOList(NamedTuple):
     """Named tuple for a root folder and its flattened list of folder nodes"""
     rootfolder: RootFolderDTO
     folders: list[FolderNodeDTO]
+    path_protections: list[PathProtectionDTO]  # from def read_pathprotections( rootfolder_id: int ). may be None or empty
 
 class DataIOSet:
     # This structure is used to collect data for verification during the tests
 
     key:    str  # input to retrieve the scenario data from cleanup_scenario_data in conftest.py
     input:  RootFolderWithMemoryFolders #input taken directly from the test data fixture
+    # If input_path_protections is set then create these protections in db after the initial insertion of simulations
+    # it cannot be done before because the API is based on the user selecting the paths in the UI
+    path_protections_paths: list[str] = None # input path protections extracted from input. 
+    expected_protected_leaf_count:int = 0 # if path_protections_paths is not None then this is the expected number of leafs protected by the path protections
 
     input_leafs: list[InMemoryFolderNode] = None # input leafs (the simulations) extracted from input
     input_leafs_to_be_marked_dict: dict[str, InMemoryFolderNode] = None
@@ -38,6 +44,7 @@ class DataIOSet:
     output: RootFolderWithFolderNodeDTOList = None  # output rootfolder and folders from db after insertion of simulations
     output_leafs: list[FolderNodeDTO] = None  # output leafs (the simulations) extracted from output
     output_for_input_leafs: list[FolderNodeDTO] = None  # output leafs (the simulations) extracted from output and ordered as input leafs
+
     retention_calculator: RetentionCalculator = None  # retention calculator for the rootfolder
 
     # retentions
@@ -140,7 +147,7 @@ class TestCleanupWorkflows:
 
         return dataset_io
 
-    def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders) -> RootFolderWithFolderNodeDTOList:
+    def insert_simulations(self, session: Session, rootfolder_with_folders: RootFolderWithMemoryFolders, path_protections_paths:list[str]) -> RootFolderWithFolderNodeDTOList:
         # Insert simulations into database and return all the rootfolder database folders for validation 
         rootfolder:RootFolderDTO=rootfolder_with_folders.rootfolder
         assert rootfolder.id is not None and rootfolder.id > 0
@@ -155,15 +162,23 @@ class TestCleanupWorkflows:
         rootfolders = [r for r in rootfolders if r.id == rootfolder.id] 
         assert len(rootfolders) == 1
 
+        #folders: list[FolderNodeDTO] = read_folders(rootfolder.id)
+
+        # insert path protections if any
+        if path_protections_paths:
+            db_api.add_pathprotection_by_paths(rootfolder.id, path_protections_paths)
+            db_api.apply_pathprotections(rootfolder.id)
+
         folders: list[FolderNodeDTO] = read_folders(rootfolder.id)
-        return RootFolderWithFolderNodeDTOList(rootfolder=rootfolders[0], folders=folders)
+
+        return RootFolderWithFolderNodeDTOList(rootfolder=rootfolders[0], folders=folders, path_protections=db_api.read_pathprotections(rootfolder.id))
 
     def import_simulations(self, integration_session, dataio_sets: list[DataIOSet]) -> list[DataIOSet]:
         # import the simulations and prepare the in and output leafs structures for later verification
 
         # Step 2 validate the output data
         for data_set in dataio_sets:
-            data_set.output = self.insert_simulations(integration_session, data_set.input)
+            data_set.output = self.insert_simulations(integration_session, data_set.input, data_set.path_protections_paths)
 
             assert data_set.input.rootfolder.id == data_set.output.rootfolder.id  # should never fail because we just got back what we input to insert_simulations
 
@@ -174,8 +189,9 @@ class TestCleanupWorkflows:
             #select and order output simulations so that they match the order of input
             output_leaf_path_dict:dict[str,InMemoryFolderNode] = {normalize_path(f.path): f for f in data_set.output_leafs}
             data_set.output_for_input_leafs = [output_leaf_path_dict[ normalize_path(p.path) ] for p in data_set.input_leafs]
-        return dataio_sets    
-            
+
+        return dataio_sets
+
 
     def verify_db_folder_hierarchy(self, integration_session, dataio_sets: list[DataIOSet]) -> list[DataIOSet]:
         # validate that the folder hierarchy is inserted correctly
@@ -288,12 +304,37 @@ class TestCleanupWorkflows:
         # @TODO: a review of this function would be good
         for data_set in data_io_sets:
 
+            # Verify path protections if the input was configured for that
+            if data_set.output.path_protections :
+                # assert the test was configured properly if path protections in db then they must have been configured in the input
+                # otherwise the test is invalid
+                assert len(data_set.output.path_protections) == len(data_set.path_protections_paths), \
+                    f"data_set.key={data_set.key}: Number of path protections in db {len(data_set.output.path_protections)} does not match input {len(data_set.path_protections_paths)}"
+                assert data_set.expected_protected_leaf_count > 0, \
+                    f"data_set.key={data_set.key}: expected_protected_leaf_count must be set when path protections are configured in input"
+                
+                # extract the number of protected folders from the database
+                # select all folders under data_set.output.rootfolder with a pathprotection_id
+                folders_with_path_protection:list[FolderNodeDTO] = [ folder for folder in data_set.output.folders if folder.pathprotection_id is not None ]
+                #verify that they are all leafs
+                assert all( folder.nodetype_id == data_set.nodetype_leaf for folder in folders_with_path_protection ), \
+                    f"data_set.key={data_set.key}: Not all folders with pathprotection_id are leafs"
+                # assert that the pathprotection_id is assigned for alle the folders
+                assert all( (folder.pathprotection_id is not None and folder.pathprotection_id !=0)  for folder in folders_with_path_protection ), \
+                    f"data_set.key={data_set.key}: All folders with pathprotection_id must have it assigned"
+
+                #assert that the number of protected leafs is as expected
+                assert len(folders_with_path_protection) == data_set.expected_protected_leaf_count, \
+                    f"data_set.key={data_set.key}: Expected {data_set.expected_protected_leaf_count} protected leafs but found {len(folders_with_path_protection)} in database"
+                
+
             for sim_folder, folder in zip(data_set.input_leafs, data_set.output_for_input_leafs):
                 # verify that modified_date was set correctly
                 assert folder.modified_date == sim_folder.modified_date
 
                 # verify that the folder type is correct
                 assert folder.nodetype_id == data_set.nodetype_leaf
+
 
                 # verify that the retention is correct
                 # Notice that there is no active cleanup round and the simulation have just been inserted 
@@ -357,7 +398,7 @@ class TestCleanupWorkflows:
 
             # step 1.1: start the cleanup round and
             cleanup_cycle_start(rootfolder.id )
-            data_set.output = RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=read_folders(rootfolder.id))  # refresh the folders in output to reflect any changes made by starting the cleanup round
+            data_set.output = RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=read_folders(rootfolder.id), path_protections=db_api.read_pathprotections(rootfolder.id))
             output_leafs_after_start: dict[str,FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders if folder.nodetype_id == data_set.nodetype_leaf}
 
             marked_folders: list[FolderNodeDTO] = read_folders_marked_for_cleanup(data_set.output.rootfolder.id)
@@ -474,6 +515,8 @@ class TestCleanupWorkflows:
         self.setup_new_db_with_vts_metadata(integration_session)
         data_keys = ["first_rootfolder", "second_rootfolder_part_one"]       
         data_io_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+        second_part_one_data_set = data_io_sets[0]
+        second_part_two_data_set = data_io_sets[1]
         for data_set in data_io_sets:
             self.import_simulations(integration_session, [data_set])
             self.verify_db_folder_hierarchy(integration_session, [data_set])
@@ -555,3 +598,30 @@ class TestCleanupWorkflows:
         assert len(reduced_marked_folders) == len(marked_folders), f"near sim_changed_by_import_ui: Expected {len(marked_folders)} marked folders but found {len(reduced_marked_folders)}"
         # Verify that sim_changed_from_ui is not found in the reduced marked folders
         assert sim_changed_by_import_ui.id not in [folder.id for folder in reduced_marked_folders], f"sim_changed_by_import_ui (id={sim_changed_by_import_ui.id}, {sim_changed_by_import_ui.path}) should not be in the reduced marked folders"
+
+
+    def test_5_root1_verify_folder_hierarchy_and_retentions_after_import_with_path_protections(self, integration_session, cleanup_scenario_data):
+        # Import all test dataset and verify the folder structures in the db and the retentions of the inserted simulations
+        self.setup_new_db_with_vts_metadata(integration_session)
+        data_keys = ["first_rootfolder"]       
+        data_io_sets: list[DataIOSet] = [self.setup_basic_dataset_io(integration_session, scenario_key=key, cleanup_scenario_data=cleanup_scenario_data) for key in data_keys]
+        root1_data = data_io_sets[0]
+
+        # Use the new method to generate two-level path protections
+        path_protection_tuple = root1_data.input.get_two_level_path_protections()
+        if path_protection_tuple is not None:
+            highlevel_path, lower_level_path = path_protection_tuple
+            root1_data.path_protections_paths = [highlevel_path, lower_level_path]
+
+        assert len(root1_data.path_protections_paths) == 2, f"test setup failure: expected 2 path protections but found {len(root1_data.path_protections_paths)} abort the test"
+        # Establish the number of expected path protections for each rootfolder so they can be verified after import in verify_retentions
+        # count the the input leaf folders that start with any of the path protection paths
+        # Note: Using any() ensures each leaf is counted only once, even if multiple path protections could match
+        root1_data.expected_protected_leaf_count = root1_data.input.count_protected_leafs(root1_data.path_protections_paths)
+
+        for data_set in data_io_sets:
+            #initialize the db and then verify attributes of the inserted simulations
+            self.import_simulations(integration_session, [data_set])
+            self.verify_db_folder_hierarchy(integration_session, [data_set])
+            data_io_sets = self.verify_retentions(integration_session, [data_set])
+        

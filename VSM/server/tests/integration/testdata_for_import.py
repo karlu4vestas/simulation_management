@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from db.db_api import normalize_path
 
 # In-memory dataclass for test data setup - not persisted to database
 # Used by test fixtures to configure cleanup settings before database insertion
@@ -37,9 +38,9 @@ class InMemoryFolderNode:
 
     """In-memory representation of a folder node using pointers for parent-child relationships"""
     def __init__(self, name: str, is_leaf: bool, external_retentiontype: ExternalRetentionTypes):
-        self.name = name
-        self.path = ""
-        self.is_leaf = is_leaf
+        self.name:str = name
+        self.path:str = ""
+        self.is_leaf:bool = is_leaf
         self.parent: Optional['InMemoryFolderNode'] = None
         self.children: list['InMemoryFolderNode'] = []
         self.modified_date: Optional[datetime] = None  # Add modified_date field
@@ -189,20 +190,66 @@ class RootFolderWithMemoryFolders:
     """Named tuple for a root folder and its flattened list of folder nodes"""
     rootfolder: RootFolderDTO
     folders: list[InMemoryFolderNode]
+    leafs: list[InMemoryFolderNode]
     def __init__(self, rootfolder: RootFolderDTO, folders: list[InMemoryFolderNode]):
         self.rootfolder = rootfolder
         self.folders = folders
+        self.leafs = [folder for folder in folders if folder.is_leaf]
 
-    def get_path_with_most_children(self, n_paths: int=2) -> list[str]:
-        # return n_paths paths with most children in the flattened folder list
+    def get_path_with_most_children(self, n_paths: int=0) -> list[str]:
+        # return n_paths paths with most children in descending order. 0 means all are returned
         # 1) find all nodes with child nodes each containing multiple children. exclude the first folder level
         # 2) sort by number of children descending
         # 3) return the paths of the first n_paths folders
         root_base_name = os.path.basename(self.rootfolder.path)
-        multiple_child_folders = [folder for folder in self.folders if any(child for child in folder.children) and folder.name != root_base_name]
+        multiple_child_folders: list[InMemoryFolderNode] = [folder for folder in self.folders if any(child for child in folder.children) and folder.name != root_base_name]
         multiple_child_folders.sort(key=lambda f: len(f.children), reverse=True)
-        paths_with_multiple_children = [folder.path for folder in multiple_child_folders[:min(n_paths, len(multiple_child_folders))]]
+        if n_paths > 0:
+            multiple_child_folders = multiple_child_folders[:min(n_paths, len(multiple_child_folders))]
+
+        paths_with_multiple_children: list[str] = [folder.path for folder in multiple_child_folders]
         return paths_with_multiple_children
+
+    def get_two_level_path_protections(self) -> tuple[str, str] | None:
+        """Generate two path protections: a high-level path and a lower-level nested path.        
+        Returns:
+            A tuple of (highlevel_path, lower_level_path) or None if unable to generate two paths
+        """
+        potential_path_protections: list[str] = self.get_path_with_most_children()
+        
+        if len(potential_path_protections) <= 1:
+            return None
+            
+        highlevel_path = potential_path_protections[1]
+        if highlevel_path.count("/") > 1:
+            # Take the parent path. We have to do it this way because in this context we only have flat lists
+            highlevel_path = "/".join(highlevel_path.split("/")[:-1])
+
+        # Find a path that is nested under highlevel_path
+        lower_level_path = next(
+            (path for path in potential_path_protections 
+             if highlevel_path in path and len(path) > len(highlevel_path)), 
+            None
+        )
+        
+        if lower_level_path is not None:
+            return (highlevel_path, lower_level_path)
+        
+        return None
+
+    def count_protected_leafs(self, path_protection_paths: list[str]) -> int:
+        """Count the number of leaf folders that start with any of the given path protection paths.
+        Args:
+            path_protection_paths: List of path protection paths to check against
+        Returns:
+            Number of leafs protected by the path protections. Each leaf is counted only once,
+            even if multiple path protections could match.
+        """
+        return sum(
+            1 for leaf in self.leafs 
+            if any(normalize_path(leaf.path).startswith(normalize_path(pp_path)) 
+                   for pp_path in path_protection_paths)
+        )
 
 class RootFolderWithMemoryFolderTree:
     """Named tuple for a root folder and its hierarchical tree structure"""
@@ -335,7 +382,7 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     root_folders: list[RootFolderWithMemoryFolderTree] = []
 
     for i in range(1, number_of_rootfolders + 1):
-        root_folder_with_tree = generate_root_folder_name("jajac", "stefw, misve", f"R{i}", i + 1)
+        root_folder_with_tree = generate_root_folder_name("jajac", "stefw, misve", f"R{i}", i + 2)
         root_folders.append(root_folder_with_tree)
     
     return root_folders

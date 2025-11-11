@@ -10,7 +10,7 @@ from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
 from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials, update_rootfolder_cleanup_configuration
-from db.db_api import read_rootfolder_retentiontypes, read_folders, read_pathprotections, add_path_protection, delete_path_protection
+from db.db_api import read_rootfolder_retentiontypes, read_folders, read_pathprotections, add_pathprotection, delete_pathprotection
 from db.db_api import change_retentions, FileInfo 
 
 from app.app_config import AppConfig
@@ -151,14 +151,14 @@ def fs_read_pathprotections( rootfolder_id: int ):
 # Add a new path protection to a specific root folder
 @app.post("/v1/rootfolders/{rootfolder_id}/pathprotection")
 def fs_add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
-    return add_path_protection(rootfolder_id, path_protection)
+    return add_pathprotection(rootfolder_id, path_protection)
 
 
 
 # Delete a path protection from a specific root folder
 @app.delete("/v1/rootfolders/{rootfolder_id}/pathprotection")
 def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
-    return delete_path_protection(rootfolder_id, protection_id)
+    return delete_pathprotection(rootfolder_id, protection_id)
 
     
 # The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanupfrequency and rootfolder.cycletime msut be set
