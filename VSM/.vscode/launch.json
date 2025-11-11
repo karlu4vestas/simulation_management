@@ -286,34 +286,12 @@
       }
     },
     {
-      "name": "Debug test_scheduler_and_agents_with_full_cleanup_round",
+      "name": "Debug test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_scheduler_and_agents.py::TestSchedulerAndAgents::test_scheduler_and_agents_with_full_cleanup_round",
-        "-v",
-        "-s",
-        "--tb=short"
-      ],
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server",
-      "justMyCode": true,
-      "env": {
-        "PYTHONUNBUFFERED": "1",
-        "PYTHONPATH": "${workspaceFolder}/server",
-        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
-        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
-      }
-    },
-    {
-      "name": "Debug test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "pytest",
-      "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_integrationphase_4_retentions_of_insertions_after_start_of_cleanup_round_and_change_of_marked_retentions",
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
         "-v",
         "-s",
         "--tb=short"

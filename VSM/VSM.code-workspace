@@ -5,12 +5,12 @@
         }
     ],
     "settings": {
-        "python.defaultInterpreterPath": "${workspaceFolder}/server/.venv/bin/python",
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
         "python.terminal.activateEnvironment": true,
         "python.terminal.activateEnvInCurrentTerminal": true,
         "terminal.integrated.env.linux": {
-            "VIRTUAL_ENV": "${workspaceFolder}/server/.venv",
-            "PATH": "${workspaceFolder}/server/.venv/bin:${env:PATH}"
+            "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+            "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
         },
         "python.analysis.extraPaths": [
             "${workspaceFolder}/server"

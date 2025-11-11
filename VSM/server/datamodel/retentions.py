@@ -56,6 +56,16 @@ class FolderRetention(Retention):
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
 
+    @staticmethod
+    def create(folder_id:int, retention: Retention) -> "FolderRetention":
+        # Update the retention fields from a Retention object.
+        return FolderRetention(
+            folder_id=folder_id,
+            retention_id=retention.retention_id,
+            pathprotection_id=retention.pathprotection_id,
+            expiration_date=retention.expiration_date
+        )
+
 # see values in vts_create_meta_data
 # @TODO Future Improvement
 # For better design, consider adding a separate category or type field with the enum, keeping name as a display label. 

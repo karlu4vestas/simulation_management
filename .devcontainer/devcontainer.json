@@ -1,29 +1,29 @@
 {
-	"name": "VSM Blazor WebAssembly",
-	"image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
-	"features": {
-		"ghcr.io/devcontainers/features/node:1": {
-			"version": "lts"
-		},
-		"ghcr.io/devcontainers/features/git:1": {},
-		"ghcr.io/devcontainers/features/github-cli:1": {}
-	},
-	"workspaceFolder": "/workspaces/simulation_management/VSM",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"ms-dotnettools.csharp",
-				"ms-dotnettools.csdevkit",
-				"ms-dotnettools.blazorwasm-companion",
-				"ms-vscode.vscode-json",
-				"bradlc.vscode-tailwindcss",
-				"mongodb.mongodb-vscode"
-			],
-			"settings": {
-				"dotnet.defaultSolution": "simulation_management.sln"
-			}
-		}
-	},
+        "name": "VSM Blazor WebAssembly",
+        "image": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+        "features": {
+                "ghcr.io/devcontainers/features/node:1": {
+                        "version": "lts"
+                },
+                "ghcr.io/devcontainers/features/git:1": {},
+                "ghcr.io/devcontainers/features/github-cli:1": {}
+        },
+        "workspaceFolder": "/workspaces/simulation_management/VSM",
+        "customizations": {
+                "vscode": {
+                        "extensions": [
+                                "ms-dotnettools.csharp",
+                                "ms-dotnettools.csdevkit",
+                                "ms-dotnettools.blazorwasm-companion",
+                                "ms-vscode.vscode-json",
+                                "bradlc.vscode-tailwindcss",
+                                "mongodb.mongodb-vscode"
+                        ],
+                        "settings": {
+                                "dotnet.defaultSolution": "simulation_management.sln"
+                        }
+                }
+        },
     "hostRequirements": {
         "memory": "8gb",
         "cpus": 2
@@ -32,7 +32,7 @@
         "DOTNET_MULTILEVEL_LOOKUP": "0",
         "TARGET": "net9.0"
     },
-	"forwardPorts": [5000, 5001, 5173],
+        "forwardPorts": [5000, 5001, 5173],
     "portsAttributes": {
         "5000": {
             "label": "API",
