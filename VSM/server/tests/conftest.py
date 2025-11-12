@@ -224,7 +224,7 @@ def cleanup_scenario_data():
 
     number_of_rootfolders = 2
     cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_start_date=date(2000, 1, 1))
-    random_days:int = 10
+
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0
 
@@ -244,16 +244,12 @@ def cleanup_scenario_data():
     mid_index = len(second_rootfolder.folders) // 2
     
     second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
-    #random.shuffle(second_rootfolder_part_one.folders)  # Shuffle part one for debugging
     randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_one.folders)
     second_rootfolder_part_one.folders.sort(key=lambda folder: folder.path)
-    #paths1 = [folder.path for folder in second_rootfolder_part_one.folders]
 
     second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
-    #random.shuffle(second_rootfolder_part_two.folders)  # Shuffle part two for debugging
     randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_two.folders)
     second_rootfolder_part_two.folders.sort(key=lambda folder: folder.path)
-    #paths2 = [folder.path for folder in second_rootfolder_part_two.folders] 
     return {
         "cleanup_configuration": cleanup_configuration,
         "rootfolder_tuples": rootfolders,
@@ -269,5 +265,3 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "integration: marks tests as integration tests") 
     config.addinivalue_line("markers", "cleanup_workflow: marks tests as cleanup workflow scenarios")
     config.addinivalue_line("markers", "slow: marks tests as slow running")
-
-

@@ -233,8 +233,8 @@ class RootFolderWithMemoryFolders:
                 if highlevel_path in lower_path and len(lower_path) > len(highlevel_path):
                     result_pairs.append((highlevel_path, lower_path))
         
-        # Sort by the high-level path (first element of tuple)
-        result_pairs.sort(key=lambda pair: pair[0])
+        # Sort by the high-level path (first element of tuple) makes it easier to look at date in the debuggger
+        # result_pairs.sort(key=lambda pair: pair[0])
         return result_pairs
 
     def count_protected_leafs(self, path_protection_paths: list[str]) -> int:
