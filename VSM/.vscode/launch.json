@@ -286,12 +286,12 @@
       }
     },
     {
-      "name": "Debug test_5_root1_verify_folder_hierarchy_and_retentions_after_import_with_path_protections",
+      "name": "Debug test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_5_root1_verify_folder_hierarchy_and_retentions_after_import_with_path_protections",
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
         "-v",
         "-s",
         "--tb=short"

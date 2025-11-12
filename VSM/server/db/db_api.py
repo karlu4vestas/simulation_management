@@ -4,7 +4,7 @@ from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
 from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupFrequencyDTO, CycleTimeDTO
-from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO
+from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum
 from datamodel.retentions import RetentionCalculator, FolderRetention
 from datamodel.dtos import FolderTypeDTO, FolderNodeDTO
 from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeEnum, FileInfo 
@@ -418,6 +418,7 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
                 )
             ).first()
             
+            # some path_protections failed. Instead of raise an exception we return the number of failed_paths in the results
             if existing_protection:
                 # Use existing protection instead of creating a new one
                 added_protections.append({"path": folder.path, "folder_id": folder.id, "already_existed": True})
@@ -432,10 +433,7 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
             
             session.add(new_protection)
             added_protections.append({"path": folder.path, "folder_id": folder.id, "already_existed": False})
-        
-        # Raise exception if any paths failed
-        if failed_paths:
-            raise HTTPException(status_code=400, detail=f"Failed to add path protection for {len(failed_paths)} path(s): {failed_paths}")
+
         
         # Commit all new protections
         session.commit()
@@ -443,7 +441,8 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
         return {
             "message": f"Added {len(added_protections)} path protection(s) for rootfolder {rootfolder_id}",
             "added_count": len(added_protections),
-            "added_protections": added_protections
+            "added_protections": added_protections,
+            "failed_paths": failed_paths
         }
 
 
@@ -456,7 +455,9 @@ def apply_pathprotections(rootfolder_id:int):
     #         Sort by increasing number of segments and apply in that order
     #         Most specific protections are applied last, overriding higher-level path protections
     # step 5: Apply path protection by setting retention_id to path retention id and pathprotection_id
-    # step 6: return number of folders modified
+    # step 6: If there is any folder with path retention whose pathprotection_id is no longer valid (protection was deleted).
+    #         Then their retention must be reset to undefined_retention_id
+    # step 7: return number of folders modified
     
     with Session(Database.get_engine()) as session:
         # Verify rootfolder exists
@@ -467,6 +468,7 @@ def apply_pathprotections(rootfolder_id:int):
         # Step 1: Find the path retention id
         path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
         path_retention_id:int = path_retention_dict["path"].id if "path" in path_retention_dict else 0
+        undefined_retention_id:int = path_retention_dict["?"].id if "?" in path_retention_dict else 0
         if path_retention_id == 0:
             raise HTTPException(status_code=500, detail=f"Path retention type not found for rootfolder {rootfolder_id}")
         
@@ -505,12 +507,43 @@ def apply_pathprotections(rootfolder_id:int):
         
         # Commit all changes
         session.commit()
+
+        # Step 6: Find folders with path retention where their pathprotection_id is not in the current list of path protections
+        #         Set their retention to undefined_retention_id
+        folders_reset = 0
         
-        # Step 6: Return number of folders modified
+        # Get the list of valid path protection IDs
+        valid_protection_ids = [p.id for p in path_protections]
+        
+        # Find all folders with path retention whose pathprotection_id is not in the valid list
+        # These are folders that were protected but their protection has been removed
+        folders_to_reset = session.exec(
+            select(FolderNodeDTO).where(
+                (FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                (FolderNodeDTO.retention_id == path_retention_id) &
+                (FolderNodeDTO.pathprotection_id.notin_(valid_protection_ids))
+            )
+        ).all()
+        
+        # Reset these folders to undefined retention
+        for folder in folders_to_reset:
+            folder.retention_id = undefined_retention_id
+            folder.pathprotection_id = None
+            session.add(folder)
+            folders_reset += 1
+        
+        session.commit()
+
+        # Step 7: Return number of folders modified
+        message = f"Applied {len(path_protections)} path protection(s) to {folders_modified} folder(s) in rootfolder {rootfolder_id}"
+        if folders_reset > 0:
+            message += f", reset {folders_reset} folder(s) no longer covered by protections"
+        
         return {
-            "message": f"Applied {len(path_protections)} path protection(s) to {folders_modified} folder(s) in rootfolder {rootfolder_id}",
+            "message": message,
             "protections_applied": len(path_protections),
-            "folders_modified": folders_modified
+            "folders_modified": folders_modified,
+            "folders_reset": folders_reset
         }
 
 
@@ -526,6 +559,44 @@ def delete_pathprotection(rootfolder_id: int, protection_id: int):
         session.delete(protection)
         session.commit()
         return {"message": f"Path protection {protection_id} deleted"}
+
+def read_simulations_by_retention_type(rootfolder_id: int, retention_type: RetentionTypeEnum, require_pathprotection: bool = False) -> list[FolderNodeDTO]:
+    """
+    Read all simulation folders with a specific retention type.
+    
+    Args:
+        rootfolder_id: ID of the root folder to query
+        retention_type: The retention type enum to filter by (e.g., PATH, MARKED, CLEAN, etc.)
+        require_pathprotection: If True, only return folders with non-null pathprotection_id (for PATH retention)
+    
+    Returns:
+        List of FolderNodeDTO matching the criteria
+    """
+    with Session(Database.get_engine()) as session:
+        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="RootFolder not found")
+
+        # Get the retention type ID for the specified enum value
+        retention_type_dict = read_rootfolder_retentiontypes_dict(rootfolder.id)
+        if retention_type.value not in retention_type_dict:
+            raise HTTPException(status_code=404, detail=f"Retention type '{retention_type.value}' not found for rootfolder {rootfolder_id}")
+        
+        retention_id: int = retention_type_dict[retention_type.value].id
+        leaf_nodetype_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+
+        # Build query with optional pathprotection filter
+        query = select(FolderNodeDTO).where(
+            (FolderNodeDTO.rootfolder_id == rootfolder_id) &
+            (FolderNodeDTO.retention_id == retention_id) &
+            (FolderNodeDTO.nodetype_id == leaf_nodetype_id)
+        )
+        
+        if require_pathprotection:
+            query = query.where(FolderNodeDTO.pathprotection_id.isnot(None))
+        
+        folders = session.exec(query).all()
+        return folders
 
 def change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
     #print(f"start change_retention_category rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
@@ -590,7 +661,13 @@ def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
 
         return folders
 
-
+# used for testing
+def read_folder( folder_id: int ) -> FolderNodeDTO:
+    with Session(Database.get_engine()) as session:
+        folder = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.id == folder_id)).first()
+        if not folder:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        return folder
 
 
 # -------------------------- insertion of simulation by agents ---------

@@ -244,11 +244,16 @@ def cleanup_scenario_data():
     mid_index = len(second_rootfolder.folders) // 2
     
     second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
+    #random.shuffle(second_rootfolder_part_one.folders)  # Shuffle part one for debugging
     randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_one.folders)
+    second_rootfolder_part_one.folders.sort(key=lambda folder: folder.path)
+    #paths1 = [folder.path for folder in second_rootfolder_part_one.folders]
 
     second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
+    #random.shuffle(second_rootfolder_part_two.folders)  # Shuffle part two for debugging
     randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_two.folders)
-
+    second_rootfolder_part_two.folders.sort(key=lambda folder: folder.path)
+    #paths2 = [folder.path for folder in second_rootfolder_part_two.folders] 
     return {
         "cleanup_configuration": cleanup_configuration,
         "rootfolder_tuples": rootfolders,
