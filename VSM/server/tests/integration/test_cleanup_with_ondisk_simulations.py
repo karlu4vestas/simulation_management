@@ -8,6 +8,8 @@ This test:
 4. Validates results using validate_cleanup from main_validate_cleanup
 """
 
+from __future__ import annotations
+from typing import TYPE_CHECKING
 import pytest
 import os
 import shutil
@@ -28,8 +30,10 @@ from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
 from cleanup_cycle.clean_agent.clean_parameters import CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
 from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
-from cleanup_cycle.clean_agent.simulation import Simulation
-from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
+if TYPE_CHECKING:
+    from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
+    from datamodel.dtos import FileInfo, FolderTypeEnum
+
 from tests import test_storage
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
@@ -71,6 +75,8 @@ class TestCleanupWithOnDiskSimulations:
         return output_path
 
     def scan_simulation_and_get_fileinfo(self, simulation_path: str) -> tuple[FileInfo, SimulationFileRegistry]:
+        from datamodel.dtos import FileInfo, FolderTypeEnum
+        from datamodel.retentions import ExternalRetentionTypes
         # Build the FileInfo requred for cleanup
         # The cleanup algorithm will ignore cleanup if the simulations modified_date has changed, 
         # because changing the simulation is a legitimate way for the user to signal that i need to work on this simulation 

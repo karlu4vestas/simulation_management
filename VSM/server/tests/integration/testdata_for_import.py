@@ -1,18 +1,19 @@
-import os
 import random
 from enum import Enum
 from typing import Optional
 from dataclasses import dataclass
 from datetime import date, timedelta, datetime
-from datamodel.dtos import ExternalRetentionTypes, FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from collections import deque
 from db.db_api import normalize_path
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
+from datamodel.retentions import ExternalRetentionTypes
 
 # In-memory dataclass for test data setup - not persisted to database
 # Used by test fixtures to configure cleanup settings before database insertion
 
 @dataclass
-class CleanupConfiguration:
+class CleanupConfiguration: 
     """In-memory cleanup configuration for test data setup."""
     cycletime: int                                          # days from initialization of the simulations til it can be cleaned
     cleanupfrequency: int                                   # number of days between cleanup rounds
@@ -472,6 +473,52 @@ def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, cleanup_c
         leaf.modified_date = cleanup_start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
         leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.AFTER
     
+
+
+def generate_cleanup_scenario_data():
+    from datamodel import dtos
+    # Sample data with 3 datasets for 2 root folders:
+    #  - part one with the first root folder and a list of all its subfolders in random order
+    #  - part two and three with a random split of each of the second rootfolders list of subfolders
+    # The root folder's cleanup configuration is not initialised means that assumes default values
+
+    number_of_rootfolders = 2
+    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_start_date=date(2000, 1, 1))
+
+    rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
+    assert len(rootfolders) > 0
+
+    # Split the two root folder in three parts:
+    # first rootfolder with all its folders randomized
+    first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
+
+    #first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
+    randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, cleanup_configuration, first_rootfolder.folders)
+
+    random.shuffle(first_rootfolder.folders)
+    #first_rootfolder.folders
+
+    # second RootFolders is split into two datasets for the same rootfolder with an "equal" number of the folders drawn in random order from the second rootfolder
+    second_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
+    random.shuffle(second_rootfolder.folders)
+    mid_index = len(second_rootfolder.folders) // 2
+    
+    second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_one.folders)
+    second_rootfolder_part_one.folders.sort(key=lambda folder: folder.path)
+
+    second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
+    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_two.folders)
+    second_rootfolder_part_two.folders.sort(key=lambda folder: folder.path)
+    return {
+        "cleanup_configuration": cleanup_configuration,
+        "rootfolder_tuples": rootfolders,
+        "first_rootfolder": first_rootfolder,
+        "second_rootfolder_part_one": second_rootfolder_part_one,
+        "second_rootfolder_part_two": second_rootfolder_part_two
+    }
+
+
 if __name__ == "__main__":  
     rootfolders = generate_in_memory_rootfolder_and_folder_hierarchies(2)
     for i, root_folder_with_tree in enumerate(rootfolders):

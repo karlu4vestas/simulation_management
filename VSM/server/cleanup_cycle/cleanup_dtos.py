@@ -1,7 +1,13 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from enum import Enum
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
+from http.client import HTTPException
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from cleanup_cycle import cleanup_db_actions
 
 
 #STARTING_RETENTION_REVIEW  is the only phase where the backend is allowed to mark simulation for cleanup.
@@ -84,7 +90,20 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     
     # Relationship
     #rootfolder: "RootFolderDTO" = Relationship(back_populates="cleanup_config")
-    
+    def transition_to_inactive(self) -> bool:
+        from cleanup_cycle import cleanup_db_actions
+        self.cleanup_progress = CleanupProgress.ProgressEnum.INACTIVE.value
+        cleanup_db_actions.deactivate_calendar(self.rootfolder_id)
+        return True
+    def transition_to_next_round(self) -> bool:
+        if not self.cleanup_progress == CleanupProgress.ProgressEnum.FINISHING:
+            raise HTTPException(status_code=400, detail="RootFolder is not in FINISHING state")
+        else:
+            self.cleanup_start_date = self.cleanup_start_date + timedelta(days=self.cleanupfrequency)
+            self.cleanup_progress = CleanupProgress.ProgressEnum.DONE.value
+            return True
+
+
     def __eq__(self, other):
         if not isinstance(other, CleanupConfigurationDTO):
             return False

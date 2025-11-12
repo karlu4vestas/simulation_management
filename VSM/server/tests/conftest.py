@@ -5,10 +5,6 @@ from sqlmodel import Session
 
 from datetime import date
 from db.database import Database
-from datamodel.dtos import RootFolderDTO, SimulationDomainDTO, FolderTypeDTO
-from tests.integration.testdata_for_import import flatten_folder_structure, generate_in_memory_rootfolder_and_folder_hierarchies, randomize_modified_dates_of_leaf_folders
-from tests.integration.testdata_for_import import RootFolderWithMemoryFolders, RootFolderWithMemoryFolderTree 
-from tests.integration.testdata_for_import import CleanupConfiguration
 
 
 @pytest.fixture(scope="function")
@@ -132,23 +128,24 @@ def sample_root_folder_data():
 
 @pytest.fixture(scope="function")
 def sample_folder_node_data(test_session):
+    from datamodel import dtos
     """Sample data for FolderNodeDTO testing"""
     # Create prerequisites first
     
     # Create simulation domain
-    domain = SimulationDomainDTO(name="TestDomain")
+    domain = dtos.SimulationDomainDTO(name="TestDomain")
     test_session.add(domain)
     test_session.commit()
     test_session.refresh(domain)
     
     # Create folder type
-    folder_type = FolderTypeDTO(simulationdomain_id=domain.id, name="innernode")
+    folder_type = dtos.FolderTypeDTO(simulationdomain_id=domain.id, name="innernode")
     test_session.add(folder_type)
     test_session.commit()
     test_session.refresh(folder_type)
     
     # Create root folder
-    root_folder = RootFolderDTO(
+    root_folder = dtos.RootFolderDTO(
         simulationdomain_id=domain.id,
         folder_id=1,
         path="/test/folder",
@@ -173,16 +170,16 @@ def sample_folder_node_data(test_session):
 
 @pytest.fixture(scope="function")
 def test_root_folder(test_session):
+    from datamodel import dtos
     """Create a root folder for tests that need it"""
-    from datamodel.dtos import RootFolderDTO, SimulationDomainDTO
     
     # Create simulation domain first
-    domain = SimulationDomainDTO(name="TestDomain")
+    domain = dtos.SimulationDomainDTO(name="TestDomain")
     test_session.add(domain)
     test_session.commit()
     test_session.refresh(domain)
     
-    root_folder = RootFolderDTO(
+    root_folder = dtos.RootFolderDTO(
         simulationdomain_id=domain.id,
         folder_id=1,
         path="/test/folder",
@@ -199,11 +196,11 @@ def test_root_folder(test_session):
 
 @pytest.fixture(scope="function")
 def sample_retention_data(test_session):
+    from datamodel import dtos
     """Sample data for RetentionDTO testing"""
-    from datamodel.dtos import SimulationDomainDTO
     
     # Create simulation domain first
-    domain = SimulationDomainDTO(name="TestDomain")
+    domain = dtos.SimulationDomainDTO(name="TestDomain")
     test_session.add(domain)
     test_session.commit()
     test_session.refresh(domain)
@@ -217,46 +214,9 @@ def sample_retention_data(test_session):
 
 @pytest.fixture(scope="function")
 def cleanup_scenario_data():
-    # Sample data with 3 datasets for 2 root folders:
-    #  - part one with the first root folder and a list of all its subfolders in random order
-    #  - part two and three with a random split of each of the second rootfolders list of subfolders
-    # The root folder's cleanup configuration is not initialised means that assumes default values
+    from tests.integration import testdata_for_import 
+    return testdata_for_import.generate_cleanup_scenario_data()
 
-    number_of_rootfolders = 2
-    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_start_date=date(2000, 1, 1))
-
-    rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
-    assert len(rootfolders) > 0
-
-    # Split the two root folder in three parts:
-    # first rootfolder with all its folders randomized
-    first_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
-
-    #first_rootfolder.rootfolder.set_cleanup_configuration(cleanup_configuration)
-    randomize_modified_dates_of_leaf_folders(first_rootfolder.rootfolder, cleanup_configuration, first_rootfolder.folders)
-
-    random.shuffle(first_rootfolder.folders)
-    #first_rootfolder.folders
-
-    # second RootFolders is split into two datasets for the same rootfolder with an "equal" number of the folders drawn in random order from the second rootfolder
-    second_rootfolder: RootFolderWithMemoryFolders = flatten_folder_structure(rootfolders.popleft())
-    random.shuffle(second_rootfolder.folders)
-    mid_index = len(second_rootfolder.folders) // 2
-    
-    second_rootfolder_part_one = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[:mid_index])
-    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_one.folders)
-    second_rootfolder_part_one.folders.sort(key=lambda folder: folder.path)
-
-    second_rootfolder_part_two = RootFolderWithMemoryFolders(rootfolder=second_rootfolder.rootfolder, folders=second_rootfolder.folders[mid_index:])
-    randomize_modified_dates_of_leaf_folders(second_rootfolder.rootfolder, cleanup_configuration, second_rootfolder_part_two.folders)
-    second_rootfolder_part_two.folders.sort(key=lambda folder: folder.path)
-    return {
-        "cleanup_configuration": cleanup_configuration,
-        "rootfolder_tuples": rootfolders,
-        "first_rootfolder": first_rootfolder,
-        "second_rootfolder_part_one": second_rootfolder_part_one,
-        "second_rootfolder_part_two": second_rootfolder_part_two
-    }
 
 # Pytest markers for test organization
 def pytest_configure(config):

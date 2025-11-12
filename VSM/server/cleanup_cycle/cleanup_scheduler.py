@@ -1,9 +1,14 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from datetime import date, datetime, timedelta, timezone
 from sqlmodel import Session, func, select
 from fastapi import HTTPException
 from db.database import Database
 from db.db_api import insert_or_update_simulations_in_db, read_folders_marked_for_cleanup
-from datamodel.dtos import FolderNodeDTO, RootFolderDTO, FileInfo
+
+if TYPE_CHECKING:
+    from datamodel.dtos import FolderNodeDTO, RootFolderDTO, FileInfo
+
 from cleanup_cycle.cleanup_dtos import AgentInfo, CleanupCalendarDTO, CleanupTaskDTO, TaskStatus, CalendarStatus, CleanupConfigurationDTO, ActionType, CleanupProgress
 
 
@@ -185,6 +190,7 @@ class CleanupScheduler:
                 return calendar
 
             # No active calendar so go ahead
+            from datamodel.dtos import RootFolderDTO
             rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == config.rootfolder_id)).first()
             if not rootfolder:
                 raise HTTPException(status_code=404, detail="RootFolder not found")
@@ -355,7 +361,7 @@ class CleanupScheduler:
             return f"Generated or found {len(calendars)} calendars ."
 
     @staticmethod
-    def extract_active_calendar_for_rootfolder(rootfolder:RootFolderDTO) -> tuple[CleanupCalendarDTO, list[CleanupTaskDTO]]:
+    def extract_active_calendar_for_rootfolder(rootfolder: "RootFolderDTO") -> tuple[CleanupCalendarDTO, list[CleanupTaskDTO]]:
         calendar: CleanupCalendarDTO = None
         tasks: list[CleanupTaskDTO] = []
         with Session(Database.get_engine()) as session:
@@ -374,6 +380,56 @@ class CleanupScheduler:
                 ).all()
         
         return calendar, tasks
+    
+    @staticmethod
+    def deactivate_calendar(rootfolder_id:int) -> None:
+        """Deactivate all active calendars and their tasks for a given rootfolder.
+        
+        This method will:
+        1. Find all active calendars for the rootfolder
+        2. Mark them as INTERRUPTED
+        3. Find all non-terminal tasks (PLANNED, ACTIVATED, RESERVED, INPROGRESS)
+        4. Mark them as FAILED with an appropriate message
+        
+        Args:
+            rootfolder_id: The ID of the rootfolder whose calendars should be deactivated
+        """
+        with Session(Database.get_engine()) as session:
+            # Get all active calendars for this rootfolder
+            active_calendars = session.exec(
+                select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
+                )
+            ).all()
+            
+            for calendar in active_calendars:
+                # Mark calendar as INTERRUPTED
+                calendar.status = CalendarStatus.INTERRUPTED.value
+                session.add(calendar)
+                
+                # Get all non-terminal tasks for this calendar
+                tasks = session.exec(
+                    select(CleanupTaskDTO).where(
+                        (CleanupTaskDTO.calendar_id == calendar.id) &
+                        (CleanupTaskDTO.status.in_([
+                            TaskStatus.PLANNED.value,
+                            TaskStatus.ACTIVATED.value,
+                            TaskStatus.RESERVED.value,
+                            TaskStatus.INPROGRESS.value
+                        ]))
+                    )
+                ).all()
+                
+                # Mark all non-terminal tasks as FAILED
+                for task in tasks:
+                    task.status = TaskStatus.FAILED.value
+                    task.status_message = "Task cancelled due to calendar deactivation"
+                    task.completed_at = datetime.now(timezone.utc)
+                    session.add(task)
+            
+            session.commit()
+
 
 class AgentInterfaceMethods:
     #agent interface methods
@@ -465,7 +521,8 @@ class AgentInterfaceMethods:
 
 
     @staticmethod
-    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list["FileInfo"]) -> dict[str, str]:
+        from datamodel.dtos import FileInfo
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
             task = session.exec(
@@ -479,7 +536,8 @@ class AgentInterfaceMethods:
 
     # return the list of FileInfo objects for folders that are marked for cleanup in the given rootfolder
     @staticmethod
-    def task_read_folders_marked_for_cleanup(task_id: int) -> list[FileInfo]:
+    def task_read_folders_marked_for_cleanup(task_id: int) -> list["FileInfo"]:
+        from datamodel.dtos import FileInfo, RootFolderDTO, FolderNodeDTO
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
             task = session.exec(

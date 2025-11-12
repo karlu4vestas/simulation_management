@@ -3,9 +3,9 @@ from datamodel.dtos import (
     RootFolderDTO, 
     FolderNodeDTO, 
     FolderTypeDTO, 
-    RetentionTypeDTO,
     SimulationDomainDTO
 )
+from datamodel.retentions import RetentionTypeDTO
 from datetime import date
 
 

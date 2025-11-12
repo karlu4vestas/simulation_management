@@ -5,7 +5,8 @@ from datetime import date, datetime
 from cleanup_cycle.cleanup_dtos import ActionType 
 from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods 
 from cleanup_cycle.internal_agents import AgentTemplate
-from datamodel.dtos import ExternalRetentionTypes, FileInfo, FolderTypeEnum
+from datamodel.dtos import FileInfo, FolderTypeEnum
+from datamodel.retentions import ExternalRetentionTypes
 from cleanup_cycle.clean_agent.clean_main import clean_main, CleanupResult
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode

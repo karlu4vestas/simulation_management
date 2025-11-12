@@ -6,10 +6,11 @@ from cleanup_cycle.cleanup_dtos import ActionType
 from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods
 from cleanup_cycle.internal_agents import AgentTemplate
 from cleanup_cycle.scan.scan import do_scan, ScanResult 
-from datamodel.dtos import ExternalRetentionTypes, FileInfo, FolderTypeEnum
+from datamodel.dtos import FileInfo, FolderTypeEnum
+from datamodel.retentions import ExternalRetentionTypes
 from cleanup_cycle.scan.ProgressWriter import ProgressWriter, ProgressReporter
 from cleanup_cycle.scan.folder_tree import FolderTree, FolderTreeNode
-#from server.cleanup_cycle.scan.progress_reporter import ProgressReporter
+#from cleanup_cycle.scan.progress_reporter import ProgressReporter
 
 # The purpose of this class is to resuse the ProgressWriter to report progress to the task
 class AgentScanProgressWriter(ProgressWriter):
@@ -28,6 +29,8 @@ class AgentScanProgressWriter(ProgressWriter):
     def close(self):
         super().close()
 
+#this agent both scan and insert the results into the database
+# @TOD refactor so scanning is done in one agent and another agent extract the simulation from the metadata and insert into the database
 class AgentScanVTSRootFolder(AgentTemplate):
     temporary_result_folder: str | None
     vts_name_set:set[str]  = set( [name.casefold() for name in ["INPUTS","DETWIND","EIG","INT","LOG", "OUT","PARTS","PROG","STA"] ] )    
@@ -74,6 +77,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
         result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db(self.task.id, extract_simulations)
 
     def scan_metadata(self, path: str, meta_file_path: str, nb_scan_thread:int) -> ScanResult:
+        # @todo should be done in separate agent that can only scan and deliver the metadata file
         scan_path      = os.path.normpath(path)
         output_archive = os.path.normpath(meta_file_path)
 

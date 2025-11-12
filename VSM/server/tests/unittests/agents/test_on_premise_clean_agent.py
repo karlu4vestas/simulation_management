@@ -15,7 +15,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanVTSRootFolder
 from cleanup_cycle.clean_agent.clean_main import CleanupResult
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
-from datamodel.dtos import FileInfo, FolderTypeEnum, ExternalRetentionTypes
+from datamodel.dtos import FileInfo, FolderTypeEnum
+from datamodel.retentions import ExternalRetentionTypes
 from tests import test_storage
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION

@@ -10,11 +10,8 @@ from sqlmodel import Session
 from datamodel.dtos import RootFolderDTO
 
 from app.web_api import run_scheduler_tasks
-from db.db_api import get_cleanup_configuration_by_rootfolder_id
-from db.db_api import read_simulation_domains   
-from db.db_api import insert_rootfolder,insert_cleanup_configuration
-
-from cleanup_cycle.cleanup_db_actions import cleanup_cycle_prepare_next_cycle, CleanupProgress
+from db.db_api import read_simulation_domains, insert_rootfolder
+from cleanup_cycle import cleanup_db_actions
 from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
 from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
 from cleanup_cycle.cleanup_dtos import ActionType, CleanupConfigurationDTO, CleanupTaskDTO, TaskStatus
@@ -47,7 +44,7 @@ class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
         self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
 
     def execute_task(self):
-        cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
+        cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id} but the Cleanup cycle is stopped here by setting cleanup_start_date=None"
 
 class ForTestAgentCalendarCreation(AgentTemplate):
@@ -85,7 +82,7 @@ class TestSchedulerAndAgents:
         # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
         # Now we create the corresponding CleanupConfigurationDTO database record
         cleanup_config:CleanupConfigurationDTO = in_memory_config.to_dto(rootfolder_id=rootfolder.id)
-        cleanup_config:CleanupConfigurationDTO = insert_cleanup_configuration(rootfolder.id, cleanup_config)
+        cleanup_config:CleanupConfigurationDTO = cleanup_db_actions.insert_cleanup_configuration(rootfolder.id, cleanup_config)
         return rootfolder, cleanup_config
     
     def test_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data):
@@ -147,7 +144,7 @@ class TestSchedulerAndAgents:
             cycletime=7,
             cleanupfrequency=1./(24*60*60),  # set to one second for the test
             cleanup_start_date=date.today() - timedelta(days=8),  #8 = cycletime+1 ensure that simulations are marked for cleanup
-            cleanup_progress=CleanupProgress.ProgressEnum.INACTIVE
+            cleanup_progress=cleanup_db_actions.CleanupProgress.ProgressEnum.INACTIVE
         )
         rootfolder:RootFolderDTO=None
         cleanup_config: CleanupConfigurationDTO=None
@@ -222,7 +219,7 @@ class TestSchedulerAndAgents:
             calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
             task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
             assert len(task_dict)  == 0, f"all active tasks should be COMPLETED but there is still {len(task_dict)} tasks active"
-            cleanup_configuration: CleanupConfigurationDTO = get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
+            cleanup_configuration: CleanupConfigurationDTO = cleanup_db_actions.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
 
             assert cleanup_configuration is not None, "Cleanup configuration should be found"
             assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"

@@ -8,7 +8,7 @@ from cleanup_cycle.clean_agent.clean_parameters import CleanParameters, CleanMod
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter
 from cleanup_cycle.clean_agent.simulation import Simulation, SimulationEvalResult
 from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
-from datamodel.dtos import ExternalRetentionTypes
+from datamodel.retentions import ExternalRetentionTypes
 
 
 def simulation_worker(params: CleanParameters):

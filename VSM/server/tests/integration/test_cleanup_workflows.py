@@ -8,11 +8,11 @@ from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start
 
 from datamodel.retentions import PathProtectionDTO, RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
-from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO
+from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO, FileInfo
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
 from db import db_api
-from db.db_api import FileInfo, exist_rootfolder
+from db.db_api import exist_rootfolder
 from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
 from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder

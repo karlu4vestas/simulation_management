@@ -1,10 +1,14 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
+
+if TYPE_CHECKING:
+    from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+    from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
 
 # see values in vts_create_meta_data
 class SimulationDomainDTO(SQLModel, table=True):
@@ -53,7 +57,8 @@ class RootFolderBase(SQLModel):
     path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
     cleanup_config_id: int | None         = Field(default=None, foreign_key="cleanupconfigurationdto.id") 
 
-    def get_cleanup_configuration(self, session: Session) -> CleanupConfigurationDTO:
+    def get_cleanup_configuration(self, session: Session) -> "CleanupConfigurationDTO":
+        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
         """Get or create cleanup configuration."""
         if self.cleanup_config_id is not None:
             cleanup = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
@@ -70,7 +75,8 @@ class RootFolderBase(SQLModel):
         session.commit()
         return new_cleanup
 
-    def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
+    def save_cleanup_configuration(self, session: Session, cleanup_configuration: "CleanupConfigurationDTO") -> "CleanupConfigurationDTO":
+        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
         #@TODO we should use insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
         if self.cleanup_config_id is not None:
             config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
@@ -105,7 +111,7 @@ class FileInfo:
     filepath: str
     modified_date: datetime
     nodetype: FolderTypeEnum
-    external_retention: ExternalRetentionTypes
+    external_retention: "ExternalRetentionTypes"
     id: int = None   # will be used during updates
 
 
@@ -124,14 +130,17 @@ class FolderNodeBase(SQLModel):
     expiration_date: date | None          = None
 
     # we should gravitate towards using the Retention dataclass to enforce consistency between retention_id and pathprotection_id nad possibly expiration_date
-    def get_retention(self) -> Retention:
+    def get_retention(self) -> "Retention":
+        from datamodel.retentions import Retention
         return Retention(self.retention_id, self.pathprotection_id, self.expiration_date)
-    def set_retention(self, retention: Retention):
+    
+    def set_retention(self, retention: "Retention"):
         self.retention_id = retention.retention_id
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
     
-    def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, RetentionTypeDTO]) -> FileInfo:
+    def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, "RetentionTypeDTO"]) -> FileInfo:
+        from datamodel.retentions import RetentionTypeDTO
         # Convert FolderNodeBase to FileInfo with all fields populated except id.        
         # Args:
         #     nodetype_dict: Dictionary mapping nodetype_id to FolderTypeDTO

@@ -3,15 +3,17 @@ from typing import Optional
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
+from cleanup_cycle import cleanup_db_actions
 from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
 from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, FolderRetention
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
-from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials, update_rootfolder_cleanup_configuration
+from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials
 from db.db_api import read_rootfolder_retentiontypes, read_folders, read_pathprotections, add_pathprotection, delete_pathprotection
-from db.db_api import change_retentions, FileInfo 
+from db.db_api import change_retentions
+from datamodel.dtos import FileInfo 
 
 from app.app_config import AppConfig
 
@@ -113,7 +115,7 @@ def fs_read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Quer
 # update a rootfolder's cleanup_configuration
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
 def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
-    return update_rootfolder_cleanup_configuration(rootfolder_id, cleanup_configuration)
+    return cleanup_db_actions.update_rootfolder_cleanup_configuration(rootfolder_id, cleanup_configuration)
 
 
 

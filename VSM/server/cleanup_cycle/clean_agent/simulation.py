@@ -15,7 +15,8 @@ from .clean_all_pr_ext import clean_all_pr_ext
 from .clean_all_but_one_pr_ext import clean_all_but_one_pr_ext
 
 # Import DTOs
-from datamodel.dtos import FileInfo, ExternalRetentionTypes, FolderTypeEnum
+from datamodel.dtos import FileInfo, FolderTypeEnum
+from datamodel.retentions import ExternalRetentionTypes
 
 
 class SimulationEvalResult(NamedTuple):

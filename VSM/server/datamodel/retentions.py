@@ -1,3 +1,5 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
 from enum import Enum
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -5,7 +7,10 @@ from typing import Literal, Optional
 from datetime import date, timedelta
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+
+if TYPE_CHECKING:
+    from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+
 #ensure consistency of retentions
 
 # Type alias for valid retention names - shared across internal and external types
@@ -136,9 +141,11 @@ class RetentionCalculator:
 
 
         # Info for all other retentions
+        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+        
         if not cleanup_config_id or cleanup_config_id <= 0:
             raise ValueError("The cleanup_config_id:{cleanup_config_id} must be valid")
-        cleanup_config:CleanupConfigurationDTO = session.get(CleanupConfigurationDTO, cleanup_config_id)
+        cleanup_config: CleanupConfigurationDTO = session.get(CleanupConfigurationDTO, cleanup_config_id)
         retention_type_dict: dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
 
         if not retention_type_dict or not cleanup_config.is_valid():

@@ -3,7 +3,6 @@
 import os
 from dataclasses import dataclass
 from threading import Thread
-from datamodel.dtos import FileInfo, FileInfo
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanParameters, CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter 
 from cleanup_cycle.clean_agent.clean_workers import ( simulation_worker, deletion_worker, progress_monitor_worker,error_writer_worker)
@@ -11,6 +10,7 @@ from cleanup_cycle.clean_agent.clean_workers import ( simulation_worker, deletio
 
 @dataclass
 class CleanupResult:
+    from datamodel.dtos import FileInfo
     """Return value from clean_main containing results and measures"""
     results: list[FileInfo]  # List of processed simulations with status
     measures: CleanMeasures  # Summary statistics from cleanup operation
@@ -46,7 +46,7 @@ class CleanupResult:
 
 
 def clean_main(
-    simulations: list[FileInfo],
+    simulations: list["FileInfo"],
     progress_reporter: CleanProgressReporter,
     output_path: str,
     clean_mode: CleanMode = CleanMode.ANALYSE,
@@ -54,6 +54,7 @@ def clean_main(
     num_deletion_workers: int = 2,
     deletion_queue_max_size: int = 1_000_000
 ) -> CleanupResult:
+    from datamodel.dtos import FileInfo
     # Clean VTS simulations with multi-threading as follows
     # 1. Sets up queues and counters
     # 2. Spawns worker threads:
