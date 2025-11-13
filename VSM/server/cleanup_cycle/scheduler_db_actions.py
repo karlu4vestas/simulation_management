@@ -9,7 +9,8 @@ from db.db_api import insert_or_update_simulations_in_db, read_folders_marked_fo
 if TYPE_CHECKING:
     from datamodel.dtos import FolderNodeDTO, RootFolderDTO, FileInfo
 
-from cleanup_cycle.cleanup_dtos import AgentInfo, CleanupCalendarDTO, CleanupTaskDTO, TaskStatus, CalendarStatus, CleanupConfigurationDTO, ActionType, CleanupProgress
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from cleanup_cycle.scheduler_dto import TaskStatus, CalendarStatus, ActionType, AgentInfo, CleanupCalendarDTO, CleanupTaskDTO 
 
 
 class CleanupScheduler:

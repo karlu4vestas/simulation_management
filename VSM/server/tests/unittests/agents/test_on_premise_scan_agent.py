@@ -16,9 +16,9 @@ import pytest
 from datetime import date, timedelta
 from unittest.mock import patch
 
-from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
-from cleanup_cycle.cleanup_dtos import ActionType, CleanupTaskDTO
-from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods
+from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
+from cleanup_cycle.scheduler_dto import ActionType, CleanupTaskDTO
+from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods
 from datamodel.dtos import FileInfo
 from tests.integration.testdata_for_import import RootFolderWithMemoryFolders, InMemoryFolderNode
 from tests.integration import test_scheduler_and_agents

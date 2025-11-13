@@ -11,11 +11,11 @@ from datamodel.dtos import RootFolderDTO
 
 from app.web_api import run_scheduler_tasks
 from db.db_api import read_simulation_domains, insert_rootfolder
-from cleanup_cycle import cleanup_db_actions
-from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
-from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
-from cleanup_cycle.cleanup_dtos import ActionType, CleanupConfigurationDTO, CleanupTaskDTO, TaskStatus
-from cleanup_cycle.internal_agents import (
+from cleanup_cycle import cleanup_db_actions, cleanup_dtos
+from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
+from cleanup_cycle.agent_on_premise_clean import AgentCleanVTSRootFolder
+from cleanup_cycle.scheduler_dto import ActionType, CleanupTaskDTO, TaskStatus
+from cleanup_cycle.agents_internal import (
     AgentTemplate,
     AgentCalendarCreation,
     AgentCleanupCycleStart,
@@ -24,7 +24,7 @@ from cleanup_cycle.internal_agents import (
     AgentCleanupCyclePrepareNext
 )
 from cleanup_cycle.agent_runner import InternalAgentFactory
-from cleanup_cycle.cleanup_scheduler import AgentInterfaceMethods, CleanupScheduler
+from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods, CleanupScheduler
 
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
@@ -65,7 +65,7 @@ class ForTestAgentCalendarCreation(AgentTemplate):
 @pytest.mark.slow
 class TestSchedulerAndAgents:
     @staticmethod
-    def import_rootfolder_and_cleanup_configuration(session:Session, rootfolder:RootFolderDTO, in_memory_config:CleanupConfiguration)-> tuple[RootFolderDTO, CleanupConfigurationDTO]:
+    def import_rootfolder_and_cleanup_configuration(session:Session, rootfolder:RootFolderDTO, in_memory_config:CleanupConfiguration)-> tuple[RootFolderDTO, cleanup_dtos.CleanupConfigurationDTO]:
 
         # Step 0: Set up a new database and verify that it is empty apart from VTS metadata
         simulation_domain_id = read_simulation_domains()[0].id

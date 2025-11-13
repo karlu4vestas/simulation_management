@@ -6,7 +6,7 @@ from fastapi import Query, HTTPException
 from db.database import Database
 
 if TYPE_CHECKING:
-    from datamodel.dtos import FolderTypeDTO, FolderNodeDTO, RootFolderDTO, SimulationDomainDTO, FolderTypeEnum, FileInfo
+    from datamodel.dtos import FolderTypeDTO, FolderNodeDTO, RootFolderDTO, SimulationDomainDTO, FileInfo, CleanupFrequencyDTO, CycleTimeDTO
     from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention 
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
@@ -34,7 +34,7 @@ def read_simulation_domain_by_name(domain_name: str):
         return simulation_domain
 
 def read_retentiontypes_by_domain_id(simulationdomain_id: int):
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
+    from datamodel.retentions import RetentionTypeDTO
     with Session(Database.get_engine()) as session:
         retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not retention_types or len(retention_types) == 0:
@@ -42,12 +42,10 @@ def read_retentiontypes_by_domain_id(simulationdomain_id: int):
         return retention_types
 #@app.get("/simulationdomain/{simulationdomain_id}/retentiontypes/dict", response_model=dict[str,RetentionTypeDTO]) do not expose before needed
 def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str, "RetentionTypeDTO"]:
-    from datamodel.retentions import RetentionTypeDTO
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
     return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
 def read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
-    from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO
+    from datamodel.dtos import CleanupFrequencyDTO
     with Session(Database.get_engine()) as session:
         cleanupfrequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cleanupfrequency or len(cleanupfrequency) == 0:
@@ -70,7 +68,7 @@ def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
     return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulationdomain_id)}
 
 def read_cycle_time_by_domain_id(simulationdomain_id: int):
-    from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO
+    from datamodel.dtos import CycleTimeDTO
     with Session(Database.get_engine()) as session:
         cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:

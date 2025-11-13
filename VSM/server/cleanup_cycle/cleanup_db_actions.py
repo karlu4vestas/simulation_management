@@ -10,7 +10,7 @@ from db.db_api import read_folder_type_dict_pr_domain_id, read_folders_marked_fo
 from db import db_api
 
 if TYPE_CHECKING:
-    from cleanup_cycle import cleanup_scheduler 
+    from cleanup_cycle import scheduler_db_actions 
 
 # This function put the cleanup cycle into CleanupProgress.ProgressEnum.STARTING_RETENTION_REVIEW in order to recalculate all numeric retentions
 # This is also the only progress state where retentions can be marked for cleanup
@@ -205,7 +205,7 @@ def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: CleanupConfi
         if existing_cleanup_config:
             return existing_cleanup_config
         
-        from cleanup_cycle.cleanup_scheduler import CleanupScheduler
+        from cleanup_cycle.scheduler_db_actions import CleanupScheduler
         cleanup_config.rootfolder_id = rootfolder_id
         cleanup_config.rootfolder_id = rootfolder_id
         cleanup_config.cleanup_progress = CleanupProgress.ProgressEnum.INACTIVE

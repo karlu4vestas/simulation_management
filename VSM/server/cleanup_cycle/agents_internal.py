@@ -1,8 +1,9 @@
 import asyncio
 from datetime import date, timedelta
-from cleanup_cycle.cleanup_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
+from cleanup_cycle.scheduler_dto import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
+from cleanup_cycle.scheduler_db_actions import CleanupScheduler, AgentInterfaceMethods
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, cleanup_cycle_finishing, cleanup_cycle_prepare_next_cycle
-from cleanup_cycle.cleanup_scheduler import CleanupScheduler, AgentInterfaceMethods
+
 
 # ----------------- AgentTemplate -----------------
 from abc import ABC, abstractmethod

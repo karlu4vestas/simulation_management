@@ -1,9 +1,9 @@
 import random
 from sqlmodel import Session, select
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupFrequencyDTO
-from datamodel.retentions import RetentionTypeDTO
-from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO 
 from db.database import Database
+from datamodel.retentions import RetentionTypeDTO
+from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO, CleanupFrequencyDTO
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 from db.db_api import insert_rootfolder, read_cleanupfrequency_name_dict_by_domain_id
 
 #-------------------------------------
@@ -51,11 +51,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
         path=path
     )
     root_folder = insert_rootfolder(root_folder)
-    #commit in order to initialize the root_folder in the db and get a valid id
-    #session.commit()
-    #session.refresh(root_folder)
-    #print(f"Root folder created. id={root_folder.id} path={root_folder.path}")
-    
+   
     # Create cleanup config (NEW)
     cleanup_config = CleanupConfigurationDTO(
         rootfolder_id=root_folder.id,

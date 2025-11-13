@@ -4,9 +4,9 @@ from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 from cleanup_cycle import cleanup_db_actions
-from cleanup_cycle.cleanup_dtos import CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
+from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
 from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, FolderRetention
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
         if AppConfig.is_client_test():
             with Session(engine) as session:
                 insert_vts_metadata_in_db(session)
-                from server.testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
+                from testdata.vts_generate_test_data import insert_test_folder_hierarchy_in_db
                 insert_test_folder_hierarchy_in_db(session)
     #else:
     #    db.clear_all_tables_and_schemas()
@@ -178,7 +178,7 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from cleanup_cycle.cleanup_scheduler import AgentInfo, CleanupScheduler, CleanupTaskDTO
+from cleanup_cycle.scheduler_db_actions import AgentInfo, CleanupScheduler, CleanupTaskDTO
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
     return AgentInfo.reserve_task(agent)
@@ -196,7 +196,7 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
     return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
 
 #-----------------Scheduler API -------------------
-from cleanup_cycle.cleanup_scheduler import CleanupScheduler
+from cleanup_cycle.scheduler_db_actions import CleanupScheduler
 from cleanup_cycle.agent_runner import InternalAgentFactory
 
 def run_scheduler_tasks():

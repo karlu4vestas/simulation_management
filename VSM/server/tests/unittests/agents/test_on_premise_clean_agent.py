@@ -12,7 +12,7 @@ from datetime import date
 # Add server directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from cleanup_cycle.on_premise_clean_agent import AgentCleanProgressWriter, AgentCleanVTSRootFolder
+from cleanup_cycle.agent_on_premise_clean import AgentCleanProgressWriter, AgentCleanVTSRootFolder
 from cleanup_cycle.clean_agent.clean_main import CleanupResult
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
 from datamodel.dtos import FileInfo, FolderTypeEnum
@@ -44,7 +44,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
         self.assertEqual(self.progress_writer.seconds_between_update, 1)
         self.assertEqual(self.progress_writer.seconds_between_filelog, 60)
     
-    @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
+    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
     def test_update_reports_progress(self, mock_interface):
         """Test that update() calls AgentInterfaceMethods.task_progress()"""
         # Create measures
@@ -77,7 +77,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
         self.assertIn("Queue: 50", message)
         self.assertIn("Threads: 4", message)
     
-    @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
+    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
     def test_update_with_zero_values(self, mock_interface):
         """Test update with all zero values"""
         measures = CleanMeasures(
@@ -167,7 +167,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         self.assertEqual(agent.clean_mode, CleanMode.DELETE)
     
 
-    @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
+    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
     def test_execute_task_no_simulations(self, mock_interface):
         """Test execute_task with no simulations to clean"""
         mock_interface.task_read_folders_marked_for_cleanup.return_value = []
@@ -186,7 +186,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         # Should return early without doing anything
         # No exception should be raised
     
-    @patch('cleanup_cycle.on_premise_clean_agent.clean_main')
+    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
     def test_clean_simulations_success(self, mock_clean_main):
         """Test clean_simulations method"""
         simulation_paths = [
@@ -238,7 +238,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         self.assertIsNotNone(call_kwargs['output_path'])
         self.assertIsNotNone(call_kwargs['progress_reporter'])
     
-    @patch('cleanup_cycle.on_premise_clean_agent.clean_main')
+    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
     def test_clean_simulations_exception(self, mock_clean_main):
         """Test clean_simulations when clean_main raises exception"""
         simulation_paths = [os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1")]
@@ -277,8 +277,8 @@ class TestAgentIntegration(unittest.TestCase):
             if key in os.environ:
                 del os.environ[key]
     
-    @patch('cleanup_cycle.on_premise_clean_agent.AgentInterfaceMethods')
-    @patch('cleanup_cycle.on_premise_clean_agent.clean_main')
+    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
+    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
     def test_full_workflow(self, mock_clean_main, mock_interface):
         """Test the complete workflow from execute_task to DB update"""
         # Create agent

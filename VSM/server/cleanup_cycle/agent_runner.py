@@ -1,8 +1,8 @@
 from typing import Callable
 from contextlib import contextmanager
-from cleanup_cycle.internal_agents import AgentTemplate, AgentCalendarCreation, AgentCleanupCycleStart, AgentNotification, AgentCleanupCycleFinishing, AgentCleanupCyclePrepareNext
-from cleanup_cycle.on_premise_scan_agent import AgentScanVTSRootFolder
-from cleanup_cycle.on_premise_clean_agent import AgentCleanVTSRootFolder
+from cleanup_cycle.agents_internal import AgentTemplate, AgentCalendarCreation, AgentCleanupCycleStart, AgentNotification, AgentCleanupCycleFinishing, AgentCleanupCyclePrepareNext
+from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
+from cleanup_cycle.agent_on_premise_clean import AgentCleanVTSRootFolder
 
 class InternalAgentFactory:
     # Factory for managing internal agents with support for dependency injection.   
