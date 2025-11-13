@@ -249,6 +249,12 @@ class Scanner:
 
                         if folder[0:8]=="\\\\?\\UNC\\": folder = "\\\\"+folder[8:]   
                         sio.output_queue.put(f"\"{folder}\";\"{min_modified}\";\"{max_modified}\";\"{min_accessed}\";\"{max_accessed}\";\"{files}\"\n")
+                    else:
+                        # get the following attributes for the folder and store them in the same ways as the files 
+                        folder_stats = [os.stat(folder)]
+                        min_modified, max_modified, str_modify_dates   = Scanner.timestamp_statistics( lambda : [state.st_mtime     for state in folder_stats]     )
+                        min_accessed, max_accessed, str_accessed_dates = Scanner.timestamp_statistics( lambda : [state.st_atime     for state in folder_stats]     )
+                        sio.output_queue.put(f"\"{folder}\";\"{min_modified}\";\"{max_modified}\";\"{min_accessed}\";\"{max_accessed}\";\"\"\n")
 
                     #add new directories AFTER handling this directories files so that the queue of directories to scan increases more slowly than if we added it before
                     dirs = [ entry for entry in entries if entry.is_dir(follow_symlinks=False) ]

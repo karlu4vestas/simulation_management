@@ -85,6 +85,21 @@ class TestSchedulerAndAgents:
         cleanup_config:CleanupConfigurationDTO = cleanup_db_actions.insert_cleanup_configuration(rootfolder.id, cleanup_config)
         return rootfolder, cleanup_config
     
+    @staticmethod
+    def generate_simulations_folder_and_files(rootdir: str, rootfolder_data:RootFolderWithMemoryFolders) -> GeneratedSimulationsResult:
+        #remove old test data
+        if os.path.isdir(rootdir):
+            shutil.rmtree(rootdir)
+
+        # generate the simulations but before that all paths must be adjusted to point to the test storage location
+        rootfolder_storage_path: str                    = os.path.join( rootdir, "rootfolder" )
+        rootfolder_data.rootfolder.path                 = os.path.join( rootfolder_storage_path, rootfolder_data.rootfolder.path)
+        leaf_folders:list[InMemoryFolderNode]           = [folder for folder in rootfolder_data.folders if folder.is_leaf]
+        simulation_folders: SimulationTestSpecification = [SimulationTestSpecification( os.path.join(rootfolder_storage_path, folder.path), 
+                                                                                        SimulationType.VTS) for folder in leaf_folders]        
+        gen_sim_results: GeneratedSimulationsResult     = generate_simulations(rootdir, simulation_folders)
+        return gen_sim_results
+
     def test_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data):
         # The purpose of this test is to test 
         # 1) the scheduling of tasks 
@@ -125,21 +140,11 @@ class TestSchedulerAndAgents:
 
         #Get one rootfolders and it list of leaf folders
         rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]
-        leaf_folders:list[InMemoryFolderNode] = [folder for folder in rootfolder_data.folders if folder.is_leaf]
         
         # setup folder for the test
         io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
-        #remove old test data
-        if os.path.isdir(io_dir_for_storage_test):
-            shutil.rmtree(io_dir_for_storage_test)
-
-        # generate the simulations but before that all paths must be adjusted to point to the test storage location
-        path_to_loadcases_configuration_file:str        = os.path.normpath("tests/generate_vts_simulations/loadcases/loadcases_ranges.json")
-        rootfolder_storage_path: str = os.path.join( io_dir_for_storage_test, "rootfolder" )
-        rootfolder_data.rootfolder.path = os.path.join( rootfolder_storage_path, rootfolder_data.rootfolder.path)
-        simulation_folders: SimulationTestSpecification = [SimulationTestSpecification(os.path.join(rootfolder_storage_path, folder.path), SimulationType.VTS) for folder in leaf_folders]        
-        gen_sim_results: GeneratedSimulationsResult     = generate_simulations(io_dir_for_storage_test, simulation_folders, path_to_loadcases_configuration_file)
-
+        
+        gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data)
         mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
             cycletime=7,
             cleanupfrequency=1./(24*60*60),  # set to one second for the test

@@ -766,13 +766,6 @@ def normalize_path(filepath: str) -> list[str]:
     # Normalize to forward slashes
     normalized = filepath.replace("\\", "/")
     return normalized
-    
-def normalize_and_split_path(filepath: str) -> list[str]:
-    normalized:str = normalize_path(filepath)
-    # Remove leading and trailing slashes, then split
-    segments = [segment for segment in normalized.strip("/").split("/") if segment.strip()]
-    
-    return segments
 
 
 def find_existing_node(session: Session, rootfolder_id: int, parent_id: int, name: str) -> "FolderNodeDTO | None":
@@ -864,7 +857,17 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
     if rootfolder_id is None or rootfolder_id <= 0:
         raise ValueError(f"Invalid rootfolder_id: {rootfolder_id}")
 
-    segments = normalize_and_split_path(simulation.filepath) #can probably be optimized to: pathlib.Path(filepath).as_posix().split('/') because the domains part of the folder should be in the rootfolder  
+    # Normalize path and split into segments
+    normalized = normalize_path(simulation.filepath).rstrip("/")
+    
+    # Check if path is absolute (starts with /)
+    if normalized.startswith("/") and len(normalized) > 1:
+        segments = [segment for segment in normalized.split("/") if segment.strip()]
+        if len(segments) > 0:
+            segments[0]= "/" + segments[0]   # restore leading slash to first segment
+    else:
+        segments = [segment for segment in normalized.split("/") if segment.strip()]
+    
     if not segments:
         raise ValueError(f"Invalid or empty filepath: {simulation.filepath}")
     
@@ -878,6 +881,9 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
             raise ValueError(f"Invalid empty segment in filepath: {simulation.filepath}")
             
         current_path_segments.append(segment)
+        
+        # Build the path, adding leading / if original path was absolute
+        current_path = "/".join(current_path_segments)
         
         # Check if node already exists at this level
         existing_node = find_existing_node(session, rootfolder_id, current_parent_id, segment)
@@ -894,7 +900,7 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
                     parent_id=current_parent_id,
                     name=segment,
                     nodetype_id=nodetypes[FolderTypeEnum.INNERNODE].id,
-                    path="/".join(current_path_segments),  # Full path up to this segment
+                    path=current_path,  # Full path up to this segment
                 )
             else:
                 new_node = FolderNodeDTO(
@@ -902,7 +908,7 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
                     parent_id=current_parent_id,
                     name=segment,
                     nodetype_id=nodetypes[FolderTypeEnum.SIMULATION].id,
-                    path="/".join(current_path_segments),  # Full path up to this segment
+                    path=current_path,  # Full path up to this segment
                 )            
             try:
                 session.add(new_node)

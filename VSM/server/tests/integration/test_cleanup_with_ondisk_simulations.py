@@ -23,7 +23,7 @@ from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../unittests/generate_vts_simulations'))
 
 from cleanup_cycle.clean_agent.file_utilities import FileStatistics
-from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations, initialize_generate_simulations
+from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations
 from tests.generate_vts_simulations.main_validate_cleanup import validate_cleanup
 
 from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
@@ -109,7 +109,7 @@ class TestCleanupWithOnDiskSimulations:
         # Step 1: Generate real VTS simulations
         print("\n=== Generating simulations for ANALYSE mode test ===")
         simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "analyse_mode_LOADS"), SimulationType.VTS)]
-        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders, path_to_loadcases_configuration_file)
+        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
         
         # Step 2: Scan simulations and count files before cleanup
         print("\n=== Step 2: Scanning simulations ===")
@@ -184,7 +184,7 @@ class TestCleanupWithOnDiskSimulations:
         # Step 1: Generate real VTS simulations
         print("\n=== Step 1: Generating simulations ===")
         simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "HTC_LOADS"), SimulationType.HTC)]
-        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders, path_to_loadcases_configuration_file)
+        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
 
         # Verify generation completed
         assert os.path.exists(gen_result.validation_csv_file), "validation.csv not created"
@@ -255,7 +255,7 @@ class TestCleanupWithOnDiskSimulations:
         # Step 1: Generate real VTS simulations
         print("\n=== Step 1: Generating simulations ===")
         simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "delete_mode_LOADS"), SimulationType.VTS)]
-        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders, path_to_loadcases_configuration_file)
+        gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
 
         # Verify generation completed
         assert os.path.exists(gen_result.validation_csv_file), "validation.csv not created"

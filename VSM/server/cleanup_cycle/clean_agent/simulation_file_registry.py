@@ -192,6 +192,10 @@ class SimulationFileRegistry:
         #         for file_entry in files:
         #             print(file_entry.path, file_entry.stat().st_size)
         return self.all_dir_entries, self.all_file_entries
+    
+    def get_all_dir_entries(self) -> dict[str, list[os.DirEntry]]:
+        # Get all directories
+        return self.all_dir_entries
 
     def get_immediate_folders_in_root(self) -> dict[str, os.DirEntry]:
         # Returns: the immediate child folders in the simulation root where the 

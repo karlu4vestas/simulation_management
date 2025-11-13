@@ -13,6 +13,8 @@ from tests import test_storage
 # Use "main_validate_cleanup.py" to expected vs actual existence of files in the cleaned testdata folders
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
+path_to_loadcases_configuration_file:str = os.path.normpath("tests/generate_vts_simulations/loadcases/loadcases_ranges.json")
+
 
 
 class GeneratedSimulationsResult(NamedTuple):
@@ -26,7 +28,8 @@ class SimulationTestSpecification(NamedTuple):
     fullpath: str
     sim_type: SimulationType
 
-def generate_simulations(base_path:str, simulation_folders: SimulationTestSpecification, loadcases_ranges_filepath:str) -> GeneratedSimulationsResult:
+def generate_simulations(base_path:str, simulation_folders: SimulationTestSpecification ) -> GeneratedSimulationsResult:
+    loadcases_ranges_filepath:str = path_to_loadcases_configuration_file
 
     simulations = []
     for p, sim_type in simulation_folders:
@@ -94,7 +97,7 @@ def initialize_generate_simulations (n_simulations:int, base_path:str, loadcases
         (os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
     ]
 
-    result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders, loadcases_ranges_filepath )
+    result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders )
     print(f"{time.perf_counter() - start_time:.2f} seconds to create {n_simulations} simulations with files:{len(result.validations)}")
     print(f"look her for the list of simulations:{result.simulations_csv_file}\nlook here for the clean up validation:{result.validation_csv_file}")
     
@@ -104,8 +107,8 @@ def main():
     #initialize the generators
     # Use your existing setup to create directories and manage file paths
     base_path = os.path.join( TEST_STORAGE_LOCATION, "vts_clean_data/test")
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    path_to_loadcases_configuration_file = os.path.join(script_dir, "loadcases", "loadcases_ranges.json")
+    #script_dir = os.path.dirname(os.path.abspath(__file__))
+    #path_to_loadcases_configuration_file = os.path.join(script_dir, "loadcases", "loadcases_ranges.json")
 
 
     # delete the old_folder
@@ -127,7 +130,7 @@ def main():
         #(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
     ]
 
-    result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders, path_to_loadcases_configuration_file )
+    result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders )
 
     print(f"{time.perf_counter() - start_time:.2f} seconds to create {len(simulation_folders)} simulations with files:{len(result.validations)}")
     print(f"look her for the list of simulations:{result.simulations_csv_file}\nlook here for the clean up validation:{result.validation_csv_file}")

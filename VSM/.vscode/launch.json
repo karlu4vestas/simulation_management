@@ -236,22 +236,6 @@
       }
     },
     {
-      "name": "Debug folder_tree.py",
-      "type": "debugpy",
-      "request": "launch",
-      "program": "${workspaceFolder}/server/cleanup_cycle/scan/folder_tree.py",
-      "args": [],
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "console": "integratedTerminal",
-      "cwd": "${workspaceFolder}/server/cleanup_cycle/scan",
-      "justMyCode": false,
-      "env": {
-        "PYTHONUNBUFFERED": "1",
-        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
-        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
-      }
-    },
-    {
       "name": "Debug main_GenerateSimulation.py",
       "type": "debugpy",
       "request": "launch",
@@ -286,12 +270,12 @@
       }
     },
     {
-      "name": "Debug test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
+      "name": "Debug test_scheduler_and_agents_with_full_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_4_verify_changes_to_retentions_after_start_of_cleanup_round",
+        "tests/integration/test_scheduler_and_agents.py::TestSchedulerAndAgents::test_scheduler_and_agents_with_full_cleanup_round",
         "-v",
         "-s",
         "--tb=short"
@@ -300,6 +284,45 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server",
       "justMyCode": true,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    },
+    {
+      "name": "Debug folder_tree.py",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/cleanup_cycle/scan/folder_tree.py",
+      "args": [],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    },
+    {
+      "name": "Debug Scan Agent Unit Test",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/unittests/agents/test_on_premise_scan_agent.py::TestOnPremiseScanAgent::test_scan_agent_without_db",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
       "env": {
         "PYTHONUNBUFFERED": "1",
         "PYTHONPATH": "${workspaceFolder}/server",

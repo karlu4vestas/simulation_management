@@ -125,7 +125,7 @@ if __name__ == "__main__":
     else: 
         nScanners = args.nScanners
 
-    from ProgressWriter import ProgressReporter, ProgressWriter
+    from ProgressWriter import ProgressWriter
     progress_reporter = ProgressWriter( seconds_between_update=5, seconds_between_filelog=60)
     progress_reporter.open(output_archive)
 
