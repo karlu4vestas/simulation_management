@@ -1,9 +1,8 @@
 import asyncio
 from datetime import date, timedelta
-from cleanup_cycle.scheduler_dto import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
+from cleanup_cycle.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
 from cleanup_cycle.scheduler_db_actions import CleanupScheduler, AgentInterfaceMethods
-from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start, cleanup_cycle_finishing, cleanup_cycle_prepare_next_cycle
-
+from cleanup_cycle import cleanup_db_actions
 
 # ----------------- AgentTemplate -----------------
 from abc import ABC, abstractmethod
@@ -70,7 +69,7 @@ class AgentCleanupCycleStart(AgentTemplate):
         super().__init__("AgentCleanupCycleStart", [ActionType.START_RETENTION_REVIEW.value])
 
     def execute_task(self):
-        cleanup_cycle_start(self.task.rootfolder_id)
+        cleanup_db_actions.cleanup_cycle_start(self.task.rootfolder_id)
         self.success_message = f"Cleanup cycle started for rootfolder {self.task.rootfolder_id}"
 
 class AgentCleanupCycleFinishing(AgentTemplate):
@@ -79,7 +78,7 @@ class AgentCleanupCycleFinishing(AgentTemplate):
         super().__init__("AgentCleanupCycleFinishing", [ActionType.FINISH_CLEANUP_CYCLE.value])
 
     def execute_task(self):
-        cleanup_cycle_finishing(self.task.rootfolder_id)
+        cleanup_db_actions.cleanup_cycle_finishing(self.task.rootfolder_id)
         self.success_message = f"Cleanup cycle finishing for rootfolder {self.task.rootfolder_id}"
 
 class AgentCleanupCyclePrepareNext(AgentTemplate):
@@ -87,7 +86,7 @@ class AgentCleanupCyclePrepareNext(AgentTemplate):
         super().__init__("AgentCleanupCyclePrepareNext", [ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value])
 
     def execute_task(self):
-        cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
+        cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id}"
 
 
@@ -159,13 +158,14 @@ class AgentNotification(AgentTemplate):
             self.error_message = f"Failed to send notification: {str(e)}"
 
     def execute_task(self):
-        from db.database import Database
-        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-        from datamodel.dtos import RootFolderDTO
         from sqlmodel import Session, func, select
+        from fastapi import Query, HTTPException
+        from db.database import Database
+        from datamodel import dtos
+        from cleanup_cycle import cleanup_dtos
         with Session(Database.get_engine()) as session:
-            rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == self.task.rootfolder_id)).first()
-            config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session) if rootfolder is not None else None
+            rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == self.task.rootfolder_id)).first()
+            config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session) if rootfolder is not None else None
             if rootfolder is None or config is None:
                 self.error_message = f"RootFolder with ID {self.task.rootfolder_id} not found."
             else:

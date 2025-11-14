@@ -4,10 +4,10 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
 from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start
 
-from datamodel.retentions import PathProtectionDTO, RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
+from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
+from datamodel import dtos
 from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO, FileInfo
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
@@ -17,14 +17,14 @@ from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_mark
 from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder
 
-from datamodel import retentions
+from datamodel import dtos, retentions
 from tests.integration.testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 
 class RootFolderWithFolderNodeDTOList(NamedTuple):
     """Named tuple for a root folder and its flattened list of folder nodes"""
     rootfolder: RootFolderDTO
     folders: list[FolderNodeDTO]
-    path_protections: list[PathProtectionDTO]  # from def read_pathprotections( rootfolder_id: int ). may be None or empty
+    path_protections: list[dtos.PathProtectionDTO]  # from def read_pathprotections( rootfolder_id: int ). may be None or empty
 
 class DataIOSet:
     # This structure is used to collect data for verification during the tests
@@ -42,8 +42,8 @@ class DataIOSet:
     # output
     #rootfolder:RootFolderDTO = None
     output: RootFolderWithFolderNodeDTOList = None  # output rootfolder and folders from db after insertion of simulations
-    output_leafs: list[FolderNodeDTO] = None  # output leafs (the simulations) extracted from output
-    output_for_input_leafs: list[FolderNodeDTO] = None  # output leafs (the simulations) extracted from output and ordered as input leafs
+    output_leafs: list[dtos.FolderNodeDTO] = None  # output leafs (the simulations) extracted from output
+    output_for_input_leafs: list[dtos.FolderNodeDTO] = None  # output leafs (the simulations) extracted from output and ordered as input leafs
 
     retention_calculator: RetentionCalculator = None  # retention calculator for the rootfolder
 
@@ -117,7 +117,7 @@ class TestCleanupWorkflows:
                 # Create CleanupConfigurationDTO from the in-memory CleanupConfiguration
                 # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
                 # Now we create the corresponding CleanupConfigurationDTO database record
-                cleanup_config_dto:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
+                cleanup_config_dto:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
 
                 in_memory_config:CleanupConfiguration   = cleanup_scenario_data.get("cleanup_configuration", None)
                 cleanup_config_dto.cycletime            = in_memory_config.cycletime
@@ -129,7 +129,7 @@ class TestCleanupWorkflows:
             else: #this case is activate for "root2_part2_data"
                 rootfolder:RootFolderDTO = insert_rootfolder(input.rootfolder) # insert return existing rootfolder it it exists 
                 input.rootfolder = rootfolder
-                cleanup_config_dto:CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
+                cleanup_config_dto:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
                 
             #cleanup_config_dto = insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
             
@@ -224,9 +224,9 @@ class TestCleanupWorkflows:
                     #   if input folder.is_leaf=True then the output folder must have a nodetype_id of VTS_SIMULATION
                     #   otherwise the nodetype must be INNERNODE
                     # Create a mapping of paths
-                    output_folder_lookup: dict[str, FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}    
+                    output_folder_lookup: dict[str, dtos.FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}    
                     for folder in data_set.input.folders: 
-                        db_folder:FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))
+                        db_folder:dtos.FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))
                         
                         assert db_folder is not None, f"data_set.key={data_set.key}: Folder {folder.path} not found in database folders"
                         if folder.is_leaf:
@@ -256,9 +256,9 @@ class TestCleanupWorkflows:
 
                     # Verify each input leaf has a corresponding output folder with the correct node type
                     # Create a mapping of paths to is_leaf status from ALL input folders (not just leafs)
-                    output_folder_lookup: dict[str, FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}
+                    output_folder_lookup: dict[str, dtos.FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}
                     for folder in data_set.input_leafs:
-                        db_folder:FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))                        
+                        db_folder:dtos.FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))                        
                         assert db_folder is not None, f"data_set.key={data_set.key}: Folder {folder.path} not found in database folders"
                         assert db_folder.nodetype_id == data_set.nodetype_leaf, \
                                 f"data_set.key={data_set.key}: Folder {db_folder.path} is a leaf in input but has nodetype_id {db_folder.nodetype_id} instead of {data_set.nodetype_leaf}"
@@ -287,9 +287,9 @@ class TestCleanupWorkflows:
                     
                     # Verify each input leaf has a corresponding output folder with the correct node type
                     # Create a mapping of paths to is_leaf status from ALL input folders (not just leafs)
-                    output_folder_lookup: dict[str, FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}
+                    output_folder_lookup: dict[str, dtos.FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders}
                     for folder in data_set.input_leafs:
-                        db_folder:FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))
+                        db_folder:dtos.FolderNodeDTO = output_folder_lookup.get(normalize_path(folder.path))
                         assert db_folder is not None, f"data_set.key={data_set.key}: Folder {folder.path} not found in database folders"
                         assert db_folder.nodetype_id == data_set.nodetype_leaf, \
                                 f"data_set.key={data_set.key}: Folder {db_folder.path} is a leaf in input but has nodetype_id {db_folder.nodetype_id} instead of {data_set.nodetype_leaf}"
@@ -304,20 +304,27 @@ class TestCleanupWorkflows:
         if data_set.output.path_protections :
             # assert the test was configured properly if path protections in db then they must have been configured in the input
             # otherwise the test is invalid
-            assert len(data_set.output.path_protections) == len(data_set.path_protections_paths), \
-                f"data_set.key={data_set.key}: Number of path protections in db {len(data_set.output.path_protections)} does not match input {len(data_set.path_protections_paths)}"
-            assert data_set.expected_protected_leaf_count > 0, \
-                f"data_set.key={data_set.key}: expected_protected_leaf_count must be set when path protections are configured in input"
+            if data_set.key == "second_rootfolder_part_one":
+                # path protections inserted in part one before the folder exist will be ignored
+                assert len(data_set.output.path_protections) <= len(data_set.path_protections_paths), \
+                    f"data_set.key={data_set.key}: Number of path protections in db {len(data_set.output.path_protections)} does not match input {len(data_set.path_protections_paths)}"
+            else:    
+                # case for data_set.key == "second_rootfolder_part_one"  path protections inserted in part one before the folder exist will be ignored
+                assert data_set.key == "first_rootfolder" or data_set.key == "second_rootfolder_part_two", f"data_set.key must be either 'first_rootfolder' or 'second_rootfolder_part_one' "
+                
+                # this case is special because part one inserted the path protections
+                assert len(data_set.output.path_protections) == len(data_set.path_protections_paths), \
+                    f"data_set.key={data_set.key}: Number of path protections in db {len(data_set.output.path_protections)} does not match input {len(data_set.path_protections_paths)}"
+                assert data_set.expected_protected_leaf_count > 0, \
+                    f"data_set.key={data_set.key}: expected_protected_leaf_count must be set when path protections are configured in input"
             
             # extract the number of protected folders from the database
             # select all folders under data_set.output.rootfolder with a pathprotection_id
             folders_with_path_protection:list[FolderNodeDTO] = [ folder for folder in data_set.output.folders if folder.pathprotection_id is not None ]
             #verify that they are all leafs
-            assert all( folder.nodetype_id == data_set.nodetype_leaf for folder in folders_with_path_protection ), \
-                f"data_set.key={data_set.key}: Not all folders with pathprotection_id are leafs"
+            assert all( folder.nodetype_id == data_set.nodetype_leaf for folder in folders_with_path_protection ), f"data_set.key={data_set.key}: Not all folders with pathprotection_id are leafs"
             # assert that the pathprotection_id is assigned for alle the folders
-            assert all( (folder.pathprotection_id is not None and folder.pathprotection_id !=0)  for folder in folders_with_path_protection ), \
-                f"data_set.key={data_set.key}: All folders with pathprotection_id must have it assigned"
+            assert all( (folder.pathprotection_id is not None and folder.pathprotection_id !=0)  for folder in folders_with_path_protection ), f"data_set.key={data_set.key}: All folders with pathprotection_id must have it assigned"
 
             #assert that the number of protected leafs is as expected
             assert len(folders_with_path_protection) == data_set.expected_protected_leaf_count, \
@@ -357,7 +364,7 @@ class TestCleanupWorkflows:
                         # NUMERIC RETENTION must be assigned undefined so it can be imported even if it the cleanup configuration is incomplete
                         assert folder.retention_id == data_set.undefined_retention.id
                     elif sim_folder.retention == ExternalRetentionTypes.NUMERIC:
-                        if data_set.retention_calculator.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE:
+                        if data_set.retention_calculator.cleanup_progress == dtos.CleanupProgress.ProgressEnum.INACTIVE:
                             # if the cleanup configuration is incomplete then the external NUMERIC retention must be converted to undefined retention
                             assert folder.retention_id == data_set.undefined_retention.id,  \
                                 f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been numeric or undefined but is {folder.retention_id}"
@@ -452,8 +459,8 @@ class TestCleanupWorkflows:
         # validate the state of the db before inserting more simulations into the same rootfolder
 
         # First entry validation: When calling this the first part of the second rootfolder is imported and a cleanup round is started
-        cleanup_config:CleanupConfigurationDTO = root2_part1_data.output.rootfolder.get_cleanup_configuration(integration_session)
-        assert cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"the second root folders part one must have been started for you to use this function. CleanupProgress is {cleanup_config.cleanup_progress}"
+        cleanup_config:dtos.CleanupConfigurationDTO = root2_part1_data.output.rootfolder.get_cleanup_configuration(integration_session)
+        assert cleanup_config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"the second root folders part one must have been started for you to use this function. CleanupProgress is {cleanup_config.cleanup_progress}"
 
         # Second entry validation:
         #   Also verify that the folders planned to be marked for cleanup can be extracted from the db. 
@@ -667,10 +674,10 @@ class TestCleanupWorkflows:
 
 
         # validate that the folder is in review state
-        rootfolder:RootFolderDTO                = root1_data_set.output.rootfolder
-        marked_folders:list[FolderNodeDTO]      = read_folders_marked_for_cleanup(rootfolder.id)
-        cleanup_config:CleanupConfigurationDTO  = rootfolder.get_cleanup_configuration(integration_session)
-        assert cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"The rootfolder should be RETENTION_REVIEW but is {cleanup_config.cleanup_progress}"
+        rootfolder:RootFolderDTO                    = root1_data_set.output.rootfolder
+        marked_folders:list[FolderNodeDTO]          = read_folders_marked_for_cleanup(rootfolder.id)
+        cleanup_config:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
+        assert cleanup_config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"The rootfolder should be RETENTION_REVIEW but is {cleanup_config.cleanup_progress}"
 
         # emulate a change of one retention from marked to a retention after it
         # Pick the last marked folder for change and remove it from the list of marked folders to keep track of how many are left      

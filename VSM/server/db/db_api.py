@@ -4,19 +4,18 @@ from sqlalchemy import func
 from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
+from datamodel import dtos
 
 if TYPE_CHECKING:
-    from datamodel.dtos import FolderTypeDTO, FolderNodeDTO, RootFolderDTO, SimulationDomainDTO, FileInfo, CleanupFrequencyDTO, CycleTimeDTO
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention 
+    from datamodel.retentions import RetentionTypeDTO, RetentionTypeEnum, FolderRetention 
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
 simulation_domain_name: Literal["vts"]
 simulation_domain_names = ["vts"]  # Define the allowed domain names
 
-def read_simulation_domains() -> list["SimulationDomainDTO"]:
-    from datamodel.dtos import SimulationDomainDTO
+def read_simulation_domains() -> list[dtos.SimulationDomainDTO]:
     with Session(Database.get_engine()) as session:
-        simulation_domains = session.exec(select(SimulationDomainDTO)).all()
+        simulation_domains = session.exec(select(dtos.SimulationDomainDTO)).all()
         if not simulation_domains:
             raise HTTPException(status_code=404, detail="SimulationDomain not found")
         return simulation_domains
@@ -26,9 +25,8 @@ def read_simulation_domains_dict():
 
 
 def read_simulation_domain_by_name(domain_name: str):
-    from datamodel.dtos import SimulationDomainDTO
     with Session(Database.get_engine()) as session:
-        simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == domain_name)).first()
+        simulation_domain = session.exec(select(dtos.SimulationDomainDTO).where(dtos.SimulationDomainDTO.name == domain_name)).first()
         if not simulation_domain:
             raise HTTPException(status_code=404, detail=f"SimulationDomain for {domain_name}not found")
         return simulation_domain
@@ -45,9 +43,8 @@ def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str,
     return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
 def read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
-    from datamodel.dtos import CleanupFrequencyDTO
     with Session(Database.get_engine()) as session:
-        cleanupfrequency = session.exec(select(CleanupFrequencyDTO).where(CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
+        cleanupfrequency = session.exec(select(dtos.CleanupFrequencyDTO).where(dtos.CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cleanupfrequency or len(cleanupfrequency) == 0:
             raise HTTPException(status_code=404, detail="CleanupFrequency not found")
         return cleanupfrequency
@@ -57,9 +54,9 @@ def read_cleanupfrequency_name_dict_by_domain_id(simulationdomain_id: int):
 
 
 def read_folder_types_pr_domain_id(simulationdomain_id: int):
-    from datamodel.dtos import FolderTypeDTO
+    
     with Session(Database.get_engine()) as session:
-        folder_types = session.exec(select(FolderTypeDTO).where(FolderTypeDTO.simulationdomain_id == simulationdomain_id)).all()
+        folder_types = session.exec(select(dtos.FolderTypeDTO).where(dtos.FolderTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not folder_types or len(folder_types) == 0:
             raise HTTPException(status_code=404, detail="foldertypes not found")
         return folder_types
@@ -68,9 +65,8 @@ def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
     return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulationdomain_id)}
 
 def read_cycle_time_by_domain_id(simulationdomain_id: int):
-    from datamodel.dtos import CycleTimeDTO
     with Session(Database.get_engine()) as session:
-        cycle_time = session.exec(select(CycleTimeDTO).where(CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
+        cycle_time = session.exec(select(dtos.CycleTimeDTO).where(dtos.CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:
             raise HTTPException(status_code=404, detail="CycleTime not found")
         return cycle_time
@@ -82,6 +78,7 @@ def read_cycle_time_dict_by_domain_id(simulationdomain_id: int):
 
 
 #-----------------start maintenance of rootfolders and information under it -------------------
+
 def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(default="")):
     if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
@@ -89,48 +86,44 @@ def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(d
     return rootfolders
 
 def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None)->list[RootFolderDTO]:
-    from datamodel.dtos import RootFolderDTO
     if simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
 
     with Session(Database.get_engine()) as session:
         if type(initials) == str and initials is not None:
             rootfolders = session.exec(
-                select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) &
-                    ((RootFolderDTO.owner == initials) | (RootFolderDTO.approvers.like(f"%{initials}%")))
+                select(dtos.RootFolderDTO).where( (dtos.RootFolderDTO.simulationdomain_id == simulationdomain_id) &
+                    ((dtos.RootFolderDTO.owner == initials) | (dtos.RootFolderDTO.approvers.like(f"%{initials}%")))
                 )
             ).all()
         else:
             rootfolders = session.exec(
-                select(RootFolderDTO).where( (RootFolderDTO.simulationdomain_id == simulationdomain_id) )
+                select(dtos.RootFolderDTO).where( (dtos.RootFolderDTO.simulationdomain_id == simulationdomain_id) )
             ).all()
 
         return rootfolders
 
-
-def exist_rootfolder(rootfolder:RootFolderDTO):
-    from datamodel.dtos import RootFolderDTO
+def exist_rootfolder(rootfolder:dtos.RootFolderDTO):
     if (rootfolder is None) or (rootfolder.simulationdomain_id is None) or (rootfolder.simulationdomain_id == 0):
         raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
 
     with Session(Database.get_engine()) as session:
         #verify if the rootfolder already exists        
-        existing_rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(
-                (RootFolderDTO.simulationdomain_id == rootfolder.simulationdomain_id) & 
-                (RootFolderDTO.path == rootfolder.path)
+        existing_rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(
+                (dtos.RootFolderDTO.simulationdomain_id == rootfolder.simulationdomain_id) & 
+                (dtos.RootFolderDTO.path == rootfolder.path)
             )).first()
         return existing_rootfolder is not None
 
-def insert_rootfolder(rootfolder:RootFolderDTO):
-    from datamodel.dtos import RootFolderDTO
+def insert_rootfolder(rootfolder:dtos.RootFolderDTO):
     if (rootfolder is None) or (rootfolder.simulationdomain_id is None) or (rootfolder.simulationdomain_id == 0):
         raise HTTPException(status_code=404, detail="You must provide a valid simulationdomain_id to create a rootfolder")
 
     with Session(Database.get_engine()) as session:
         #verify if the rootfolder already exists
-        existing_rootfolder:RootFolderDTO = session.exec(select(RootFolderDTO).where(
-                (RootFolderDTO.simulationdomain_id == rootfolder.simulationdomain_id) & 
-                (RootFolderDTO.path == rootfolder.path)
+        existing_rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(
+                (dtos.RootFolderDTO.simulationdomain_id == rootfolder.simulationdomain_id) & 
+                (dtos.RootFolderDTO.path == rootfolder.path)
             )).first()
         if existing_rootfolder:
             return existing_rootfolder
@@ -145,15 +138,13 @@ def insert_rootfolder(rootfolder:RootFolderDTO):
 
 
 def read_rootfolder_retentiontypes(rootfolder_id: int):
-    #from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
     retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retentiontypes_dict(rootfolder_id).values())
     return retention_types
+
 #@app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO]) #do not expose untill needed
 def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, "RetentionTypeDTO"]:
-    #from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
-    from datamodel.dtos import RootFolderDTO
     with Session(Database.get_engine()) as session:
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
 
@@ -167,16 +158,87 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, "Retenti
         return retention_types
 
 def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, "RetentionTypeDTO"]:
-    #from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
     retention_types_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
     #filter to keep only retentions with at cycletime
     return {key:retention for key,retention in retention_types_dict.items() if retention.days_to_cleanup is not None}
 
 def read_folders( rootfolder_id: int ):
-    from datamodel.dtos import FolderNodeDTO
     with Session(Database.get_engine()) as session:
-        folders = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
+        folders = session.exec(select(dtos.FolderNodeDTO).where(dtos.FolderNodeDTO.rootfolder_id == rootfolder_id)).all()
         return folders
+
+
+def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
+    is_valid = cleanup_configuration.is_valid()
+    if not is_valid:
+        raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
+
+    #now the configuration is consistent
+    with Session(Database.get_engine()) as session:
+        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+      
+        # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
+        cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        # Update the DTO with values from the incoming dataclass
+        # any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
+        cleanup_config.cycletime          = cleanup_configuration.cycletime
+        cleanup_config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
+        cleanup_config.cleanup_start_date = cleanup_configuration.cleanup_start_date
+        cleanup_config.cleanup_progress   = dtos.CleanupProgress.ProgressEnum.INACTIVE 
+        #config_dto.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress 
+        rootfolder.save_cleanup_configuration(session, cleanup_config)
+
+        #if cleanup_configuration.can_start_cleanup():
+        #    print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
+        #    #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
+        #    #start_new_cleanup_cycle(rootfolder_id)
+        return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {cleanup_config.id} "}
+
+def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> dtos.CleanupConfigurationDTO:
+    with Session(Database.get_engine()) as session:
+        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+
+        cleanup_configuration = rootfolder.get_cleanup_configuration(session)
+        if not cleanup_configuration:
+            raise HTTPException(status_code=404, detail="cleanup_configuration not found")
+
+    return cleanup_configuration
+
+#insert the cleanup configuration for a rootfolder and update the rootfolder to point to the cleanup configuration
+def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.CleanupConfigurationDTO):
+    if (rootfolder_id is None) or (rootfolder_id == 0):
+        raise HTTPException(status_code=404, detail="You must provide a valid rootfolder_id to create a cleanup configuration")
+    
+    with Session(Database.get_engine()) as session:
+        #verify if the rootfolder already exists
+        existing_rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where((dtos.RootFolderDTO.id == rootfolder_id))).first()
+        if not existing_rootfolder:
+            raise HTTPException(status_code=404, detail=f"Failed to find rootfolder with id {rootfolder_id} to create a cleanup configuration")
+
+        #verify if a cleanup configuration already exists for this rootfolder
+        existing_cleanup_config:dtos.CleanupConfigurationDTO = session.exec(select(dtos.CleanupConfigurationDTO).where((dtos.CleanupConfigurationDTO.rootfolder_id == rootfolder_id))).first()
+        if existing_cleanup_config:
+            return existing_cleanup_config
+        
+        from cleanup_cycle.scheduler_db_actions import CleanupScheduler
+        cleanup_config.rootfolder_id = rootfolder_id
+        cleanup_config.rootfolder_id = rootfolder_id
+        cleanup_config.cleanup_progress = dtos.CleanupProgress.ProgressEnum.INACTIVE
+        CleanupScheduler.deactivate_calendar(cleanup_config.rootfolder_id)
+        session.add(cleanup_config)
+        session.commit()
+        session.refresh(cleanup_config)
+        existing_rootfolder.cleanup_config_id = cleanup_config.id
+        session.add(existing_rootfolder)
+        session.commit()
+
+        if (cleanup_config.id is None) or (cleanup_config.id == 0):
+            raise HTTPException(status_code=404, detail=f"Failed to provide cleanup configuration for rootfolder_id {rootfolder_id} with an id")
+        return cleanup_config   
 
 # # --------------- start not in use now - will be used for optimization -------------------
 
@@ -282,23 +344,21 @@ def read_folders( rootfolder_id: int ):
 #     )
 # # --------------- end start not in use now - will be used for optimization -------------------
 
-def read_pathprotections( rootfolder_id: int )-> list["PathProtectionDTO"]:
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
+def read_pathprotections( rootfolder_id: int )-> list[dtos.PathProtectionDTO]:
     with Session(Database.get_engine()) as session:
-        paths = session.exec(select(PathProtectionDTO).where(PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
+        paths = session.exec(select(dtos.PathProtectionDTO).where(dtos.PathProtectionDTO.rootfolder_id == rootfolder_id)).all()
         return paths
 
 # @TODO we should consider to enforce the changed path protection on existing folders
 # at present it is the clients responsibility to so and communicate it in "def change_retentions"
-def add_pathprotection(rootfolder_id:int, path_protection:"PathProtectionDTO"):
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
+def add_pathprotection(rootfolder_id:int, path_protection:dtos.PathProtectionDTO):
     #print(f"Adding path protection {path_protection}")
     with Session(Database.get_engine()) as session:
         # Check if path protection already exists for this path in this rootfolder
         existing_protection = session.exec(
-            select(PathProtectionDTO).where(
-                (PathProtectionDTO.rootfolder_id == rootfolder_id) & 
-                (PathProtectionDTO.folder_id == path_protection.folder_id)
+            select(dtos.PathProtectionDTO).where(
+                (dtos.PathProtectionDTO.rootfolder_id == rootfolder_id) & 
+                (dtos.PathProtectionDTO.folder_id == path_protection.folder_id)
             )
         ).first()
         
@@ -306,7 +366,7 @@ def add_pathprotection(rootfolder_id:int, path_protection:"PathProtectionDTO"):
             raise HTTPException(status_code=409, detail="Path protection already exists for this path")
         
         # Create new path protection
-        new_protection = PathProtectionDTO(
+        new_protection = dtos.PathProtectionDTO(
             rootfolder_id = rootfolder_id,
             folder_id     = path_protection.folder_id,
             path          = path_protection.path
@@ -318,27 +378,25 @@ def add_pathprotection(rootfolder_id:int, path_protection:"PathProtectionDTO"):
             "message": f"Path protection added id '{new_protection.id}' for path '{new_protection.path}'"}
 
 def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO
     # step 1: find the folder nodes by path
-    # step 2: create list[PathProtectionDTO] with rootfolder_id, folder_id, path
-    # step 3: call add_path_protection for each PathProtectionDTO
+    # step 2: create list[dtos.PathProtectionDTO] with rootfolder_id, folder_id, path
+    # step 3: call add_path_protection for each dtos.PathProtectionDTO
     # Note: Uses case-insensitive path matching and raises exceptions for errors
     if not paths:
         raise HTTPException(status_code=400, detail="No paths provided")
     
     with Session(Database.get_engine()) as session:
         # Verify rootfolder exists
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
         
         # Step 1: Find the folder nodes by path (case-insensitive)
         lower_case_paths = [path.lower() for path in paths]
         existing_folders = session.exec(
-            select(FolderNodeDTO).where(
-                (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-                (func.lower(FolderNodeDTO.path).in_(lower_case_paths))
+            select(dtos.FolderNodeDTO).where(
+                (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                (func.lower(dtos.FolderNodeDTO.path).in_(lower_case_paths))
             )
         ).all()
         
@@ -359,9 +417,9 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
             
             # Check if path protection already exists
             existing_protection = session.exec(
-                select(PathProtectionDTO).where(
-                    (PathProtectionDTO.rootfolder_id == rootfolder_id) & 
-                    (PathProtectionDTO.folder_id == folder.id)
+                select(dtos.PathProtectionDTO).where(
+                    (dtos.PathProtectionDTO.rootfolder_id == rootfolder_id) & 
+                    (dtos.PathProtectionDTO.folder_id == folder.id)
                 )
             ).first()
             
@@ -372,7 +430,7 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
                 continue
             
             # Create new path protection
-            new_protection = PathProtectionDTO(
+            new_protection = dtos.PathProtectionDTO(
                 rootfolder_id=rootfolder_id,
                 folder_id=folder.id,
                 path=folder.path
@@ -394,8 +452,6 @@ def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
 
 
 def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
     # ensure that all existing path protections for the root folder has been applied to the folders
     # step 1: find the path retention id
     # step 2: get the simulation nodetype id (only simulation nodes get retention, not innernodes)
@@ -410,7 +466,7 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
     
     with Session(Database.get_engine()) as session:
         # Verify rootfolder exists
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
         
@@ -422,10 +478,10 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
             raise HTTPException(status_code=500, detail=f"Path retention type not found for rootfolder {rootfolder_id}")
         
         # Step 2: Get the simulation nodetype id (only SIMULATION nodes, not INNERNODE)
-        nodetype_simulation_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+        nodetype_simulation_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[dtos.FolderTypeEnum.SIMULATION].id
         
         # Step 3: Find all path protections for the rootfolder
-        path_protections = session.exec( select(PathProtectionDTO).where( PathProtectionDTO.rootfolder_id == rootfolder_id) ).all()        
+        path_protections = session.exec( select(dtos.PathProtectionDTO).where( dtos.PathProtectionDTO.rootfolder_id == rootfolder_id) ).all()        
         if not path_protections:
             return {"message": f"No path protections found for rootfolder {rootfolder_id}", "folders_modified": 0}
         
@@ -439,11 +495,11 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
             # Find all SIMULATION folders that start with this path (case-insensitive)
             # Using LIKE with wildcards to match the path and all subpaths
             matching_folders = session.exec(
-                select(FolderNodeDTO).where(
-                    (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-                    (FolderNodeDTO.nodetype_id == nodetype_simulation_id) &
-                    ((func.lower(FolderNodeDTO.path) == protection.path.lower()) |
-                     (func.lower(FolderNodeDTO.path).like(f"{protection.path.lower()}/%")))
+                select(dtos.FolderNodeDTO).where(
+                    (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                    (dtos.FolderNodeDTO.nodetype_id == nodetype_simulation_id) &
+                    ((func.lower(dtos.FolderNodeDTO.path) == protection.path.lower()) |
+                     (func.lower(dtos.FolderNodeDTO.path).like(f"{protection.path.lower()}/%")))
                 )
             ).all()
             
@@ -467,10 +523,10 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
         # Find all folders with path retention whose pathprotection_id is not in the valid list
         # These are folders that were protected but their protection has been removed
         folders_to_reset = session.exec(
-            select(FolderNodeDTO).where(
-                (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-                (FolderNodeDTO.retention_id == path_retention_id) &
-                (FolderNodeDTO.pathprotection_id.notin_(valid_protection_ids))
+            select(dtos.FolderNodeDTO).where(
+                (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                (dtos.FolderNodeDTO.retention_id == path_retention_id) &
+                (dtos.FolderNodeDTO.pathprotection_id.notin_(valid_protection_ids))
             )
         ).all()
         
@@ -499,10 +555,9 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
 # @TODO we should consider to enforce the changed path protection on existing folders
 # at present it is the clients responsibility to so and communicate it in "def change_retentions"
 def delete_pathprotection(rootfolder_id: int, protection_id: int):
-    from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, RetentionTypeEnum, FolderRetention
     with Session(Database.get_engine()) as session:
         # Find the path protection by ID and rootfolder_id
-        protection = session.exec( select(PathProtectionDTO).where((PathProtectionDTO.id == protection_id) & (PathProtectionDTO.rootfolder_id == rootfolder_id)) ).first()
+        protection = session.exec( select(dtos.PathProtectionDTO).where((dtos.PathProtectionDTO.id == protection_id) & (dtos.PathProtectionDTO.rootfolder_id == rootfolder_id)) ).first()
         if not protection:
             raise HTTPException(status_code=404, detail="Path protection not found")
         
@@ -510,8 +565,7 @@ def delete_pathprotection(rootfolder_id: int, protection_id: int):
         session.commit()
         return {"message": f"Path protection {protection_id} deleted"}
 
-def read_simulations_by_retention_type(rootfolder_id: int, retention_type: RetentionTypeEnum, require_pathprotection: bool = False) -> list[FolderNodeDTO]:
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
+def read_simulations_by_retention_type(rootfolder_id: int, retention_type: RetentionTypeEnum, require_pathprotection: bool = False) -> list[dtos.FolderNodeDTO]:
     """
     Read all simulation folders with a specific retention type.
     
@@ -524,7 +578,7 @@ def read_simulations_by_retention_type(rootfolder_id: int, retention_type: Reten
         List of FolderNodeDTO matching the criteria
     """
     with Session(Database.get_engine()) as session:
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
@@ -534,28 +588,25 @@ def read_simulations_by_retention_type(rootfolder_id: int, retention_type: Reten
             raise HTTPException(status_code=404, detail=f"Retention type '{retention_type.value}' not found for rootfolder {rootfolder_id}")
         
         retention_id: int = retention_type_dict[retention_type.value].id
-        leaf_nodetype_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+        leaf_nodetype_id: int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[dtos.FolderTypeEnum.SIMULATION].id
 
         # Build query with optional pathprotection filter
-        query = select(FolderNodeDTO).where(
-            (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-            (FolderNodeDTO.retention_id == retention_id) &
-            (FolderNodeDTO.nodetype_id == leaf_nodetype_id)
+        query = select(dtos.FolderNodeDTO).where(
+            (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+            (dtos.FolderNodeDTO.retention_id == retention_id) &
+            (dtos.FolderNodeDTO.nodetype_id == leaf_nodetype_id)
         )
         
         if require_pathprotection:
-            query = query.where(FolderNodeDTO.pathprotection_id.isnot(None))
+            query = query.where(dtos.FolderNodeDTO.pathprotection_id.isnot(None))
         
         folders = session.exec(query).all()
         return folders
 
-def change_retentions(rootfolder_id: int, retentions: list["FolderRetention"]):
-    from datamodel.retentions import RetentionCalculator
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO
-    #print(f"start change_retention_category rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
-    
+def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]):
+    from datamodel.retentions import RetentionCalculator    
     with Session(Database.get_engine()) as session:
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
@@ -587,39 +638,36 @@ def change_retentions(rootfolder_id: int, retentions: list["FolderRetention"]):
             }
             for retention in retentions
         ]
-        session.bulk_update_mappings(FolderNodeDTO, bulk_updates)
+        session.bulk_update_mappings(dtos.FolderNodeDTO, bulk_updates)
         session.commit()
         
         #print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
         return {"message": f"Updated rootfolder {rootfolder_id} with {len(retentions)} retentions"}
 
 # -------------------------- db operation related to cleanup_cycle action ---------
-def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[FolderNodeDTO]:
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeEnum
-
+def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[dtos.FolderNodeDTO]:
     with Session(Database.get_engine()) as session:
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         marked_retention_id:int = read_rootfolder_retentiontypes_dict(rootfolder.id)["marked"].id
-        leaf_nodetype_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[FolderTypeEnum.SIMULATION].id
+        leaf_nodetype_id:int = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[dtos.FolderTypeEnum.SIMULATION].id
 
         # Get all folders marked for cleanup. FolderNodeDTO.nodetype_id == leaf_nodetype_id is not required but
         # should we in the future handle hierarchies of simulation then we must refactor and test any way
-        folders = session.exec(select(FolderNodeDTO).where(
-            (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-            (FolderNodeDTO.retention_id == marked_retention_id) &
-            (FolderNodeDTO.nodetype_id == leaf_nodetype_id)
+        folders = session.exec(select(dtos.FolderNodeDTO).where(
+            (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+            (dtos.FolderNodeDTO.retention_id == marked_retention_id) &
+            (dtos.FolderNodeDTO.nodetype_id == leaf_nodetype_id)
         )).all()
 
         return folders
 
 # used for testing
-def read_folder( folder_id: int ) -> FolderNodeDTO:
-    from datamodel.dtos import FolderNodeDTO
+def read_folder( folder_id: int ) -> dtos.FolderNodeDTO:
     with Session(Database.get_engine()) as session:
-        folder = session.exec(select(FolderNodeDTO).where(FolderNodeDTO.id == folder_id)).first()
+        folder = session.exec(select(dtos.FolderNodeDTO).where(dtos.FolderNodeDTO.id == folder_id)).first()
         if not folder:
             raise HTTPException(status_code=404, detail="Folder not found")
         return folder
@@ -639,7 +687,7 @@ def read_folder( folder_id: int ) -> FolderNodeDTO:
 #  - the expiration date and numeric retentions will:
 #       if cleanup is active then recalculate them 
 #       if cleanup is inactive then ignore them 
-def insert_or_update_simulations_in_db(rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+def insert_or_update_simulations_in_db(rootfolder_id: int, simulations: list[dtos.FileInfo]) -> dict[str, str]:
     #here we can remove all existing simulation if nothing changes for them
     ret1:dict[str, str] = insert_or_update_simulation_in_db_internal(rootfolder_id, simulations)
     ret2:dict[str, str] = apply_pathprotections(rootfolder_id) # this should no be necessary but
@@ -648,25 +696,24 @@ def insert_or_update_simulations_in_db(rootfolder_id: int, simulations: list[Fil
 
 
 #the function is slow so before calling this function remove all simulation that does not provide new information. new simulation, new modified date, new retention
-def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: list["FileInfo"]) -> dict[str, str]:
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FileInfo
+def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: list[dtos.FileInfo]) -> dict[str, str]:
     with Session(Database.get_engine()) as session:
-        rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == rootfolder_id)).first()
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
 
         # and the filepaths from the list of simulations
         existing_folders_query = session.exec(
-            select(FolderNodeDTO).where(
-                (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-                (FolderNodeDTO.path.in_([sim.filepath.lower() for sim in simulations]))
+            select(dtos.FolderNodeDTO).where(
+                (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+                (dtos.FolderNodeDTO.path.in_([sim.filepath.lower() for sim in simulations]))
             )
         ).all()
         
         # Create a mapping from filepath to existing folder for fast lookup
-        existing_folders: set[str]          = set([folder.path.lower() for folder in existing_folders_query])
-        insert_simulations: list[FileInfo]  = [sim for sim in simulations if sim.filepath.lower() not in existing_folders]
-        existing_folders                    = None # to preserve memory
+        existing_folders: set[str]               = set([folder.path.lower() for folder in existing_folders_query])
+        insert_simulations: list[dtos.FileInfo]  = [sim for sim in simulations if sim.filepath.lower() not in existing_folders]
+        existing_folders                         = None # to preserve memory
 
         insertion_results: dict[str, int]   = insert_simulations_in_db(rootfolder, insert_simulations)
         insert_simulations = None
@@ -687,17 +734,17 @@ def insert_or_update_simulation_in_db_internal(rootfolder_id: int, simulations: 
 # This function update the attributes of existing simulations
 # The function is slow so before calling this function remove all simulation that does not provide new information. new simulation, new modified date, new retention
 # The update implements the attribute changes described in insert_or_update_simulation_in_db
-def update_simulation_attributes_in_db_internal(session: Session, rootfolder: "RootFolderDTO", simulations: list["FileInfo"]):
+def update_simulation_attributes_in_db_internal(session: Session, rootfolder: dtos.RootFolderDTO, simulations: list[dtos.FileInfo]):
     from datamodel.retentions import RetentionCalculator
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FileInfo
+
     # retrieve the simulations in the rootfolder and ensure that the order is the same as in the simulations list 
     # This is important for the subsequent update operation to maintain consistency.
     lower_case_filepaths = [sim.filepath.lower() for sim in simulations]
     # Replace the query + ordering block with:
     rows = session.exec(
-        select(FolderNodeDTO).where(
-            (FolderNodeDTO.rootfolder_id == rootfolder.id) &
-            (func.lower(FolderNodeDTO.path).in_(lower_case_filepaths))
+        select(dtos.FolderNodeDTO).where(
+            (dtos.FolderNodeDTO.rootfolder_id == rootfolder.id) &
+            (func.lower(dtos.FolderNodeDTO.path).in_(lower_case_filepaths))
         ) ).all()
 
     # Execute the ordered query to get results in the same order as simulations
@@ -741,7 +788,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: "R
         })
     
     # Execute bulk update
-    session.bulk_update_mappings(FolderNodeDTO, bulk_updates)
+    session.bulk_update_mappings(dtos.FolderNodeDTO, bulk_updates)
 
     return {"updated_count": len(bulk_updates)}
 
@@ -766,8 +813,7 @@ def normalize_path(filepath: str) -> list[str]:
     return normalized
 
 
-def find_existing_node(session: Session, rootfolder_id: int, parent_id: int, name: str) -> "FolderNodeDTO | None":
-    from datamodel.dtos import FolderNodeDTO
+def find_existing_node(session: Session, rootfolder_id: int, parent_id: int, name: str) -> dtos.FolderNodeDTO | None:
     """
     Find existing node by parent_id and name (case-insensitive) within a rootfolder.
     
@@ -781,13 +827,12 @@ def find_existing_node(session: Session, rootfolder_id: int, parent_id: int, nam
         FolderNodeDTO if found, None otherwise
     """
     return session.exec(
-        select(FolderNodeDTO).where(
-            (FolderNodeDTO.rootfolder_id == rootfolder_id) &
-            (FolderNodeDTO.parent_id == parent_id) &
-            (func.lower(FolderNodeDTO.name) == name.lower())
+        select(dtos.FolderNodeDTO).where(
+            (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
+            (dtos.FolderNodeDTO.parent_id == parent_id) &
+            (func.lower(dtos.FolderNodeDTO.name) == name.lower())
         )
     ).first()
-
 
 def generate_path_ids(parent_path_ids: str, node_id: int) -> str:
     """
@@ -808,8 +853,7 @@ def generate_path_ids(parent_path_ids: str, node_id: int) -> str:
         return f"{parent_path_ids}/{node_id}"
 
 #todo implement hierarchical inserts
-def insert_simulations_in_db(rootfolder: "RootFolderDTO", simulations: list["FileInfo"]):
-    from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, FileInfo
+def insert_simulations_in_db(rootfolder: dtos.RootFolderDTO, simulations: list[dtos.FileInfo]):
     # Insert missing hierarchy for all simulation filepaths.
     # This function only creates the folder structure, attributes will be updated separately.
     if not simulations:
@@ -817,7 +861,7 @@ def insert_simulations_in_db(rootfolder: "RootFolderDTO", simulations: list["Fil
         
     #print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
-    nodetypes:dict[str,FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
+    nodetypes:dict[str,dtos.FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
     #innernode_type_id =nodetypes.get(FolderTypeEnum.INNERNODE, None).id
     #if not innernode_type_id:
     #    raise HTTPException(status_code=500, detail=f"Unable to retrieve node_type_id=innernode for {rootfolder.id}")
@@ -840,17 +884,14 @@ def insert_simulations_in_db(rootfolder: "RootFolderDTO", simulations: list["Fil
         
         # Commit all insertions
         session.commit()
-        count = session.exec(select(func.count()).select_from(FolderNodeDTO).where(
-            FolderNodeDTO.rootfolder_id == rootfolder.id
-        )).first()
+        count = session.exec(select(func.count()).select_from(dtos.FolderNodeDTO).where(dtos.FolderNodeDTO.rootfolder_id == rootfolder.id )).first()
         #print(f"Total records in DB for rootfolder {rootfolder.id}: {count}")
         #print(f"end insert_simulations rootfolder_id {rootfolder.id} - successfully inserted hierarchy for {inserted_count}/{len(simulations)} paths, {len(failed_paths)} failed")
         
     return {"inserted_hierarchy_count": inserted_count, "failed_path_count": len(failed_paths), "failed_paths": failed_paths}
 
 
-def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: "FileInfo", nodetypes:dict[str,"FolderTypeDTO"]) -> int:
-    from datamodel.dtos import FolderNodeDTO, FolderTypeDTO, FileInfo, FolderTypeEnum
+def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: dtos.FileInfo, nodetypes:dict[str,dtos.FolderTypeDTO]) -> int:
     #    Insert missing hierarchy for a single filepath and return the leaf node ID.
     if rootfolder_id is None or rootfolder_id <= 0:
         raise ValueError(f"Invalid rootfolder_id: {rootfolder_id}")
@@ -893,19 +934,19 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
         else:
             # Node doesn't exist, create it
             if index < len(segments) - 1:
-                new_node = FolderNodeDTO(
+                new_node = dtos.FolderNodeDTO(
                     rootfolder_id=rootfolder_id,
                     parent_id=current_parent_id,
                     name=segment,
-                    nodetype_id=nodetypes[FolderTypeEnum.INNERNODE].id,
+                    nodetype_id=nodetypes[dtos.FolderTypeEnum.INNERNODE].id,
                     path=current_path,  # Full path up to this segment
                 )
             else:
-                new_node = FolderNodeDTO(
+                new_node = dtos.FolderNodeDTO(
                     rootfolder_id=rootfolder_id,
                     parent_id=current_parent_id,
                     name=segment,
-                    nodetype_id=nodetypes[FolderTypeEnum.SIMULATION].id,
+                    nodetype_id=nodetypes[dtos.FolderTypeEnum.SIMULATION].id,
                     path=current_path,  # Full path up to this segment
                 )            
             try:

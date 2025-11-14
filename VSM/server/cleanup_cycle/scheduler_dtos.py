@@ -1,17 +1,10 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
 from enum import Enum
-from datetime import date, datetime, timedelta
-from http.client import HTTPException
+from datetime import date, datetime
 from sqlmodel import SQLModel, Field
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from cleanup_cycle import cleanup_db_actions
-
 
 # ------------------cleanup calendar and tasks ------------------
-
 # The scheduler runs periodically to activate the tasks in the rootfolders calendar when their scheduled time comes.
 # Agents pull ACTIVATED tasks from the central queue by trying to make a reservation of a task that matched their profile (ActionType,storage_id), 
 # If a task is returned then it is reserved before return to the agent. The agent must execute it and report back to close the task 
@@ -105,8 +98,6 @@ class CleanupTaskDTO(CleanupTaskBase, table=True):
     id: int | None                      = Field(default=None, primary_key=True)
     
 
-
-
 class CleanupCalendarBase(SQLModel):
     """
     Base class for cleanup calendar tasks.
@@ -132,11 +123,3 @@ class CleanupCalendarBase(SQLModel):
 
 class CleanupCalendarDTO(CleanupCalendarBase, table=True):
     id: int | None         = Field(default=None, primary_key=True)
-
-    #There must be a scheduler that generates the calendar when a cleanupconfiguration is ready to start
-    def generate_calendar(self) -> bool:
-        from cleanup_cycle.scheduler_dto import CleanupCalendarDTO
-        calendar: CleanupCalendarDTO = None
-        if self.can_start_cleanup_now():
-            calendar = CleanupCalendarDTO.generate_calendarClean(self)
-        return calendar is not None

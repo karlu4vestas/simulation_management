@@ -1,16 +1,12 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
 from datetime import date, datetime, timedelta, timezone
 from sqlmodel import Session, func, select
 from fastapi import HTTPException
 from db.database import Database
-from db.db_api import insert_or_update_simulations_in_db, read_folders_marked_for_cleanup
-
-if TYPE_CHECKING:
-    from datamodel.dtos import FolderNodeDTO, RootFolderDTO, FileInfo
-
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
-from cleanup_cycle.scheduler_dto import TaskStatus, CalendarStatus, ActionType, AgentInfo, CleanupCalendarDTO, CleanupTaskDTO 
+from db import db_api
+from datamodel import dtos
+from cleanup_cycle import cleanup_dtos
+from cleanup_cycle import scheduler_dtos
+from cleanup_cycle.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, AgentInfo, CleanupCalendarDTO, CleanupTaskDTO 
 
 
 class CleanupScheduler:
@@ -27,7 +23,6 @@ class CleanupScheduler:
             calendar.status = CalendarStatus.FAILED
             session.add(calendar)
             calendars_failed += 1
-
         
         # Check if any task has failed
         failed_tasks = [t for t in tasks if t.status == TaskStatus.FAILED.value]
@@ -178,12 +173,12 @@ class CleanupScheduler:
 
     
     @staticmethod
-    def generate_cleanup_calendar(config: CleanupConfigurationDTO, stop_after_cleanup_cycle: bool=False) -> "CleanupCalendarDTO":
+    def generate_cleanup_calendar(config: cleanup_dtos.CleanupState, stop_after_cleanup_cycle: bool=False) -> "CleanupCalendarDTO":
         with Session(Database.get_engine()) as session:
             # Check if there is already an active calendar for this rootfolder
             calendar: CleanupCalendarDTO = session.exec(
                 select(CleanupCalendarDTO).where(
-                    (CleanupCalendarDTO.rootfolder_id == config.rootfolder_id) & 
+                    (CleanupCalendarDTO.rootfolder_id == config.dto.rootfolder_id) & 
                     (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
                 )
             ).first()
@@ -192,12 +187,12 @@ class CleanupScheduler:
 
             # No active calendar so go ahead
             from datamodel.dtos import RootFolderDTO
-            rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == config.rootfolder_id)).first()
+            rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == config.dto.rootfolder_id)).first()
             if not rootfolder:
                 raise HTTPException(status_code=404, detail="RootFolder not found")
 
-            calendar: CleanupCalendarDTO = CleanupCalendarDTO(rootfolder_id=config.rootfolder_id,
-                                                              start_date=config.cleanup_start_date,
+            calendar: CleanupCalendarDTO = CleanupCalendarDTO(rootfolder_id=config.dto.rootfolder_id,
+                                                              start_date=config.dto.cleanup_start_date,
                                                               status=CalendarStatus.ACTIVE.value)
             session.add(calendar)
             session.flush()  # Ensure calendar.id is available
@@ -209,7 +204,7 @@ class CleanupScheduler:
             # Storage agent: scan the rootfolder for simulations. Can take up to one day
             task_scan_rootfolder = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=0,   # max due to testing 
                 action_type=ActionType.SCAN_ROOTFOLDER.value,
@@ -223,7 +218,7 @@ class CleanupScheduler:
             # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
             task_start_retention_review = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=0,
                 action_type=ActionType.START_RETENTION_REVIEW.value,
@@ -237,7 +232,7 @@ class CleanupScheduler:
             # Internal email agent: Notify stakeholders about the new retention review. Takes less than a minute
             task_send_initial_notification = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=0,
                 action_type=ActionType.SEND_INITIAL_NOTIFICATION.value,
@@ -250,10 +245,10 @@ class CleanupScheduler:
             # 3) SEND_FINAL_NOTIFICATION - About a week before end of RETENTION_REVIEW phase
             # Internal email agent: Notify stakeholders about the ongoing retention review. Takes less than a minute
             # Assuming RETENTION_REVIEW lasts for config.cleanupfrequency days, schedule 7 days before end
-            retention_review_duration = config.cleanupfrequency if config.cleanupfrequency > 0. else 7.
+            retention_review_duration = config.dto.cleanupfrequency if config.dto.cleanupfrequency > 0. else 7.
             task_send_final_notification = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=max(retention_review_duration,retention_review_duration - 7), # max due to testing
                 action_type=ActionType.SEND_FINAL_NOTIFICATION.value,
@@ -268,7 +263,7 @@ class CleanupScheduler:
             # Storage agent: clean marked simulations. Can take up to a day
             task_clean_rootfolder = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=retention_review_duration,  # Start of CLEANING phase
                 action_type=ActionType.CLEAN_ROOTFOLDER.value,
@@ -282,7 +277,7 @@ class CleanupScheduler:
             # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type
             task_finish_cleanup_cycle = CleanupTaskDTO(
                 calendar_id=calendar.id,
-                rootfolder_id=config.rootfolder_id,
+                rootfolder_id=config.dto.rootfolder_id,
                 path=rootfolder.path,
                 task_offset=max(retention_review_duration, retention_review_duration + 1),  # 1 day after cleaning starts
                 action_type=ActionType.FINISH_CLEANUP_CYCLE.value,
@@ -300,7 +295,7 @@ class CleanupScheduler:
                 # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
                 task_prepare_next_cleanup_cycle = CleanupTaskDTO(
                     calendar_id=calendar.id,
-                    rootfolder_id=config.rootfolder_id,
+                    rootfolder_id=config.dto.rootfolder_id,
                     path=rootfolder.path,
                     task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
                     action_type=ActionType.STOP_AFTER_CLEANUP_CYCLE.value,
@@ -313,7 +308,7 @@ class CleanupScheduler:
                 # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
                 task_prepare_next_cleanup_cycle = CleanupTaskDTO(
                     calendar_id=calendar.id,
-                    rootfolder_id=config.rootfolder_id,
+                    rootfolder_id=config.dto.rootfolder_id,
                     path=rootfolder.path,
                     task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
                     action_type=ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value,
@@ -342,29 +337,30 @@ class CleanupScheduler:
         
         with Session(Database.get_engine()) as session:
             configs = session.exec(
-                select(CleanupConfigurationDTO).where(
-                    (CleanupConfigurationDTO.cycletime > 0) &
-                    (CleanupConfigurationDTO.cleanupfrequency > 0) &
-                    (CleanupConfigurationDTO.cleanup_start_date != None) &
-                    (CleanupConfigurationDTO.cleanup_start_date <= today) &
-                    (CleanupConfigurationDTO.cleanup_progress.in_([
-                        CleanupProgress.ProgressEnum.INACTIVE.value,
-                        CleanupProgress.ProgressEnum.DONE.value
+                select(dtos.CleanupConfigurationDTO).where(
+                    (dtos.CleanupConfigurationDTO.cycletime > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanupfrequency > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date != None) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date <= today) &
+                    (dtos.CleanupConfigurationDTO.cleanup_progress.in_([
+                        dtos.CleanupProgress.ProgressEnum.INACTIVE.value,
+                        dtos.CleanupProgress.ProgressEnum.DONE.value
                     ]))
                 )
             ).all()
 
-            calendars:list[CleanupCalendarDTO] = []
-            for config in configs:
+            state_configs:list[cleanup_dtos.CleanupState] = [cleanup_dtos.CleanupState(config) for config in configs]
+            calendars:list[scheduler_dtos.CleanupCalendarDTO] = []
+            for config in state_configs:
                 if config.can_start_cleanup_now():
                     calendars.append(CleanupScheduler.generate_cleanup_calendar(config, stop_after_cleanup_cycle=stop_after_cleanup_cycle))
 
             return f"Generated or found {len(calendars)} calendars ."
 
     @staticmethod
-    def extract_active_calendar_for_rootfolder(rootfolder: "RootFolderDTO") -> tuple[CleanupCalendarDTO, list[CleanupTaskDTO]]:
-        calendar: CleanupCalendarDTO = None
-        tasks: list[CleanupTaskDTO] = []
+    def extract_active_calendar_for_rootfolder(rootfolder: dtos.RootFolderDTO) -> tuple[scheduler_dtos.CleanupCalendarDTO, list[scheduler_dtos.CleanupTaskDTO]]:
+        calendar: scheduler_dtos.CleanupCalendarDTO = None
+        tasks: list[scheduler_dtos.CleanupTaskDTO] = []
         with Session(Database.get_engine()) as session:
             calendar = session.exec(
                 select(CleanupCalendarDTO).where(
@@ -522,7 +518,7 @@ class AgentInterfaceMethods:
 
 
     @staticmethod
-    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list["FileInfo"]) -> dict[str, str]:
+    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list[dtos.FileInfo]) -> dict[str, str]:
         from datamodel.dtos import FileInfo
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
@@ -532,12 +528,12 @@ class AgentInterfaceMethods:
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
 
-        return insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
+        return db_api.insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
 
 
     # return the list of FileInfo objects for folders that are marked for cleanup in the given rootfolder
     @staticmethod
-    def task_read_folders_marked_for_cleanup(task_id: int) -> list["FileInfo"]:
+    def task_read_folders_marked_for_cleanup(task_id: int) -> list[dtos.FileInfo]:
         from datamodel.dtos import FileInfo, RootFolderDTO, FolderNodeDTO
         #validate the task_id as a minimum security check
         with Session(Database.get_engine()) as session:
@@ -555,16 +551,15 @@ class AgentInterfaceMethods:
                 raise HTTPException(status_code=404, detail=f"The rootfolder with id {task.rootfolder_id} was not found")
 
             # Get folder type dictionary (by name)
-            from db.db_api import read_folder_type_dict_pr_domain_id, read_retentiontypes_dict_by_domain_id
-            nodetype_dict_by_name = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
-            retention_dict_by_name = read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
+            nodetype_dict_by_name = db_api.read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
+            retention_dict_by_name = db_api.read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
             
             # Convert to ID-based dictionaries
             nodetype_dict  = {ft.id: ft for ft in nodetype_dict_by_name.values()}
             retention_dict = {rt.id: rt for rt in retention_dict_by_name.values()}
 
             # Get simulations marked for cleanup
-            simulations:list[FolderNodeDTO] = read_folders_marked_for_cleanup(task.rootfolder_id)
+            simulations:list[FolderNodeDTO] = db_api.read_folders_marked_for_cleanup(task.rootfolder_id)
             
             # Convert each FolderNodeDTO to FileInfo using get_fileinfo()
             file_infos:list[FileInfo] = [folder.get_fileinfo(session, nodetype_dict, retention_dict) for folder in simulations]

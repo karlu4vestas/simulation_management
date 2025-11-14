@@ -1,6 +1,5 @@
 # Configuration module for the simulation management server.
 # Manages global settings including test mode configuration.
-
 from enum import Enum
 from typing import Literal
 

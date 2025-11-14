@@ -7,7 +7,6 @@ from datetime import date, datetime
 from enum import Enum
 
 if TYPE_CHECKING:
-    from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
     from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
 
 # see values in vts_create_meta_data
@@ -63,6 +62,90 @@ class CycleTimeDTO(CycleTimeBase, table=True):
 #      - cleaning: this is the last phase in which the actual cleaning happens
 #      - finished: the cleanup round is finished and we wait for the next round
 
+#STARTING_RETENTION_REVIEW  is the only phase where the backend is allowed to mark simulation for cleanup.
+#Simulations imported in this phase must postpone possible marked for cleanup to the next cleanup round
+class CleanupProgress:
+    class ProgressEnum(str, Enum):
+        """Enumeration of cleanup round progress states."""
+        INACTIVE                    = "inactive"    # No cleanup is active
+        STARTING_RETENTION_REVIEW   = "starting_retention_review"      # This is the only phase where the backend is allowed to mark simulation for cleanup.
+        RETENTION_REVIEW            = "retention_review"      # Markup phase - users can adjust what simulations will be cleaned. 
+        CLEANING                    = "cleaning"    # Actual cleaning is happening
+        FINISHING                   = "finish_cleanup_round"    # finish the cleanup round
+        DONE                        = "cleanup_is_done"    # Cleanup round is complete, waiting for next round
+
+    # Define valid state transitions
+    valid_transitions: dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]] = {
+        ProgressEnum.INACTIVE: [ProgressEnum.STARTING_RETENTION_REVIEW],
+        ProgressEnum.STARTING_RETENTION_REVIEW: [ProgressEnum.RETENTION_REVIEW],
+        ProgressEnum.RETENTION_REVIEW: [ProgressEnum.CLEANING, ProgressEnum.INACTIVE],
+        ProgressEnum.CLEANING: [ProgressEnum.FINISHING, ProgressEnum.INACTIVE],
+        ProgressEnum.FINISHING: [ProgressEnum.DONE, ProgressEnum.INACTIVE],
+        ProgressEnum.DONE: [ProgressEnum.INACTIVE, ProgressEnum.STARTING_RETENTION_REVIEW],
+    }
+    
+    # Define the natural progression through cleanup states
+    next_natural_state: dict["CleanupProgress.ProgressEnum", "CleanupProgress.ProgressEnum"] = {
+        ProgressEnum.INACTIVE: ProgressEnum.STARTING_RETENTION_REVIEW,
+        ProgressEnum.STARTING_RETENTION_REVIEW: ProgressEnum.RETENTION_REVIEW,
+        ProgressEnum.RETENTION_REVIEW: ProgressEnum.CLEANING,
+        ProgressEnum.CLEANING: ProgressEnum.FINISHING,
+        ProgressEnum.FINISHING: ProgressEnum.DONE,
+        ProgressEnum.DONE: ProgressEnum.STARTING_RETENTION_REVIEW,
+    }
+
+# The configuration can be used as follow:
+#   a) deactivating cleanup is done by setting cleanupfrequency to None
+#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. 
+#        If cleanup_round_start_date is not set then we assume today
+#   c) cycletime: is minimum number of days from last modification of a simulation til it can be cleaned
+#        It can be set with cleanup is inactive cleanupfrequency is None
+#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
+#      - inactive: going from an activate state to inactive will set the cleanup_start_date to None. 
+#                  If inactivate state and cleanupfrequency, cycletime and cleanup_start_date will start the cleanup when the cleanup_start_date is reached.
+#      - started:  the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
+#      - cleaning: this is the last phase in which the actual cleaning happens
+#      - finished: the cleanup round is finished and we wait for the next round
+class CleanupConfigurationBase(SQLModel):
+    """Base class for cleanup configuration."""
+    rootfolder_id: int              = Field(default=None, foreign_key="rootfolderdto.id")
+    cycletime: int                  = Field(default=0)  # days a simulation must be available before cleanup can start. 
+    cleanupfrequency: float         = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
+    cleanup_start_date: date | None = Field(default=None)
+    cleanup_progress: str           = Field(default=CleanupProgress.ProgressEnum.INACTIVE.value)
+
+class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
+    """Cleanup configuration as separate table."""
+    id: int | None = Field(default=None, primary_key=True)
+
+    # def __eq__(self, other):
+    #     if not isinstance(other, CleanupConfigurationDTO):
+    #         return False
+    #     return (self.cycletime == other.cycletime and 
+    #             self.cleanupfrequency == other.cleanupfrequency and 
+    #             self.cleanup_start_date == other.cleanup_start_date and
+    #             self.cleanup_progress == other.cleanup_progress)
+
+    def is_valid(self) -> bool:
+        # has cleanup_frequency and cycle_time been set. 
+        # If cleanup_start_date is None then cleanup_progress must be INACTIVE
+        is_valid: bool = (self.cleanupfrequency is not None and self.cleanupfrequency > 0) and \
+                         (self.cycletime is not None and self.cycletime > 0) and \
+                         ((self.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value) \
+                          or self.cleanup_start_date is not None)
+        return is_valid
+    
+# path protection for a specific path in a rootfolder
+# the question is whether we need a foreigne key to the folder id 
+class PathProtectionBase(SQLModel):
+    rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
+    folder_id: int       = Field(foreign_key="foldernodedto.id")
+    path: str            = Field(default="")
+
+class PathProtectionDTO(PathProtectionBase, table=True):
+    id: int | None       = Field(default=None, primary_key=True)
+
+
 
 #storage_id:  @TODO the default = "local" must eb fixed when moving to other remote platofrms
 class RootFolderBase(SQLModel):
@@ -74,8 +157,7 @@ class RootFolderBase(SQLModel):
     path: str                             = Field(default="")     # fullpath including the domain. Maybe only the domains because folder_id points to the foldername
     cleanup_config_id: int | None         = Field(default=None, foreign_key="cleanupconfigurationdto.id") 
 
-    def get_cleanup_configuration(self, session: Session) -> "CleanupConfigurationDTO":
-        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+    def get_cleanup_configuration(self, session: Session) -> CleanupConfigurationDTO:
         """Get or create cleanup configuration."""
         if self.cleanup_config_id is not None:
             cleanup = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
@@ -92,8 +174,7 @@ class RootFolderBase(SQLModel):
         session.commit()
         return new_cleanup
 
-    def save_cleanup_configuration(self, session: Session, cleanup_configuration: "CleanupConfigurationDTO") -> "CleanupConfigurationDTO":
-        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
+    def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
         #@TODO we should use insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
         if self.cleanup_config_id is not None:
             config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)

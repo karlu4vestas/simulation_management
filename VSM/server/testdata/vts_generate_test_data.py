@@ -3,8 +3,8 @@ from sqlmodel import Session, select
 from db.database import Database
 from datamodel.retentions import RetentionTypeDTO
 from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO, CleanupFrequencyDTO
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-from db.db_api import insert_rootfolder, read_cleanupfrequency_name_dict_by_domain_id
+from datamodel import dtos
+from db import db_api
 
 #-------------------------------------
 # helper to generate random retenttype except for the "Path" retention. 
@@ -50,10 +50,10 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
         approvers=approvers,
         path=path
     )
-    root_folder = insert_rootfolder(root_folder)
+    root_folder =db_api.insert_rootfolder(root_folder)
    
     # Create cleanup config (NEW)
-    cleanup_config = CleanupConfigurationDTO(
+    cleanup_config = dtos.CleanupConfigurationDTO(
         rootfolder_id=root_folder.id,
         cycletime=cycle_time,
         cleanupfrequency=cleanupfrequency
@@ -67,11 +67,9 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     return root_folder, cleanup_config
 
 def insert_test_folder_hierarchy_in_db(session:Session):
-    from db.db_api import read_cleanupfrequency_name_dict_by_domain_id
-
-    vts_simulation_domain = session.exec(select(SimulationDomainDTO).where(SimulationDomainDTO.name == "vts")).first()
+    vts_simulation_domain = session.exec(select(dtos.SimulationDomainDTO).where(dtos.SimulationDomainDTO.name == "vts")).first()
     domain_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0
-    frequency_name_dict:dict[str,CleanupFrequencyDTO] = read_cleanupfrequency_name_dict_by_domain_id(vts_simulation_domain.id)
+    frequency_name_dict:dict[str,CleanupFrequencyDTO] = db_api.read_cleanupfrequency_name_dict_by_domain_id(vts_simulation_domain.id)
     if domain_id == 0:
         raise ValueError("vts simulation domain not found")
     cycle_time:int = 0 #days
@@ -224,7 +222,7 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
         raise ValueError("vts simulation domain not found")
     
     domain_id = vts_simulation_domain.id
-    frequency_name_dict: dict[str, CleanupFrequencyDTO] = read_cleanupfrequency_name_dict_by_domain_id(domain_id)
+    frequency_name_dict: dict[str, CleanupFrequencyDTO] = db_api.read_cleanupfrequency_name_dict_by_domain_id(domain_id)
     cycle_time: int = 0  # days
     
     # Only create 2 small root folders with minimal depth for unit testing
@@ -234,5 +232,5 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
     root_folders = session.exec(select(RootFolderDTO)).all()
     print("Minimal test data for unit tests inserted successfully:")
     for rf in root_folders:
-        config:CleanupConfigurationDTO = rf.get_cleanup_configuration(session)
+        config:dtos.CleanupConfigurationDTO = rf.get_cleanup_configuration(session)
         print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers} Folder id: {rf.folder_id}, CleanUpFrequency: {config.cleanupfrequency}")

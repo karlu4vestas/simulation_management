@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta, datetime
 from collections import deque
 from db.db_api import normalize_path
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from datamodel import dtos
 from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO 
 from datamodel.retentions import ExternalRetentionTypes
 
@@ -18,11 +18,11 @@ class CleanupConfiguration:
     cycletime: int                                          # days from initialization of the simulations til it can be cleaned
     cleanupfrequency: int                                   # number of days between cleanup rounds
     cleanup_start_date: date | None = None                  # at what date did the current cleanup round start
-    cleanup_progress: CleanupProgress.ProgressEnum = CleanupProgress.ProgressEnum.INACTIVE  # current state of the cleanup round
+    cleanup_progress: dtos.CleanupProgress.ProgressEnum = dtos.CleanupProgress.ProgressEnum.INACTIVE  # current state of the cleanup round
     
-    def to_dto(self, rootfolder_id: int) -> CleanupConfigurationDTO:
+    def to_dto(self, rootfolder_id: int) -> dtos.CleanupConfigurationDTO:
         """Convert to CleanupConfigurationDTO for database insertion."""
-        return CleanupConfigurationDTO(
+        return dtos.CleanupConfigurationDTO(
             rootfolder_id=rootfolder_id,
             cycletime=self.cycletime,
             cleanupfrequency=self.cleanupfrequency,

@@ -1,9 +1,5 @@
-from collections import deque
-import random
 import pytest
 from sqlmodel import Session
-
-from datetime import date
 from db.database import Database
 
 

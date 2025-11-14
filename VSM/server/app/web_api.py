@@ -4,17 +4,12 @@ from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 from cleanup_cycle import cleanup_db_actions
-from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO
-from datamodel.retentions import RetentionTypeDTO, PathProtectionDTO, FolderRetention
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO
+from datamodel.retentions import RetentionTypeDTO, FolderRetention
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO, PathProtectionDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
-from db.db_api import read_simulation_domains,read_simulation_domain_by_name, read_retentiontypes_by_domain_id, read_folder_types_pr_domain_id, read_cycle_time_by_domain_id
-from db.db_api import read_cleanupfrequency_by_domain_id, read_rootfolders_by_domain_and_initials
-from db.db_api import read_rootfolder_retentiontypes, read_folders, read_pathprotections, add_pathprotection, delete_pathprotection
-from db.db_api import change_retentions
+from db import db_api
 from datamodel.dtos import FileInfo 
-
 from app.app_config import AppConfig
 
 
@@ -74,31 +69,31 @@ async def get_current_test_mode() -> dict:
 #-----------------start retrieval of metadata for a simulation domain -------------------
 @app.get("/v1/simulationdomains/", response_model=list[SimulationDomainDTO])
 def fs_read_simulation_domains():
-    return read_simulation_domains()
+    return db_api.read_simulation_domains()
 
 @app.get("/v1/simulationdomains/{domain_name}", response_model=SimulationDomainDTO)
 def fs_read_simulation_domain_by_name(domain_name: str):
-    return read_simulation_domain_by_name(domain_name)
+    return db_api.read_simulation_domain_by_name(domain_name)
 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/retentiontypes/", response_model=list[RetentionTypeDTO])
 def fs_read_retentiontypes_by_domain_id(simulationdomain_id: int):
-    return read_retentiontypes_by_domain_id(simulationdomain_id)
+    return db_api.read_retentiontypes_by_domain_id(simulationdomain_id)
 
 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/foldertypes/", response_model=list[FolderTypeDTO])
 def fs_read_folder_types_pr_domain_id(simulationdomain_id: int):
-    return read_folder_types_pr_domain_id(simulationdomain_id)
+    return db_api.read_folder_types_pr_domain_id(simulationdomain_id)
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/cycletimes/", response_model=list[CycleTimeDTO])
 def fs_read_cycle_time_by_domain_id(simulationdomain_id: int):
-    return read_cycle_time_by_domain_id(simulationdomain_id)
+    return db_api.read_cycle_time_by_domain_id(simulationdomain_id)
 
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
 def fs_read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
-    return read_cleanupfrequency_by_domain_id(simulationdomain_id)
+    return db_api.read_cleanupfrequency_by_domain_id(simulationdomain_id)
 
 #-----------------end retrieval of metadata for a simulation domain -------------------
 
@@ -108,7 +103,7 @@ def fs_read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
 # we must only allow the webclient to read the RootFolders
 @app.get("/v1/rootfolders/", response_model=list[RootFolderDTO])
 def fs_read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(default="")):
-    return read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
+    return db_api.read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
 
 
 
@@ -121,46 +116,42 @@ def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_confi
 
 @app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
 def fs_read_rootfolder_retentiontypes(rootfolder_id: int):
-    return read_rootfolder_retentiontypes(rootfolder_id)
+    return db_api.read_rootfolder_retentiontypes(rootfolder_id)
 
 
 #develop a @app.get("/folders/")   that extract send all FolderNodeDTOs as csv
 @app.get("/v1/rootfolders/{rootfolder_id}/folders/", response_model=list[FolderNodeDTO])
 def fs_read_folders( rootfolder_id: int ):
-    return read_folders( rootfolder_id )
-
+    return db_api.read_folders( rootfolder_id )
 
 # Endpoint to extract and send all FolderNodeDTOs as CSV
 #@app.get("/v1/rootfolders/{rootfolder_id}/folders/csv")
 #def fs_read_folders_csv(rootfolder_id: int):
-#    return read_folders_csv(rootfolder_id)
+#    return db_api.read_folders_csv(rootfolder_id)
     
-
 
 # Endpoint to extract and send all FolderNodeDTOs as compressed CSV using zstd
 #@app.get("/v1/rootfolders/{rootfolder_id}/folders/csv-zstd")
 #def fs_read_folders_csv_zstd(rootfolder_id: int):
-#    return read_folders_csv_zstd(rootfolder_id)
-
-
+#    return db_api.read_folders_csv_zstd(rootfolder_id)
 
 #get all path protections for a specific root folder
 @app.get("/v1/rootfolders/{rootfolder_id}/pathprotections", response_model=list[PathProtectionDTO])
 def fs_read_pathprotections( rootfolder_id: int ):
-    return read_pathprotections( rootfolder_id )
+    return db_api.read_pathprotections( rootfolder_id )
 
 
 # Add a new path protection to a specific root folder
 @app.post("/v1/rootfolders/{rootfolder_id}/pathprotection")
 def fs_add_path_protection(rootfolder_id:int, path_protection:PathProtectionDTO):
-    return add_pathprotection(rootfolder_id, path_protection)
+    return db_api.add_pathprotection(rootfolder_id, path_protection)
 
 
 
 # Delete a path protection from a specific root folder
 @app.delete("/v1/rootfolders/{rootfolder_id}/pathprotection")
 def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
-    return delete_pathprotection(rootfolder_id, protection_id)
+    return db_api.delete_pathprotection(rootfolder_id, protection_id)
 
     
 # The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanupfrequency and rootfolder.cycletime msut be set
@@ -169,11 +160,8 @@ def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type
 @app.post("/v1/rootfolders/{rootfolder_id}/retentions")
 def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
-    result = change_retentions(rootfolder_id, retentions)
+    result = db_api.change_retentions(rootfolder_id, retentions)
     return result
-
-
-
 
 #-----------------end maintenance of rootfolders and information under it -------------------
 

@@ -7,14 +7,14 @@ from datetime import timedelta
 
 from sqlmodel import Session
 
-from datamodel.dtos import RootFolderDTO
+from datamodel import dtos
 
 from app.web_api import run_scheduler_tasks
-from db.db_api import read_simulation_domains, insert_rootfolder
+from db import db_api
 from cleanup_cycle import cleanup_db_actions, cleanup_dtos
 from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
 from cleanup_cycle.agent_on_premise_clean import AgentCleanVTSRootFolder
-from cleanup_cycle.scheduler_dto import ActionType, CleanupTaskDTO, TaskStatus
+from cleanup_cycle.scheduler_dtos import ActionType, CleanupTaskDTO, TaskStatus
 from cleanup_cycle.agents_internal import (
     AgentTemplate,
     AgentCalendarCreation,
@@ -65,15 +65,15 @@ class ForTestAgentCalendarCreation(AgentTemplate):
 @pytest.mark.slow
 class TestSchedulerAndAgents:
     @staticmethod
-    def import_rootfolder_and_cleanup_configuration(session:Session, rootfolder:RootFolderDTO, in_memory_config:CleanupConfiguration)-> tuple[RootFolderDTO, cleanup_dtos.CleanupConfigurationDTO]:
+    def import_rootfolder_and_cleanup_configuration(session:Session, rootfolder:dtos.RootFolderDTO, in_memory_config:CleanupConfiguration)-> tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO]:
 
         # Step 0: Set up a new database and verify that it is empty apart from VTS metadata
-        simulation_domain_id = read_simulation_domains()[0].id
+        simulation_domain_id = db_api.read_simulation_domains()[0].id
         assert simulation_domain_id is not None and simulation_domain_id > 0
 
         #save the rootfolder
         rootfolder.simulationdomain_id = simulation_domain_id
-        rootfolder = insert_rootfolder(rootfolder)
+        rootfolder = db_api.insert_rootfolder(rootfolder)
         assert rootfolder is not None
         assert rootfolder.id is not None and rootfolder.id > 0
         assert rootfolder.path == rootfolder.path
@@ -81,8 +81,8 @@ class TestSchedulerAndAgents:
         # Create CleanupConfigurationDTO from the in-memory CleanupConfiguration
         # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
         # Now we create the corresponding CleanupConfigurationDTO database record
-        cleanup_config:CleanupConfigurationDTO = in_memory_config.to_dto(rootfolder_id=rootfolder.id)
-        cleanup_config:CleanupConfigurationDTO = cleanup_db_actions.insert_cleanup_configuration(rootfolder.id, cleanup_config)
+        cleanup_config:dtos.CleanupConfigurationDTO = in_memory_config.to_dto(rootfolder_id=rootfolder.id)
+        cleanup_config:dtos.CleanupConfigurationDTO = db_api.insert_cleanup_configuration(rootfolder.id, cleanup_config)
         return rootfolder, cleanup_config
     
     @staticmethod
@@ -149,10 +149,10 @@ class TestSchedulerAndAgents:
             cycletime=7,
             cleanupfrequency=1./(24*60*60),  # set to one second for the test
             cleanup_start_date=date.today() - timedelta(days=8),  #8 = cycletime+1 ensure that simulations are marked for cleanup
-            cleanup_progress=cleanup_db_actions.CleanupProgress.ProgressEnum.INACTIVE
+            cleanup_progress=dtos.CleanupProgress.ProgressEnum.INACTIVE
         )
-        rootfolder:RootFolderDTO=None
-        cleanup_config: CleanupConfigurationDTO=None
+        rootfolder:dtos.RootFolderDTO=None
+        cleanup_config: dtos.CleanupConfigurationDTO=None
         rootfolder, cleanup_config = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
 
         # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
@@ -224,7 +224,7 @@ class TestSchedulerAndAgents:
             calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
             task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
             assert len(task_dict)  == 0, f"all active tasks should be COMPLETED but there is still {len(task_dict)} tasks active"
-            cleanup_configuration: CleanupConfigurationDTO = cleanup_db_actions.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
+            cleanup_configuration: dtos.CleanupConfigurationDTO = db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
 
             assert cleanup_configuration is not None, "Cleanup configuration should be found"
             assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"

@@ -1,5 +1,3 @@
-from __future__ import annotations
-from typing import TYPE_CHECKING
 from enum import Enum
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -7,9 +5,8 @@ from typing import Literal, Optional
 from datetime import date, timedelta
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
-
-if TYPE_CHECKING:
-    from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
+from datamodel import dtos
+from cleanup_cycle import cleanup_dtos
 
 #ensure consistency of retentions
 
@@ -107,16 +104,6 @@ class RetentionTypeDTO(RetentionTypeBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
 
-# path protection for a specific path in a rootfolder
-# the question is whether we need a foreigne key to the folder id 
-class PathProtectionBase(SQLModel):
-    rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
-    folder_id: int       = Field(foreign_key="foldernodedto.id")
-    path: str            = Field(default="")
-
-class PathProtectionDTO(PathProtectionBase, table=True):
-    id: int | None       = Field(default=None, primary_key=True)
-
 
 class RetentionCalculator:
     #    def __init__(self, retention_type_dict: dict[str, RetentionTypeDTO], cleanup_config: CleanupConfigurationDTO):
@@ -130,7 +117,7 @@ class RetentionCalculator:
         self.default_path_protection_id: int = 0 # @TODO wil this be used?
 
         #self.match_prefix_id = make_prefix_id_matcher(protections)
-        protections:list[PathProtectionDTO] = read_pathprotections(rootfolder_id)
+        protections:list[dtos.PathProtectionDTO] = read_pathprotections(rootfolder_id)
         self.sorted_protections: list[tuple[str, int]] = [(dto.path.lower().replace('\\', '/').rstrip('/'), dto.id) for dto in protections]
 
         self.sorted_protections: list[tuple[str, int]] = sorted(
@@ -141,40 +128,40 @@ class RetentionCalculator:
 
 
         # Info for all other retentions
-        from cleanup_cycle.cleanup_dtos import CleanupConfigurationDTO, CleanupProgress
         
         if not cleanup_config_id or cleanup_config_id <= 0:
             raise ValueError("The cleanup_config_id:{cleanup_config_id} must be valid")
-        cleanup_config: CleanupConfigurationDTO = session.get(CleanupConfigurationDTO, cleanup_config_id)
+        
+        cleanup_state: cleanup_dtos.CleanupState = cleanup_dtos.CleanupState.load_by_id(session, cleanup_config_id) 
         retention_type_dict: dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
 
-        if not retention_type_dict or not cleanup_config.is_valid():
+        if not retention_type_dict or not cleanup_state.is_valid():
             raise ValueError("cleanup_round_start_date, at least one numeric retention type and cycletime must be set for RetentionCalculator to work")
 
         # It is on the one hand practical to make a first configuration of retention without starting a cleanup round, if the user desires this
         # but on the other hand the RetentionCalculator requires a cleanup_start_date to be able to calculate retentions
-        # If the cleanup_config can be used to start a cleanup round then use its start date
+        # If the cleanup_state can be used to start a cleanup round then use its start date
         # If the cleanup_progress is INACTIVE and no cleanup_start_date is set, we set the cleanup_round_start_date to today. 
         # Notice that no retention will be marked with cleanup progress in CleanupProgress.ProgressEnum.INACTIVE
         start_date = None
-        if cleanup_config.is_valid() and cleanup_config.cleanup_start_date is not None:
-            start_date = cleanup_config.cleanup_start_date
-        elif cleanup_config.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value:
+        if cleanup_state.is_valid() and cleanup_state.dto.cleanup_start_date is not None:
+            start_date = cleanup_state.dto.cleanup_start_date
+        elif cleanup_state.dto.cleanup_progress == dtos.CleanupProgress.ProgressEnum.INACTIVE.value:
             start_date = date.today()
         else:
-            raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_config}")
+            raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_state}")
         self.cleanup_round_start_date    = start_date
 
-        self.cycletimedelta              = timedelta(days=cleanup_config.cycletime)
+        self.cycletimedelta              = timedelta(days=cleanup_state.dto.cycletime)
 
         self.retention_type_str_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}
         self.path_retention_id           = self.retention_type_str_dict["path"].id   if self.retention_type_str_dict.get("path", None) is not None else 0  
         self.marked_retention_id         = self.retention_type_str_dict["marked"].id if self.retention_type_str_dict.get("marked", None) is not None else 0  
         self.undefined_retention_id      = self.retention_type_str_dict["?"].id      if self.retention_type_str_dict.get("?", None) is not None else 0  
-        self.cleanup_progress            = cleanup_config.cleanup_progress
-        self.is_in_cleanup_round         = cleanup_config.is_in_cleanup_round()
-        self.is_starting_cleanup_round   = cleanup_config.is_starting_cleanup_round()
+        self.cleanup_progress            = cleanup_state.dto.cleanup_progress
+        self.is_in_cleanup_round         = cleanup_state.is_in_cleanup_round()
+        self.is_starting_cleanup_round   = cleanup_state.is_starting_cleanup_round()
 
         # create numeric retention values sorted by days_to_cleanup
         numeric_retention_types:list[RetentionTypeDTO]      = sorted([retention for key,retention in retention_type_dict.items() if retention.days_to_cleanup is not None ], key=lambda r: r.days_to_cleanup)

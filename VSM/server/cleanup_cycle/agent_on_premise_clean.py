@@ -2,7 +2,7 @@ import os
 import time as time_module
 import tempfile
 from datetime import date, datetime
-from cleanup_cycle.scheduler_dto import ActionType 
+from cleanup_cycle.scheduler_dtos import ActionType 
 from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods 
 from cleanup_cycle.agents_internal import AgentTemplate
 from datamodel.dtos import FileInfo

@@ -185,7 +185,7 @@
       }
     },
     {
-      "name": "Debug Integration Tests",
+      "name": "Debug All Integration Tests",
       "type": "debugpy",
       "request": "launch",
       "program": "${workspaceFolder}/server/run_integration_test.py",
