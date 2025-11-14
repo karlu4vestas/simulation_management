@@ -21,7 +21,7 @@ from cleanup_cycle.agents_internal import (
     AgentCleanupCycleStart,
     AgentNotification,
     AgentCleanupCycleFinishing,
-    AgentCleanupCyclePrepareNext
+    #AgentCleanupCyclePrepareNext
 )
 from cleanup_cycle.agent_runner import InternalAgentFactory
 from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods, CleanupScheduler
@@ -31,21 +31,22 @@ from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 from tests import test_storage
+from cleanup_cycle import cleanup_db_actions
 
 
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
     
-class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
-    def __init__(self):
-        super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
+# class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
+#     def __init__(self):
+#         super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
 
-    def reserve_task(self):
-        self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
+#     def reserve_task(self):
+#         self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
 
-    def execute_task(self):
-        cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
-        self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id} but the Cleanup cycle is stopped here by setting cleanup_start_date=None"
+#     def execute_task(self):
+#         cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
+#         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id} but the Cleanup cycle is stopped here by setting cleanup_start_date=None"
 
 class ForTestAgentCalendarCreation(AgentTemplate):
     # this ia a fake agent because it does not require a task and will always be run when called
@@ -57,8 +58,21 @@ class ForTestAgentCalendarCreation(AgentTemplate):
         self.execute_task()
 
     def execute_task(self):
-        msg: str = CleanupScheduler.create_calendars_for_cleanup_configuration_ready_to_start(stop_after_cleanup_cycle=True)
+        msg: str = cleanup_db_actions.create_calendars_for_cleanup_configuration_ready_to_start(stop_after_cleanup_cycle=True)
         self.success_message = f"CalendarCreation done with: {msg}"
+
+class ForTestAgentCalendarClosure(AgentTemplate):
+    # this ia a fake agent because it does not require a task and will always be run when called
+    # In fact the agent calls the scheduler to close calendars that finishes
+    def __init__(self):
+        super().__init__("AgentCalendarClosure", [ActionType.CLOSE_FINISHED_CALENDARS.value])
+
+    def run(self):
+        self.execute_task()
+
+    def execute_task(self):
+        msg: str = cleanup_db_actions.close_finished_calenders()
+        self.success_message = f"AgentCalendarClosure done with: {msg}"
 
 @pytest.mark.integration
 @pytest.mark.cleanup_workflow
@@ -138,94 +152,101 @@ class TestSchedulerAndAgents:
         #new db created by pytest_fixture so we only need to populate the metadata
         insert_vts_metadata_in_db(integration_session)
 
-        #Get one rootfolders and it list of leaf folders
-        rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]
-        
-        # setup folder for the test
-        io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
-        
-        gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data)
         mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
             cycletime=7,
             cleanupfrequency=1./(24*60*60),  # set to one second for the test
             cleanup_start_date=date.today() - timedelta(days=8),  #8 = cycletime+1 ensure that simulations are marked for cleanup
             cleanup_progress=dtos.CleanupProgress.ProgressEnum.INACTIVE
         )
-        rootfolder:dtos.RootFolderDTO=None
-        cleanup_config: dtos.CleanupConfigurationDTO=None
-        rootfolder, cleanup_config = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
 
-        # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
-        # Lets define the environment variables needed by the scheduler and agents
+        for i in range(2):
 
-        # for the AgentScanVTSRootFolder
-        os.environ['SCAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_scanning")  # where should the meta data for file and folders be placed
-        os.environ['SCAN_THREADS'] = str(1)  # number of scanning threads
+            #Get one rootfolders and it list of leaf folders
+            rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]
+            
+            # setup folder for the test
+            io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
+            
+            gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data)
+            rootfolder:dtos.RootFolderDTO=None
+            cleanup_config: dtos.CleanupConfigurationDTO=None
+            rootfolder, cleanup_config = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
+            
+            # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
+            # Lets define the environment variables needed by the scheduler and agents
 
-        #for the cleanup agent
-        os.environ['CLEAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_cleaning")
-        os.environ['CLEAN_SIM_WORKERS'] = str(1)
-        os.environ['CLEAN_DELETION_WORKERS'] = str(2)
-        os.environ['CLEAN_MODE'] = 'ANALYSE'
+            # for the AgentScanVTSRootFolder
+            os.environ['SCAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_scanning")  # where should the meta data for file and folders be placed
+            os.environ['SCAN_THREADS'] = str(1)  # number of scanning threads
 
-        # Create test-specific agents (they will pick up the environment variables set above)
-        test_agents = [
-            ForTestAgentCalendarCreation(),
-            AgentScanVTSRootFolder(),       # Uses SCAN_TEMP_FOLDER, SCAN_THREADS env vars
-            AgentCleanupCycleStart(),
-            AgentNotification(),
-            AgentCleanVTSRootFolder(),      # Uses CLEAN_TEMP_FOLDER, CLEAN_SIM_WORKERS, etc. env vars
-            AgentCleanupCycleFinishing(),
-            #AgentCleanupCyclePrepareNext(),
-            ForTestAgentCleanupCyclePrepareNextAndStop()
-        ]
+            #for the cleanup agent
+            os.environ['CLEAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_cleaning")
+            os.environ['CLEAN_SIM_WORKERS'] = str(1)
+            os.environ['CLEAN_DELETION_WORKERS'] = str(2)
+            os.environ['CLEAN_MODE'] = 'ANALYSE'
+            
+            # Create fresh test-specific agents for each iteration to avoid stale state
+            # (they will pick up the environment variables set above)
+            test_agents = [
+                ForTestAgentCalendarClosure(),
+                ForTestAgentCalendarCreation(),
+                AgentScanVTSRootFolder(),       # Uses SCAN_TEMP_FOLDER, SCAN_THREADS env vars
+                AgentCleanupCycleStart(),
+                AgentNotification(),
+                AgentCleanVTSRootFolder(),      # Uses CLEAN_TEMP_FOLDER, CLEAN_SIM_WORKERS, etc. env vars
+                AgentCleanupCycleFinishing(),
+                #AgentCleanupCyclePrepareNext(),
+                #ForTestAgentCleanupCyclePrepareNextAndStop()
+            ]
+            
+            # Use context manager to inject test agents
+            with InternalAgentFactory.with_agents(test_agents):
+                # Step 3: Run scheduler to create scan tasks and execute the scan
+                run_scheduler_tasks()
+                # extract all task
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.SCAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "SCAN_ROOTFOLDER task should be ACTIVATED"
 
-        # Use context manager to inject test agents
-        with InternalAgentFactory.with_agents(test_agents):
-            # Step 3: Run scheduler to create scan tasks and execute the scan
-            run_scheduler_tasks()
-            # extract all task
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.SCAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "SCAN_ROOTFOLDER task should be ACTIVATED"
+                run_scheduler_tasks()
+                # extract all task
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.START_RETENTION_REVIEW].status == TaskStatus.ACTIVATED.value, "START_RETENTION_REVIEW task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            # extract all task
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.START_RETENTION_REVIEW].status == TaskStatus.ACTIVATED.value, "START_RETENTION_REVIEW task should be ACTIVATED"
+                run_scheduler_tasks()
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.SEND_INITIAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_INITIAL_NOTIFICATION task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.SEND_INITIAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_INITIAL_NOTIFICATION task should be ACTIVATED"
+                run_scheduler_tasks()
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.SEND_FINAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_FINAL_NOTIFICATION task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.SEND_FINAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_FINAL_NOTIFICATION task should be ACTIVATED"
+                run_scheduler_tasks()
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.CLEAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "CLEAN_ROOTFOLDER task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.CLEAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "CLEAN_ROOTFOLDER task should be ACTIVATED"
+                run_scheduler_tasks()
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert task_dict[ActionType.FINISH_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "FINISH_CLEANUP_CYCLE task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.FINISH_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "FINISH_CLEANUP_CYCLE task should be ACTIVATED"
+                # run_scheduler_tasks()
+                # calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                # task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                # assert task_dict[ActionType.STOP_AFTER_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "STOP_AFTER_CLEANUP_CYCLE task should be ACTIVATED"
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert task_dict[ActionType.STOP_AFTER_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "STOP_AFTER_CLEANUP_CYCLE task should be ACTIVATED"
+                run_scheduler_tasks()
+                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
+                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
+                assert len(task_dict)  == 0, f"all active tasks should be COMPLETED but there is still {len(task_dict)} tasks active"
+                cleanup_configuration: dtos.CleanupConfigurationDTO = db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
 
-            run_scheduler_tasks()
-            calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-            task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-            assert len(task_dict)  == 0, f"all active tasks should be COMPLETED but there is still {len(task_dict)} tasks active"
-            cleanup_configuration: dtos.CleanupConfigurationDTO = db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
-
-            assert cleanup_configuration is not None, "Cleanup configuration should be found"
-            assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"
+                assert cleanup_configuration.cleanup_progress == dtos.CleanupProgress.ProgressEnum.DONE.value, \
+                    f"The state of the cleanup_configuration was in {cleanup_config.cleanup_progress} but should have been in RETENTION_REVIEW"
+                cleanup_configuration = None
+            #assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"
        

@@ -81,13 +81,13 @@ class AgentCleanupCycleFinishing(AgentTemplate):
         cleanup_db_actions.cleanup_cycle_finishing(self.task.rootfolder_id)
         self.success_message = f"Cleanup cycle finishing for rootfolder {self.task.rootfolder_id}"
 
-class AgentCleanupCyclePrepareNext(AgentTemplate):
-    def __init__(self):
-        super().__init__("AgentCleanupCyclePrepareNext", [ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value])
+# class AgentCleanupCyclePrepareNext(AgentTemplate):
+#     def __init__(self):
+#         super().__init__("AgentCleanupCyclePrepareNext", [ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value])
 
-    def execute_task(self):
-        cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
-        self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id}"
+#     def execute_task(self):
+#         cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
+#         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id}"
 
 
 

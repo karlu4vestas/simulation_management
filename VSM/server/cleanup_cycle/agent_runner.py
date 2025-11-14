@@ -1,8 +1,7 @@
+import random
 from typing import Callable
 from contextlib import contextmanager
-from cleanup_cycle.agents_internal import AgentTemplate, AgentCalendarCreation, AgentCleanupCycleStart, AgentNotification, AgentCleanupCycleFinishing, AgentCleanupCyclePrepareNext
-from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
-from cleanup_cycle.agent_on_premise_clean import AgentCleanVTSRootFolder
+from cleanup_cycle import agents_internal, agent_on_premise_scan, agent_on_premise_clean
 
 class InternalAgentFactory:
     # Factory for managing internal agents with support for dependency injection.   
@@ -15,24 +14,24 @@ class InternalAgentFactory:
     #         run_scheduler_tasks()
     
     # Class-level registry that can be overridden for testing
-    _agent_registry: list[AgentTemplate] | None = None
-    _default_agents_factory: Callable[[], list[AgentTemplate]] | None = None
+    _agent_registry: list[agents_internal.AgentTemplate] | None = None
+    _default_agents_factory: Callable[[], list[agents_internal.AgentTemplate]] | None = None
     
     @staticmethod
-    def _create_default_agents() -> list[AgentTemplate]:
+    def _create_default_agents() -> list[agents_internal.AgentTemplate]:
         # Create the default set of production agents.
         return [
-            AgentCalendarCreation(),
-            AgentScanVTSRootFolder(),
-            AgentCleanupCycleStart(),
-            AgentNotification(),
-            AgentCleanVTSRootFolder(),
-            AgentCleanupCycleFinishing(),
-            AgentCleanupCyclePrepareNext(),
+            agents_internal.AgentCalendarCreation(),
+            agent_on_premise_scan.AgentScanVTSRootFolder(),
+            agents_internal.AgentCleanupCycleStart(),
+            agents_internal.AgentNotification(),
+            agent_on_premise_clean.AgentCleanVTSRootFolder(),
+            agents_internal.AgentCleanupCycleFinishing(),
+            #AgentCleanupCyclePrepareNext(),
         ]
     
     @staticmethod
-    def get_internal_agents() -> list[AgentTemplate]:
+    def get_internal_agents() -> list[agents_internal.AgentTemplate]:
         # Returns the registered agents if set, otherwise creates default agents.
         # This allows for dependency injection in tests while maintaining default behavior in production.
         if InternalAgentFactory._agent_registry is not None:
@@ -44,14 +43,13 @@ class InternalAgentFactory:
         return InternalAgentFactory._create_default_agents()
     
     @staticmethod
-    def register_agents(agents: list[AgentTemplate]) -> None:
+    def register_agents(agents: list[agents_internal.AgentTemplate]) -> None:
         # Register a custom list of agents (for testing) to use instead of defaults
         InternalAgentFactory._agent_registry = agents
     
     @staticmethod
-    def register_agents_factory(factory: Callable[[], list[AgentTemplate]]) -> None:
+    def register_agents_factory(factory: Callable[[], list[agents_internal.AgentTemplate]]) -> None:
         # Register a factory function for advanced testing. It must return a list of AgentTemplate instances.
-        
         InternalAgentFactory._default_agents_factory = factory
     
     @staticmethod
@@ -62,7 +60,7 @@ class InternalAgentFactory:
     
     @staticmethod
     @contextmanager
-    def with_agents(agents: list[AgentTemplate]):
+    def with_agents(agents: list[agents_internal.AgentTemplate]):
         # Context manager for temporarily using custom agents.
         # This is the recommended approach for testing as it ensures proper cleanup.
         
@@ -84,10 +82,11 @@ class InternalAgentFactory:
         finally:
             InternalAgentFactory._agent_registry = old_registry
             InternalAgentFactory._default_agents_factory = old_factory
-    
+
+
     @staticmethod
     def run_internal_agents(
-        agents: list[AgentTemplate] | None = None,
+        agents: list[agents_internal.AgentTemplate] | None = None,
         run_randomized: bool = False
     ) -> dict[str, any]:
         # Run internal agents.        
@@ -100,7 +99,6 @@ class InternalAgentFactory:
         agent_list = agents if agents is not None else InternalAgentFactory.get_internal_agents()
         
         if run_randomized:
-            import random
             random.shuffle(agent_list)
         
         for agent in agent_list:

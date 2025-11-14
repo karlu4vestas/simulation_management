@@ -42,6 +42,7 @@ class TaskStatus(str, Enum):
 # Agent can pickup the following types of tasks
 class ActionType(str, Enum):
     """Types of actions that can be scheduled in the calendar."""
+    CLOSE_FINISHED_CALENDARS  = "0 - close_finished_calendars"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
     CREATE_CLEANUP_CALENDAR   = "1 - create_cleanup_calendar"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
     SCAN_ROOTFOLDER           = "2 - scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. 0 day into START_RETENTION_REVIEW. Can take upto one day
     START_RETENTION_REVIEW    = "3 - start_retention_review"                    # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
@@ -49,8 +50,8 @@ class ActionType(str, Enum):
     SEND_FINAL_NOTIFICATION   = "5 - send_notification"                         # internal email agent: Notify stakeholders about the ongoing retention review. About a week before end of RETENTION_REVIEW phase. Takes less than a minute
     CLEAN_ROOTFOLDER          = "6 - clean_simulations"                         # storage agent: clean marked simulations. 0 day into the CLEANING phase. Can take upto a day
     FINISH_CLEANUP_CYCLE      = "7 - finish_cleanup_cycle"                      # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type.
-    PREPARE_NEXT_CLEANUP_CYCLE= "8 - prepare_next_cleanup_cycle"                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
-    STOP_AFTER_CLEANUP_CYCLE  = "9 - stop_after_cleanup_cycle"                   # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle. Before exit set the start date to None and progress to INACTIVE
+    #PREPARE_NEXT_CLEANUP_CYCLE= "8 - prepare_next_cleanup_cycle"                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
+    #STOP_AFTER_CLEANUP_CYCLE  = "9 - stop_after_cleanup_cycle"                   # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle. Before exit set the start date to None and progress to INACTIVE
 
 class AgentInfo(BaseModel):
     """Represents the agent Information that is required to reserve and report on tasks.
@@ -93,7 +94,6 @@ class CleanupTaskBase(SQLModel):
     # Results
     status_message: str | None          = Field(default=None, description="Result message from agent")
     
-
 class CleanupTaskDTO(CleanupTaskBase, table=True):
     id: int | None                      = Field(default=None, primary_key=True)
     

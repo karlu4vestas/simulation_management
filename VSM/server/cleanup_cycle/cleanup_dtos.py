@@ -1,20 +1,49 @@
 from fastapi import HTTPException
+from sqlmodel import Session
 from datetime import date, timedelta
 from datamodel import dtos
+from db import db_api
+from db.database import Database
 
 class CleanupState:
     dto:dtos.CleanupConfigurationDTO = None
+
     def __init__(self, dto: dtos.CleanupConfigurationDTO):
         self.dto = dto
+
     @staticmethod
     def load_by_id(session, cleanup_config_id: int) -> "CleanupState":
         cleanup_config: dtos.CleanupConfigurationDTO = session.get(dtos.CleanupConfigurationDTO, cleanup_config_id)
         if cleanup_config is None:
             raise HTTPException(status_code=404, detail=f"CleanupConfigurationDTO with id:{cleanup_config_id} not found")
         return CleanupState(cleanup_config)
+    
+    @staticmethod
+    def load_by_rootfolder_id(rootfolder_id: int) -> "CleanupState":
+        cfg: dtos.CleanupConfigurationDTO = db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder_id)    
+        cleanup_config: CleanupState = CleanupState(cfg)
+        return cleanup_config
+    
+    def save_to_db(self, session:Session=None) -> None:
+        if session:
+            session.add(self.dto)
+            session.commit()
+            session.refresh(self.dto)
+        else:    
+            with Session(Database.get_engine()) as session:
+                session.add(self.dto)
+                session.commit()
+                session.refresh(self.dto)
 
     def is_valid(self) -> bool:
         return self.dto.is_valid()
+    
+    @property
+    def cleanup_progress(self) -> str:
+        return self.dto.cleanup_progress
+    @cleanup_progress.setter
+    def cleanup_progress(self, value: str) -> None:
+        self.dto.cleanup_progress = value
     
     def can_start_cleanup_now(self) -> bool:
         # Return true if 
@@ -63,7 +92,7 @@ class CleanupState:
         can_transition = self.can_transition_to(new_state)
         
         if can_transition:
-            self.dto.cleanup_progress = new_state.value
+            self.cleanup_progress = new_state.value
             return True
         
         return False

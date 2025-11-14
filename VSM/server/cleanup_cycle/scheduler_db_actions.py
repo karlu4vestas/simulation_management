@@ -4,8 +4,7 @@ from fastapi import HTTPException
 from db.database import Database
 from db import db_api
 from datamodel import dtos
-from cleanup_cycle import cleanup_dtos
-from cleanup_cycle import scheduler_dtos
+from cleanup_cycle import cleanup_dtos, cleanup_db_actions, scheduler_dtos
 from cleanup_cycle.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, AgentInfo, CleanupCalendarDTO, CleanupTaskDTO 
 
 
@@ -171,6 +170,35 @@ class CleanupScheduler:
                 "tasks_failed_timeout": task_timeouts
             }
 
+    @staticmethod
+    def close_finished_calenders() -> None:
+        """Close calenders where alle tasks are done
+        
+        This method will:
+        1. Find all active calendars and tasks. 
+        2. all tasks are COMPLETED or FAILED, then close the calendar 
+        
+        Args:
+            rootfolder_id: The ID of the rootfolder whose calendars should be deactivated
+        """
+        with Session(Database.get_engine()) as session:
+            # Get all active calendars for this rootfolder
+            active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                    CleanupCalendarDTO.status == CalendarStatus.ACTIVE) ).all()
+
+            for calendar in active_calendars:
+                # Get all non-terminal tasks for this calendar
+                tasks = session.exec( select(CleanupTaskDTO).where( (CleanupTaskDTO.calendar_id == calendar.id) ) ).all()
+                
+                # evaluate if all teh taks are either COMPLETED or FAILED
+                all_done = all( t.status in [TaskStatus.COMPLETED.value, TaskStatus.FAILED.value] for t in tasks )
+                if all_done:
+                    # Mark calendar as COMPLETED
+                    calendar.status = CalendarStatus.COMPLETED.value
+                    session.add(calendar)
+            
+            session.commit()
+
     
     @staticmethod
     def generate_cleanup_calendar(config: cleanup_dtos.CleanupState, stop_after_cleanup_cycle: bool=False) -> "CleanupCalendarDTO":
@@ -198,7 +226,6 @@ class CleanupScheduler:
             session.flush()  # Ensure calendar.id is available
             
             # Generate the tasks for this calendar based on ActionType enum
-
 
             # 4) SCAN_ROOTFOLDER - About 3 days before the end of the RETENTION_REVIEW phase
             # Storage agent: scan the rootfolder for simulations. Can take up to one day
@@ -258,7 +285,6 @@ class CleanupScheduler:
             )
             session.add(task_send_final_notification)
 
-
             # 5) CLEAN_ROOTFOLDER - 0 day into the CLEANING phase
             # Storage agent: clean marked simulations. Can take up to a day
             task_clean_rootfolder = CleanupTaskDTO(
@@ -287,75 +313,40 @@ class CleanupScheduler:
             )
             session.add(task_finish_cleanup_cycle)
 
-            if stop_after_cleanup_cycle:
-                # 7) STOP_AFTER_CLEANUP_CYCLE - Final step used by integrations tests so that the next cycle is not prepared automatically 
-                # This task is as fot ActionType.PREPARE_NEXT_CLEANUP_CYCLE but it will set the cleanup_start_date to None
-                # We can use the value of cleanup_start_date==None as exit criteria and then verify the completed tasks and the cleanup results
+            # if stop_after_cleanup_cycle:
+            #     # 7) STOP_AFTER_CLEANUP_CYCLE - Final step used by integrations tests so that the next cycle is not prepared automatically 
+            #     # This task is as fot ActionType.PREPARE_NEXT_CLEANUP_CYCLE but it will set the cleanup_start_date to None
+            #     # We can use the value of cleanup_start_date==None as exit criteria and then verify the completed tasks and the cleanup results
 
-                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
-                task_prepare_next_cleanup_cycle = CleanupTaskDTO(
-                    calendar_id=calendar.id,
-                    rootfolder_id=config.dto.rootfolder_id,
-                    path=rootfolder.path,
-                    task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
-                    action_type=ActionType.STOP_AFTER_CLEANUP_CYCLE.value,
-                    storage_id=None,  # Internal action
-                    status=TaskStatus.PLANNED.value,
-                    max_execution_hours=1
-                )
-            else:    
-                # 7) PREPARE_NEXT_CLEANUP_CYCLE - Final step
-                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
-                task_prepare_next_cleanup_cycle = CleanupTaskDTO(
-                    calendar_id=calendar.id,
-                    rootfolder_id=config.dto.rootfolder_id,
-                    path=rootfolder.path,
-                    task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
-                    action_type=ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value,
-                    storage_id=None,  # Internal action
-                    status=TaskStatus.PLANNED.value,
-                    max_execution_hours=1
-                )
-            session.add(task_prepare_next_cleanup_cycle)
+            #     # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
+            #     task_prepare_next_cleanup_cycle = CleanupTaskDTO(
+            #         calendar_id=calendar.id,
+            #         rootfolder_id=config.dto.rootfolder_id,
+            #         path=rootfolder.path,
+            #         task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
+            #         action_type=ActionType.STOP_AFTER_CLEANUP_CYCLE.value,
+            #         storage_id=None,  # Internal action
+            #         status=TaskStatus.PLANNED.value,
+            #         max_execution_hours=1
+            #     )
+            # else:    
+            #     # 7) PREPARE_NEXT_CLEANUP_CYCLE - Final step
+            #     # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
+            #     task_prepare_next_cleanup_cycle = CleanupTaskDTO(
+            #         calendar_id=calendar.id,
+            #         rootfolder_id=config.dto.rootfolder_id,
+            #         path=rootfolder.path,
+            #         task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
+            #         action_type=ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value,
+            #         storage_id=None,  # Internal action
+            #         status=TaskStatus.PLANNED.value,
+            #         max_execution_hours=1
+            #     )
+            # session.add(task_prepare_next_cleanup_cycle)
 
             session.commit()
             return calendar
 
-    @staticmethod
-    def create_calendars_for_cleanup_configuration_ready_to_start(stop_after_cleanup_cycle: bool=False) -> str:
-        """
-        Fetch all cleanup configurations that are ready to start a new cleanup cycle.
-        
-        Returns:
-            List of CleanupConfigurationDTO objects that meet all criteria:
-            - cycletime > 0
-            - cleanupfrequency > 0
-            - cleanup_start_date >= today
-            - cleanup_progress in [INACTIVE, DONE]
-        """
-        today = date.today()
-        
-        with Session(Database.get_engine()) as session:
-            configs = session.exec(
-                select(dtos.CleanupConfigurationDTO).where(
-                    (dtos.CleanupConfigurationDTO.cycletime > 0) &
-                    (dtos.CleanupConfigurationDTO.cleanupfrequency > 0) &
-                    (dtos.CleanupConfigurationDTO.cleanup_start_date != None) &
-                    (dtos.CleanupConfigurationDTO.cleanup_start_date <= today) &
-                    (dtos.CleanupConfigurationDTO.cleanup_progress.in_([
-                        dtos.CleanupProgress.ProgressEnum.INACTIVE.value,
-                        dtos.CleanupProgress.ProgressEnum.DONE.value
-                    ]))
-                )
-            ).all()
-
-            state_configs:list[cleanup_dtos.CleanupState] = [cleanup_dtos.CleanupState(config) for config in configs]
-            calendars:list[scheduler_dtos.CleanupCalendarDTO] = []
-            for config in state_configs:
-                if config.can_start_cleanup_now():
-                    calendars.append(CleanupScheduler.generate_cleanup_calendar(config, stop_after_cleanup_cycle=stop_after_cleanup_cycle))
-
-            return f"Generated or found {len(calendars)} calendars ."
 
     @staticmethod
     def extract_active_calendar_for_rootfolder(rootfolder: dtos.RootFolderDTO) -> tuple[scheduler_dtos.CleanupCalendarDTO, list[scheduler_dtos.CleanupTaskDTO]]:
@@ -377,7 +368,7 @@ class CleanupScheduler:
                 ).all()
         
         return calendar, tasks
-    
+
     @staticmethod
     def deactivate_calendar(rootfolder_id:int) -> None:
         """Deactivate all active calendars and their tasks for a given rootfolder.
@@ -428,6 +419,8 @@ class CleanupScheduler:
             session.commit()
 
 
+
+
 class AgentInterfaceMethods:
     #agent interface methods
     @staticmethod
@@ -459,6 +452,10 @@ class AgentInterfaceMethods:
                 return None
             else:
                 reserved_task = tasks[0]
+                #@TODO: hmm is this a hack or a the start of a better design ?
+                if reserved_task.action_type == ActionType.CLEAN_ROOTFOLDER:
+                    cleanup_db_actions.register_cleaning_start(reserved_task.rootfolder_id)
+
                 reserved_task.status = TaskStatus.RESERVED.value
                 reserved_task.reserved_by_agent_id = agent.agent_id
                 reserved_task.reserved_at = datetime.now(timezone.utc)
@@ -471,9 +468,7 @@ class AgentInterfaceMethods:
     def task_progress(task_id: str, progress_message: str|None = None) -> dict[str,str]:
         
         with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
+            task = session.exec( select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id)) ).first()
             if not task:
                 raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
             
@@ -484,6 +479,7 @@ class AgentInterfaceMethods:
             task.status_message = progress_message
             session.add(task)
             session.commit()
+
             return {"message": f"Task {task_id} updated to status {task.status}"}
 
     @staticmethod
@@ -506,11 +502,9 @@ class AgentInterfaceMethods:
             task.status_message = status_message
             task.completed_at = datetime.now(timezone.utc)
             
-            #a hack we have to fix
+            #@TODO: hmm is this a hack or a the start of a better design ?
             if task.action_type == ActionType.CLEAN_ROOTFOLDER:
-                # Notify that the cleanup is done
-                from cleanup_cycle.cleanup_db_actions import register_cleanup_done
-                register_cleanup_done(task.rootfolder_id)
+                cleanup_db_actions.register_cleanup_done(task.rootfolder_id)
 
             session.add(task)
             session.commit()

@@ -168,34 +168,6 @@ def read_folders( rootfolder_id: int ):
         return folders
 
 
-def update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
-    is_valid = cleanup_configuration.is_valid()
-    if not is_valid:
-        raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
-
-    #now the configuration is consistent
-    with Session(Database.get_engine()) as session:
-        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
-        if not rootfolder:
-            raise HTTPException(status_code=404, detail="rootfolder not found")
-      
-        # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
-        cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        # Update the DTO with values from the incoming dataclass
-        # any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
-        cleanup_config.cycletime          = cleanup_configuration.cycletime
-        cleanup_config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
-        cleanup_config.cleanup_start_date = cleanup_configuration.cleanup_start_date
-        cleanup_config.cleanup_progress   = dtos.CleanupProgress.ProgressEnum.INACTIVE 
-        #config_dto.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress 
-        rootfolder.save_cleanup_configuration(session, cleanup_config)
-
-        #if cleanup_configuration.can_start_cleanup():
-        #    print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
-        #    #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
-        #    #start_new_cleanup_cycle(rootfolder_id)
-        return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {cleanup_config.id} "}
-
 def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> dtos.CleanupConfigurationDTO:
     with Session(Database.get_engine()) as session:
         rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
@@ -239,6 +211,35 @@ def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.Cleanup
         if (cleanup_config.id is None) or (cleanup_config.id == 0):
             raise HTTPException(status_code=404, detail=f"Failed to provide cleanup configuration for rootfolder_id {rootfolder_id} with an id")
         return cleanup_config   
+    
+def update_cleanup_configuration_by_rootfolder_id(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
+    is_valid = cleanup_configuration.is_valid()
+    if not is_valid:
+        raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
+
+    #now the configuration is consistent
+    with Session(Database.get_engine()) as session:
+        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+      
+        # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
+        cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        # Update the DTO with values from the incoming dataclass
+        # any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
+        cleanup_config.cycletime          = cleanup_configuration.cycletime
+        cleanup_config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
+        cleanup_config.cleanup_start_date = cleanup_configuration.cleanup_start_date
+        cleanup_config.cleanup_progress   = dtos.CleanupProgress.ProgressEnum.INACTIVE 
+        #config_dto.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress 
+        rootfolder.save_cleanup_configuration(session, cleanup_config)
+
+        #if cleanup_configuration.can_start_cleanup():
+        #    print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
+        #    #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
+        #    #start_new_cleanup_cycle(rootfolder_id)
+        return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {cleanup_config.id} "}
+
 
 # # --------------- start not in use now - will be used for optimization -------------------
 
