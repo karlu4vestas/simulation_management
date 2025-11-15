@@ -1,12 +1,11 @@
 import os
 import time as time_module
 import tempfile
-from datetime import date, datetime
+from datetime import datetime
 from cleanup_cycle.scheduler_dtos import ActionType 
-from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods 
+from cleanup_cycle.agent_task_manager import CleanupTaskManager 
 from cleanup_cycle.agents_internal import AgentTemplate
 from datamodel.dtos import FileInfo
-from datamodel.retentions import ExternalRetentionTypes
 from cleanup_cycle.clean_agent.clean_main import clean_main, CleanupResult
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
 from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
@@ -30,7 +29,7 @@ class AgentCleanProgressWriter(CleanProgressWriter):
             f"Queue: {deletion_queue_size}; "
             f"Threads: {active_threads}"
         )
-        AgentInterfaceMethods.task_progress(self.agentCleanRootFolder.task.id, msg)
+        CleanupTaskManager.task_progress(self.agentCleanRootFolder.task.id, msg)
 
     def open(self, output_path: str):
         super().open(output_path)
@@ -81,26 +80,25 @@ class AgentCleanVTSRootFolder(AgentTemplate):
             self.error_message = "Temporary result folder is not set"
             return
             
-        simulations: list[FileInfo] = AgentInterfaceMethods.task_read_folders_marked_for_cleanup(self.task.id)
-        AgentInterfaceMethods.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
+        simulations: list[FileInfo] = CleanupTaskManager.task_read_folders_marked_for_cleanup(self.task.id)
+        CleanupTaskManager.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
         
         clean_result: CleanupResult = None
         if len(simulations) > 0:
             clean_result: CleanupResult = self.clean_simulations(simulations)
             # Report summary
             measures = clean_result.measures
-            AgentInterfaceMethods.task_progress( self.task.id,
+            CleanupTaskManager.task_progress( self.task.id,
                 f"Cleanup completed: {measures.simulations_processed} processed, "
                 f"{measures.simulations_cleaned} cleaned, {measures.simulations_issue} issues, "
                 f"{measures.simulations_skipped} skipped"
             )
             # Update simulations in database with cleanup results
             if len(clean_result.results) > 0:
-                result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
+                result: dict[str, str] = CleanupTaskManager.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
 
-                AgentInterfaceMethods.task_progress( self.task.id, f"Insertion completed: {len(clean_result.results)} simulations inserted" )
-        
-        return
+                CleanupTaskManager.task_progress( self.task.id, f"Insertion completed: {len(clean_result.results)} simulations inserted" )
+        self.success_message = f"Cleaned {len(simulations)} simulations in rootfolder {self.task.rootfolder_id}"
 
     def clean_simulations(self, simulations: list[FileInfo]) -> CleanupResult | None:
         

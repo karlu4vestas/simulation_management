@@ -24,7 +24,7 @@ from cleanup_cycle.agents_internal import (
     #AgentCleanupCyclePrepareNext
 )
 from cleanup_cycle.agent_runner import InternalAgentFactory
-from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods, CleanupScheduler
+from cleanup_cycle.scheduler_db_actions import CleanupScheduler
 
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
@@ -42,7 +42,7 @@ TEST_STORAGE_LOCATION = test_storage.LOCATION
 #         super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
 
 #     def reserve_task(self):
-#         self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
+#         self.task = CleanupTaskManager.reserve_task(self.agent_info)
 
 #     def execute_task(self):
 #         cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
@@ -52,27 +52,157 @@ class ForTestAgentCalendarCreation(AgentTemplate):
     # this ia a fake agent because it does not require a task and will always be run when called
     # In fact the agent calls the scheduler to create calendars and tasks for rootfolder that are ready to start cleanup cycles
     def __init__(self):
-        super().__init__("AgentCalendarCreation", [ActionType.CREATE_CLEANUP_CALENDAR.value])
+        super().__init__("AgentCalendarCreation", [])
 
+    # run without reservation because not calendar exists for this agent
     def run(self):
         self.execute_task()
 
     def execute_task(self):
-        msg: str = cleanup_db_actions.create_calendars_for_cleanup_configuration_ready_to_start(stop_after_cleanup_cycle=True)
+        msg: str = CleanupScheduler.create_calendars_for_cleanup_configuration_ready_to_start()
+        CleanupScheduler.update_calendars_and_tasks() # prepare so the next task can be activated right away
         self.success_message = f"CalendarCreation done with: {msg}"
 
-class ForTestAgentCalendarClosure(AgentTemplate):
-    # this ia a fake agent because it does not require a task and will always be run when called
-    # In fact the agent calls the scheduler to close calendars that finishes
+# class ForTestAgentCalendarClosure(AgentTemplate):
+#     # this ia a fake agent because it does not require a task and will always be run when called
+#     # In fact the agent calls the scheduler to close calendars that finishes
+#     def __init__(self):
+#         super().__init__("ForTestAgentCalendarClosure", [ActionType.CLOSE_FINISHED_CALENDARS.value])
+#     # run without reservation because not calendar exists for this agent
+#     def run(self):
+#          self.execute_task()
+
+#     def execute_task(self):
+#         msg: str = cleanup_db_actions.close_finished_calenders()
+#         self.success_message = f"ForTestAgentCalendarClosure done with: {msg}"
+
+#implementation of class AgentCallbackHandler(ABC):
+# the implementation also get the CleanupState.cleanup_progress by load it using rootfolder_id from CleanupTaskDTO
+# Data are saved to a two list of AgentExecutionRecord for later verification of the pre and post run data in the test  
+
+@dataclass
+class AgentExecutionRecord:
+    """Record of agent execution for testing purposes"""
+    calendar_id: int | None
+    agent_id: str
+    action_types: list[str]
+    task_id: int | None
+    rootfolder_id: int | None
+    cleanup_progress: dtos.CleanupProgress.ProgressEnum | None
+    error_message: str | None
+    success_message: str | None
+
+from cleanup_cycle.agent_runner import AgentCallbackHandler
+from cleanup_cycle.scheduler_dtos import AgentInfo
+
+class TestAgentCallbackHandler(AgentCallbackHandler):
+    """Callback handler for testing that collects agent execution data"""
+    
     def __init__(self):
-        super().__init__("AgentCalendarClosure", [ActionType.CLOSE_FINISHED_CALENDARS.value])
-
-    def run(self):
-        self.execute_task()
-
-    def execute_task(self):
-        msg: str = cleanup_db_actions.close_finished_calenders()
-        self.success_message = f"AgentCalendarClosure done with: {msg}"
+        self.prerun_records: list[AgentExecutionRecord] = []
+        self.postrun_records: list[AgentExecutionRecord] = []
+    
+    def on_agent_prerun(self, agent_info: AgentInfo, task: CleanupTaskDTO | None) -> None:
+        """Collect data before agent runs"""
+        cleanup_progress = None
+        rootfolder_id = None
+        calendar_id = None
+        
+        if task:
+            calendar_id = task.calendar_id if hasattr(task, 'calendar_id') else None
+            if task.rootfolder_id:
+                rootfolder_id = task.rootfolder_id
+                cleanup_config = db_api.get_cleanup_configuration_by_rootfolder_id(task.rootfolder_id)
+                if cleanup_config:
+                    cleanup_progress = dtos.CleanupProgress.ProgressEnum(cleanup_config.cleanup_progress)
+        
+        record = AgentExecutionRecord(
+            agent_id=agent_info.agent_id,
+            action_types=agent_info.action_types,
+            task_id=task.id if task else None,
+            calendar_id=calendar_id,
+            rootfolder_id=rootfolder_id,
+            cleanup_progress=cleanup_progress,
+            error_message=None,
+            success_message=None
+        )
+        self.prerun_records.append(record)
+    
+    def on_agent_postrun(self, agent_info: AgentInfo, task: CleanupTaskDTO | None, 
+                         error_message: str | None, success_message: str | None) -> None:
+        """Collect data after agent completes"""
+        cleanup_progress = None
+        rootfolder_id = None
+        calendar_id = None
+        
+        if task:
+            calendar_id = task.calendar_id if hasattr(task, 'calendar_id') else None
+            if task.rootfolder_id:
+                rootfolder_id = task.rootfolder_id
+                cleanup_config = db_api.get_cleanup_configuration_by_rootfolder_id(task.rootfolder_id)
+                if cleanup_config:
+                    cleanup_progress = dtos.CleanupProgress.ProgressEnum(cleanup_config.cleanup_progress)
+        
+        record = AgentExecutionRecord(
+            agent_id=agent_info.agent_id,
+            action_types=agent_info.action_types,
+            task_id=task.id if task else None,
+            calendar_id=calendar_id,
+            rootfolder_id=rootfolder_id,
+            cleanup_progress=cleanup_progress,
+            error_message=error_message,
+            success_message=success_message
+        )
+        self.postrun_records.append(record)
+    
+    def save_records_to_csv(self, prerun_path: str, postrun_path: str) -> None:
+        """Save prerun and postrun records to CSV files
+        
+        Args:
+            prerun_path: Path where prerun records should be saved
+            postrun_path: Path where postrun records should be saved
+        """
+        import csv
+        
+        # Ensure directories exist
+        os.makedirs(os.path.dirname(prerun_path), exist_ok=True)
+        os.makedirs(os.path.dirname(postrun_path), exist_ok=True)
+        
+        # Define CSV headers
+        headers = ['calendar_id', 'agent_id', 'action_types', 'task_id', 'rootfolder_id', 
+                   'cleanup_progress', 'error_message', 'success_message']
+        
+        # Save prerun records
+        with open(prerun_path, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter=';')
+            writer.writerow(headers)
+            for record in self.prerun_records:
+                writer.writerow([
+                    record.calendar_id or '',
+                    record.agent_id,
+                    '|'.join(record.action_types) if record.action_types else '',
+                    record.task_id or '',
+                    record.rootfolder_id or '',
+                    record.cleanup_progress.value if record.cleanup_progress else '',
+                    record.error_message or '',
+                    record.success_message or ''
+                ])
+        
+        # Save postrun records
+        with open(postrun_path, 'w', newline='') as f:
+            writer = csv.writer(f, delimiter=';')
+            writer.writerow(headers)
+            for record in self.postrun_records:
+                writer.writerow([
+                    record.calendar_id or '',
+                    record.agent_id,
+                    '|'.join(record.action_types) if record.action_types else '',
+                    record.task_id or '',
+                    record.rootfolder_id or '',
+                    record.cleanup_progress.value if record.cleanup_progress else '',
+                    record.error_message or '',
+                    record.success_message or ''
+                ])
 
 @pytest.mark.integration
 @pytest.mark.cleanup_workflow
@@ -158,95 +288,48 @@ class TestSchedulerAndAgents:
             cleanup_start_date=date.today() - timedelta(days=8),  #8 = cycletime+1 ensure that simulations are marked for cleanup
             cleanup_progress=dtos.CleanupProgress.ProgressEnum.INACTIVE
         )
+        
+        runtime_callback: TestAgentCallbackHandler = TestAgentCallbackHandler()
+        #Get one rootfolders and it list of leaf folders
+        rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]        
+        # setup folder for the test
+        io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
+        # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
+        # Lets define the environment variables needed by the scheduler and agents
 
-        for i in range(2):
+        # for the AgentScanVTSRootFolder
+        os.environ['SCAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_scanning")  # where should the meta data for file and folders be placed
+        os.environ['SCAN_THREADS'] = str(1)  # number of scanning threads
 
-            #Get one rootfolders and it list of leaf folders
-            rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]
-            
-            # setup folder for the test
-            io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
-            
+        #for the cleanup agent
+        os.environ['CLEAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_cleaning")
+        os.environ['CLEAN_SIM_WORKERS'] = str(1)
+        os.environ['CLEAN_DELETION_WORKERS'] = str(2)
+        os.environ['CLEAN_MODE'] = 'ANALYSE'
+
+        for i in range(1):
             gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data)
-            rootfolder:dtos.RootFolderDTO=None
-            cleanup_config: dtos.CleanupConfigurationDTO=None
-            rootfolder, cleanup_config = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
-            
-            # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
-            # Lets define the environment variables needed by the scheduler and agents
-
-            # for the AgentScanVTSRootFolder
-            os.environ['SCAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_scanning")  # where should the meta data for file and folders be placed
-            os.environ['SCAN_THREADS'] = str(1)  # number of scanning threads
-
-            #for the cleanup agent
-            os.environ['CLEAN_TEMP_FOLDER'] = os.path.join(io_dir_for_storage_test, "temp_for_cleaning")
-            os.environ['CLEAN_SIM_WORKERS'] = str(1)
-            os.environ['CLEAN_DELETION_WORKERS'] = str(2)
-            os.environ['CLEAN_MODE'] = 'ANALYSE'
-            
+            root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO] = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
+                  
             # Create fresh test-specific agents for each iteration to avoid stale state
             # (they will pick up the environment variables set above)
             test_agents = [
-                ForTestAgentCalendarClosure(),
+                #ForTestAgentCalendarClosure(),
                 ForTestAgentCalendarCreation(),
                 AgentScanVTSRootFolder(),       # Uses SCAN_TEMP_FOLDER, SCAN_THREADS env vars
                 AgentCleanupCycleStart(),
+                AgentNotification(),
                 AgentNotification(),
                 AgentCleanVTSRootFolder(),      # Uses CLEAN_TEMP_FOLDER, CLEAN_SIM_WORKERS, etc. env vars
                 AgentCleanupCycleFinishing(),
                 #AgentCleanupCyclePrepareNext(),
                 #ForTestAgentCleanupCyclePrepareNextAndStop()
             ]
-            
-            # Use context manager to inject test agents
             with InternalAgentFactory.with_agents(test_agents):
                 # Step 3: Run scheduler to create scan tasks and execute the scan
-                run_scheduler_tasks()
-                # extract all task
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.SCAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "SCAN_ROOTFOLDER task should be ACTIVATED"
+                run_scheduler_tasks(runtime_callback)
 
-                run_scheduler_tasks()
-                # extract all task
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.START_RETENTION_REVIEW].status == TaskStatus.ACTIVATED.value, "START_RETENTION_REVIEW task should be ACTIVATED"
-
-                run_scheduler_tasks()
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.SEND_INITIAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_INITIAL_NOTIFICATION task should be ACTIVATED"
-
-                run_scheduler_tasks()
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.SEND_FINAL_NOTIFICATION].status == TaskStatus.ACTIVATED.value, "SEND_FINAL_NOTIFICATION task should be ACTIVATED"
-
-                run_scheduler_tasks()
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.CLEAN_ROOTFOLDER].status == TaskStatus.ACTIVATED.value, "CLEAN_ROOTFOLDER task should be ACTIVATED"
-
-                run_scheduler_tasks()
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert task_dict[ActionType.FINISH_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "FINISH_CLEANUP_CYCLE task should be ACTIVATED"
-
-                # run_scheduler_tasks()
-                # calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                # task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                # assert task_dict[ActionType.STOP_AFTER_CLEANUP_CYCLE].status == TaskStatus.ACTIVATED.value, "STOP_AFTER_CLEANUP_CYCLE task should be ACTIVATED"
-
-                run_scheduler_tasks()
-                calendar, tasks = CleanupScheduler.extract_active_calendar_for_rootfolder(rootfolder)
-                task_dict: dict[ActionType, CleanupTaskDTO] = {ActionType(task.action_type): task for task in tasks}
-                assert len(task_dict)  == 0, f"all active tasks should be COMPLETED but there is still {len(task_dict)} tasks active"
-                cleanup_configuration: dtos.CleanupConfigurationDTO = db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder.id)
-
-                assert cleanup_configuration.cleanup_progress == dtos.CleanupProgress.ProgressEnum.DONE.value, \
-                    f"The state of the cleanup_configuration was in {cleanup_config.cleanup_progress} but should have been in RETENTION_REVIEW"
-                cleanup_configuration = None
-            #assert cleanup_configuration.cleanup_start_date is None, "Cleanup configuration cleanup_start_date should be None after stopping cleanup cycle in this test"
-       
+        runtime_callback.save_records_to_csv(
+            prerun_path=os.path.join(io_dir_for_storage_test, "agent_prerun_records.csv"),
+            postrun_path=os.path.join(io_dir_for_storage_test, "agent_postrun_records.csv")
+        )

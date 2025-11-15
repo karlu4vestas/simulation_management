@@ -42,7 +42,7 @@ class TaskStatus(str, Enum):
 # Agent can pickup the following types of tasks
 class ActionType(str, Enum):
     """Types of actions that can be scheduled in the calendar."""
-    CLOSE_FINISHED_CALENDARS  = "0 - close_finished_calendars"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
+    #CLOSE_FINISHED_CALENDARS  = "0 - close_finished_calendars"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
     CREATE_CLEANUP_CALENDAR   = "1 - create_cleanup_calendar"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
     SCAN_ROOTFOLDER           = "2 - scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. 0 day into START_RETENTION_REVIEW. Can take upto one day
     START_RETENTION_REVIEW    = "3 - start_retention_review"                    # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
@@ -83,7 +83,7 @@ class CleanupTaskBase(SQLModel):
     storage_id: str | None              = Field(description="Storage platform where the rootfolder is located")
  
     # Execution tracking
-    status: str = Field(default=None, description="TaskStatus")
+    status: str                         = Field(default=None, description="TaskStatus")
     reserved_by_agent_id: str | None    = Field(default=None, description="ID of agent that reserved this task")
     reserved_at: datetime | None        = Field(default=None, description="When the task was reserved")    
     completed_at: datetime | None       = Field(default=None, description="When execution completed")

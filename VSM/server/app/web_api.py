@@ -166,7 +166,8 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from cleanup_cycle.scheduler_db_actions import AgentInfo, CleanupScheduler, CleanupTaskDTO
+from cleanup_cycle.scheduler_db_actions import CleanupScheduler, CleanupTaskDTO
+from cleanup_cycle.scheduler_dtos import AgentInfo
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
     return AgentInfo.reserve_task(agent)
@@ -185,12 +186,12 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
 
 #-----------------Scheduler API -------------------
 from cleanup_cycle.scheduler_db_actions import CleanupScheduler
-from cleanup_cycle.agent_runner import InternalAgentFactory
+from cleanup_cycle.agent_runner import InternalAgentFactory, AgentCallbackHandler
 
-def run_scheduler_tasks():
-    """Background task to run internal agents and update calendars/tasks"""
-    InternalAgentFactory.run_internal_agents()
-    CleanupScheduler.update_calendars_and_tasks()
+def run_scheduler_tasks(callback_handler: AgentCallbackHandler = None):
+    #callback_handler: Optional handler for agent execution callbacks with on_agent_prerun and on_agent_postrun methods
+    InternalAgentFactory.run_internal_agents(callback_handler=callback_handler)
+    CleanupScheduler.update_calendars_and_tasks() # just as precaution. this is actualle done on complettion of each task
 
 @app.post("/v1/scheduler/update_calendars_and_tasks")
 def fs_schedule_calendars_and_tasks(background_tasks: BackgroundTasks):

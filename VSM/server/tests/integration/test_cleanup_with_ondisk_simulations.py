@@ -7,9 +7,6 @@ This test:
 3. Runs clean_main to perform cleanup
 4. Validates results using validate_cleanup from main_validate_cleanup
 """
-
-from __future__ import annotations
-from typing import TYPE_CHECKING
 import pytest
 import os
 import shutil
@@ -30,9 +27,7 @@ from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
 from cleanup_cycle.clean_agent.clean_parameters import CleanMode
 from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
 from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
-if TYPE_CHECKING:
-    from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
-    from datamodel.dtos import FileInfo, FolderTypeEnum
+from datamodel.dtos import FileInfo
 
 from tests import test_storage
 

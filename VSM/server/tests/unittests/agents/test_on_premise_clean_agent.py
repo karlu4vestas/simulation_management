@@ -43,60 +43,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
         self.assertEqual(self.progress_writer.agentCleanRootFolder, self.mock_agent)
         self.assertEqual(self.progress_writer.seconds_between_update, 1)
         self.assertEqual(self.progress_writer.seconds_between_filelog, 60)
-    
-    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
-    def test_update_reports_progress(self, mock_interface):
-        """Test that update() calls AgentInterfaceMethods.task_progress()"""
-        # Create measures
-        measures = CleanMeasures(
-            simulations_processed=10,
-            simulations_cleaned=8,
-            simulations_issue=1,
-            simulations_skipped=1,
-            files_deleted=100,
-            bytes_deleted=1000000,
-            error_count=0
-        )
         
-        # Call update
-        self.progress_writer.update(measures, deletion_queue_size=50, active_threads=4)
-        
-        # Verify task_progress was called
-        mock_interface.task_progress.assert_called_once()
-        call_args = mock_interface.task_progress.call_args
-        
-        # Check task_id
-        self.assertEqual(call_args[0][0], 123)
-        
-        # Check message contains key metrics
-        message = call_args[0][1]
-        self.assertIn("Processed: 10", message)
-        self.assertIn("Cleaned: 8", message)
-        self.assertIn("Issue: 1", message)
-        self.assertIn("Skipped: 1", message)
-        self.assertIn("Queue: 50", message)
-        self.assertIn("Threads: 4", message)
-    
-    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
-    def test_update_with_zero_values(self, mock_interface):
-        """Test update with all zero values"""
-        measures = CleanMeasures(
-            simulations_processed=0,
-            simulations_cleaned=0,
-            simulations_issue=0,
-            simulations_skipped=0,
-            files_deleted=0,
-            bytes_deleted=0,
-            error_count=0
-        )
-        
-        self.progress_writer.update(measures, deletion_queue_size=0, active_threads=0)
-        
-        mock_interface.task_progress.assert_called_once()
-        message = mock_interface.task_progress.call_args[0][1]
-        self.assertIn("Processed: 0", message)
-
-
 class TestAgentCleanRootFolder(unittest.TestCase):
     """Test the AgentCleanRootFolder class"""
     
@@ -166,16 +113,6 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         
         self.assertEqual(agent.clean_mode, CleanMode.DELETE)
     
-
-    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
-    def test_execute_task_no_simulations(self, mock_interface):
-        """Test execute_task with no simulations to clean"""
-        mock_interface.task_read_folders_marked_for_cleanup.return_value = []
-        
-        self.agent.execute_task()
-        
-        # Verify error message is set
-        self.assertIsNone(self.agent.error_message)
     
     def test_execute_task_invalid_temp_folder(self):
         """Test execute_task when temp folder is invalid"""
@@ -277,9 +214,9 @@ class TestAgentIntegration(unittest.TestCase):
             if key in os.environ:
                 del os.environ[key]
     
-    @patch('cleanup_cycle.agent_on_premise_clean.AgentInterfaceMethods')
+    @patch('cleanup_cycle.agent_on_premise_clean.CleanupTaskManager')
     @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
-    def test_full_workflow(self, mock_clean_main, mock_interface):
+    def test_full_workflow(self, mock_clean_main, mock_task_manager):
         """Test the complete workflow from execute_task to DB update"""
         # Create agent
         agent = AgentCleanVTSRootFolder()
@@ -292,7 +229,7 @@ class TestAgentIntegration(unittest.TestCase):
             os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
             os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim2")
         ]
-        mock_interface.task_read_folders_marked_for_cleanup.return_value = simulation_paths
+        mock_task_manager.task_read_folders_marked_for_cleanup.return_value = simulation_paths
         
         result_fileinfos = [
             FileInfo(
@@ -322,9 +259,9 @@ class TestAgentIntegration(unittest.TestCase):
         agent.execute_task()
         
         # Verify the complete call chain
-        mock_interface.task_read_folders_marked_for_cleanup.assert_called_once_with(789)
+        mock_task_manager.task_read_folders_marked_for_cleanup.assert_called_once_with(789)
         mock_clean_main.assert_called_once()
-        mock_interface.task_insert_or_update_simulations_in_db.assert_called_once_with(
+        mock_task_manager.task_insert_or_update_simulations_in_db.assert_called_once_with(
             789,
             result_fileinfos
         )

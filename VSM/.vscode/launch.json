@@ -270,12 +270,12 @@
       }
     },
     {
-      "name": "Debug test_scheduler_and_agents_with_full_cleanup_round",
+      "name": "Debug test_cleanup_with_ondisk_simulations",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_scheduler_and_agents.py::TestSchedulerAndAgents::test_scheduler_and_agents_with_full_cleanup_round",
+        "tests/integration/test_cleanup_with_ondisk_simulations.py::TestCleanupWithOnDiskSimulations::test_cleanup_cycle_ondisk_simulations",
         "-v",
         "-s",
         "--tb=short"

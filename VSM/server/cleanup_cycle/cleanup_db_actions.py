@@ -9,49 +9,10 @@ from db import db_api
 from datamodel import dtos
 from cleanup_cycle import cleanup_dtos, scheduler_dtos, scheduler_db_actions
 
-def create_calendars_for_cleanup_configuration_ready_to_start(stop_after_cleanup_cycle: bool=False) -> str:
-    """
-    Fetch all cleanup configurations that are ready to start a new cleanup cycle.
-    
-    Returns:
-        List of CleanupConfigurationDTO objects that meet all criteria:
-        - cycletime > 0
-        - cleanupfrequency > 0
-        - cleanup_start_date >= today
-        - cleanup_progress in [INACTIVE, DONE]
-    """
-    today = date.today()
-    
-    with Session(Database.get_engine()) as session:
-        configs = session.exec(
-            select(dtos.CleanupConfigurationDTO).where(
-                (dtos.CleanupConfigurationDTO.cycletime > 0) &
-                (dtos.CleanupConfigurationDTO.cleanupfrequency > 0) &
-                (dtos.CleanupConfigurationDTO.cleanup_start_date != None) &
-                (dtos.CleanupConfigurationDTO.cleanup_start_date <= today) &
-                (dtos.CleanupConfigurationDTO.cleanup_progress.in_([
-                    dtos.CleanupProgress.ProgressEnum.INACTIVE.value,
-                    dtos.CleanupProgress.ProgressEnum.DONE.value
-                ]))
-            )
-        ).all()
 
-        state_configs:list[cleanup_dtos.CleanupState] = [cleanup_dtos.CleanupState(config) for config in configs]
-        calendars:list[scheduler_dtos.CleanupCalendarDTO] = []
-        for config in state_configs:
-            if config.can_start_cleanup_now():
-                # if the state is DONE then we must advance the start date to today before generating the calendar
-                # otherwise new simulation will not come into scope for cleanup
-                if config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.DONE.value:
-                    config.dto.cleanup_start_date = datetime.now() #date.today()
-                    config.save_to_db(session)
-                calendar:scheduler_dtos.CleanupCalendarDTO = scheduler_db_actions.CleanupScheduler.generate_cleanup_calendar(config, stop_after_cleanup_cycle=stop_after_cleanup_cycle)    
-                calendars.append(calendar)
 
-        return f"Generated or found {len(calendars)} calendars ."
-
-def close_finished_calenders() -> None:
-    scheduler_db_actions.CleanupScheduler.close_finished_calenders()
+# def close_finished_calenders() -> None:
+#     scheduler_db_actions.CleanupScheduler.close_finished_calenders()
 
 def cleanup_cycle_start(rootfolder_id: int) -> dict[str, str]:
     #start the cleanup cycle by recalculating retentions for all leaf folders in the rootfolder

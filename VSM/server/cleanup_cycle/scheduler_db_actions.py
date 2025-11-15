@@ -2,214 +2,63 @@ from datetime import date, datetime, timedelta, timezone
 from sqlmodel import Session, func, select
 from fastapi import HTTPException
 from db.database import Database
-from db import db_api
 from datamodel import dtos
-from cleanup_cycle import cleanup_dtos, cleanup_db_actions, scheduler_dtos
-from cleanup_cycle.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, AgentInfo, CleanupCalendarDTO, CleanupTaskDTO 
+from cleanup_cycle import cleanup_dtos, scheduler_dtos
+from cleanup_cycle.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, CleanupCalendarDTO, CleanupTaskDTO 
 
-
-class CleanupScheduler:
-    # scheduler functions
-    @staticmethod
-    def update_calendar_and_verify_tasks(session: Session, calendar: CleanupCalendarDTO, tasks: list[CleanupTaskDTO]) -> tuple[int, int, int]:
-
-        calendars_completed = 0
-        calendars_failed = 0
-        tasks_failed_timeout = 0
-
-        if len(tasks) == 0:
-            # No tasks for this calendar - this shouldn't happen, but mark as failed
-            calendar.status = CalendarStatus.FAILED
-            session.add(calendar)
-            calendars_failed += 1
-        
-        # Check if any task has failed
-        failed_tasks = [t for t in tasks if t.status == TaskStatus.FAILED.value]
-        if failed_tasks:
-            # If any task failed, mark the calendar as FAILED
-            calendar.status = CalendarStatus.FAILED
-            session.add(calendar)
-            calendars_failed += 1
-        
-
-        # Check for reserved tasks that have exceeded their max execution time
-        reserved_tasks = [task for task in tasks if task.status == TaskStatus.RESERVED.value and task.reserved_at]
-        now = datetime.now(timezone.utc)
-        for task in reserved_tasks:
-            # Check if execution time has been exceeded
-            execution_duration = now - task.reserved_at
-            max_duration = timedelta(hours=task.max_execution_hours)
-            
-            if execution_duration > max_duration:
-                # Mark task as failed due to timeout
-                task.status = TaskStatus.FAILED.value
-                task.status_message = f"Task exceeded maximum execution time of {task.max_execution_hours} hours"
-                task.completed_at = now
-                session.add(task)
-                tasks_failed_timeout += 1
-                
-                # Mark calendar as failed too
-                calendar.status = CalendarStatus.FAILED
-                session.add(calendar)
-                calendars_failed += 1
-        
-        # Check if all tasks are completed
-        all_completed = all(t.status == TaskStatus.COMPLETED.value for t in tasks)
-        if all_completed:
-            calendar.status = CalendarStatus.COMPLETED
-            session.add(calendar)
-            calendars_completed += 1
-
-        return calendars_completed, calendars_failed, tasks_failed_timeout
-
-    @staticmethod
-    def activate_planned_tasks(session: Session, calendar: CleanupCalendarDTO, ordered_tasks: list[CleanupTaskDTO]) -> int:
-        tasks_activated = 0
-
-        # Activate PLANNED tasks if ready
-        # Logic: Activate tasks only when:
-        #   1. The scheduled date (start_date + days_offset) has been reached or exceeded
-        #   2. All previous tasks in the calendar are completed (sequential execution)
-        planned_tasks = [t for t in ordered_tasks if t.status == TaskStatus.PLANNED.value]
-        today = date.today()
-        
-        for task in planned_tasks:
-            # Calculate the scheduled date for this task
-            scheduled_date = calendar.start_date + timedelta(days=task.task_offset)
-            
-            # Check if the scheduled date has been reached
-            if today < scheduled_date:
-                # Not ready yet, skip this task
-                continue
-            
-            # Check if all previous tasks are completed
-            # Tasks are already ordered by days_offset, then by ID from the database query
-            #task_index = next((i for i, t in enumerate(ordered_tasks) if t.id == task.id), -1)
-            
-            #if task_index > 0:
-                # Check if all previous tasks are completed
-            previous_tasks = ordered_tasks[:ordered_tasks.index(task)]
-            all_previous_completed = all(
-                t.status == TaskStatus.COMPLETED.value for t in previous_tasks
-            )
-            
-            if not all_previous_completed:
-                # Tasks must be done sequentially so break 
-                break
-            
-            # All prerequisites met (date reached and previous tasks completed), activate the task
-            task.status = TaskStatus.ACTIVATED.value
-            session.add(task)
-            tasks_activated += 1
-            print(f"Activated task {task.id} for calendar {task}")
-
-        return tasks_activated
-    
-
+class CleanupSchedulerPrePlanned:
     # Check all rootfolders Active calendars periodically to verify:
     #  - are all tasks completed so that the calendars state can change to completed
     #  - can I activate the next task because the previous task is completed
     #  - do I need to change the status of the calendar to FAILED because a task failed
-    @staticmethod
-    def update_calendars_and_tasks() -> dict[str, any]:
-        # Periodically check all active calendars and their tasks to:
-        # 1. Activate PLANNED tasks that are ready for execution
-        # 2. Check if RESERVED tasks have exceeded their max execution time and mark them as FAILED
-        # 3. Mark calendars as COMPLETED when all their tasks are completed
-        # 4. Mark calendars as FAILED if any of their tasks failed
-        
-        # A task transitions from PLANNED to ACTIVATED only when both conditions are met:
-        # - The scheduled date has been reached or exceeded
-        # - All previous tasks in the calendar are completed
-        #Returns:
-        #    Dictionary with summary of actions taken
-        with Session(Database.get_engine()) as session:
-
-            # Get all ACTIVE calendars and update their status before any task is activated
-            active_calendars = session.exec(
-                select(CleanupCalendarDTO).where(
-                    CleanupCalendarDTO.status == CalendarStatus.ACTIVE
-                )
-            ).all()
-            
-            
-            calendars_completed = 0
-            calendars_failed = 0
-            tasks_activated = 0
-            task_timeouts = 0
-            
-            for calendar in active_calendars:
-
-                # Get all tasks for this calendar, ordered by days_offset then by ID
-                tasks = session.exec(
-                    select(CleanupTaskDTO)
-                    .where(CleanupTaskDTO.calendar_id == calendar.id)
-                    .order_by(CleanupTaskDTO.action_type)     #trying to pospone dependencies on dates til later in the process old order=>     .order_by(CleanupTaskDTO.task_offset, CleanupTaskDTO.id)
-                ).all()
-
-                if not tasks:
-                    tasks = []
-
-                completed, failed, task_timeouts = CleanupScheduler.update_calendar_and_verify_tasks(session, calendar, tasks)
-                calendars_completed  += completed
-                calendars_failed     += failed
-                task_timeouts        += task_timeouts
-
-                tasks_activated_ = CleanupScheduler.activate_planned_tasks(session, calendar, tasks)
-                tasks_activated += tasks_activated_
-            
-            # Commit all changes
-            session.commit()
-            
-            return {
-                "message": f"Scheduler run completed",
-                "calendars_processed": len(active_calendars),
-                "calendars_completed": calendars_completed,
-                "calendars_failed": calendars_failed,
-                "tasks_activated": tasks_activated,
-                "tasks_failed_timeout": task_timeouts
-            }
 
     @staticmethod
-    def close_finished_calenders() -> None:
-        """Close calenders where alle tasks are done
-        
-        This method will:
-        1. Find all active calendars and tasks. 
-        2. all tasks are COMPLETED or FAILED, then close the calendar 
-        
-        Args:
-            rootfolder_id: The ID of the rootfolder whose calendars should be deactivated
+    def create_calendars_for_cleanup_configuration_ready_to_start() -> str:
         """
+        Fetch all cleanup configurations that are ready to start a new cleanup cycle.
+        
+        Returns:
+            List of CleanupConfigurationDTO objects that meet all criteria:
+            - cycletime > 0
+            - cleanupfrequency > 0
+            - cleanup_start_date >= today
+            - cleanup_progress in [INACTIVE, DONE]
+        """
+        today = date.today()
+        
         with Session(Database.get_engine()) as session:
-            # Get all active calendars for this rootfolder
-            active_calendars = session.exec( select(CleanupCalendarDTO).where(
-                    CleanupCalendarDTO.status == CalendarStatus.ACTIVE) ).all()
+            configs = session.exec( select(dtos.CleanupConfigurationDTO).where(
+                    (dtos.CleanupConfigurationDTO.cycletime > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanupfrequency > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date != None) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date <= today) &
+                    (dtos.CleanupConfigurationDTO.cleanup_progress.in_([
+                        dtos.CleanupProgress.ProgressEnum.INACTIVE.value,
+                        dtos.CleanupProgress.ProgressEnum.DONE.value
+                    ]))
+                ) ).all()
 
-            for calendar in active_calendars:
-                # Get all non-terminal tasks for this calendar
-                tasks = session.exec( select(CleanupTaskDTO).where( (CleanupTaskDTO.calendar_id == calendar.id) ) ).all()
-                
-                # evaluate if all teh taks are either COMPLETED or FAILED
-                all_done = all( t.status in [TaskStatus.COMPLETED.value, TaskStatus.FAILED.value] for t in tasks )
-                if all_done:
-                    # Mark calendar as COMPLETED
-                    calendar.status = CalendarStatus.COMPLETED.value
-                    session.add(calendar)
-            
-            session.commit()
+            state_configs:list[cleanup_dtos.CleanupState] = [cleanup_dtos.CleanupState(config) for config in configs]
+            calendars:list[scheduler_dtos.CleanupCalendarDTO] = []
+            for config in state_configs:
+                if config.can_start_cleanup_now():
+                    # if the state is DONE then we must advance the start date to today before generating the calendar
+                    # otherwise new simulation will not come into scope for cleanup
+                    if config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.DONE.value:
+                        config.dto.cleanup_start_date = datetime.now() #date.today()
+                        config.save_to_db(session)
+                    calendar:scheduler_dtos.CleanupCalendarDTO = CleanupScheduler.generate_cleanup_calendar(config)    
+                    calendars.append(calendar)
 
+            return f"Generated or found {len(calendars)} calendars ."
     
     @staticmethod
     def generate_cleanup_calendar(config: cleanup_dtos.CleanupState, stop_after_cleanup_cycle: bool=False) -> "CleanupCalendarDTO":
         with Session(Database.get_engine()) as session:
             # Check if there is already an active calendar for this rootfolder
-            calendar: CleanupCalendarDTO = session.exec(
-                select(CleanupCalendarDTO).where(
+            calendar: CleanupCalendarDTO = session.exec( select(CleanupCalendarDTO).where(
                     (CleanupCalendarDTO.rootfolder_id == config.dto.rootfolder_id) & 
-                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
-                )
-            ).first()
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value) ) ).first()
             if calendar is not None:
                 return calendar
 
@@ -312,63 +161,156 @@ class CleanupScheduler:
                 max_execution_hours=1
             )
             session.add(task_finish_cleanup_cycle)
-
-            # if stop_after_cleanup_cycle:
-            #     # 7) STOP_AFTER_CLEANUP_CYCLE - Final step used by integrations tests so that the next cycle is not prepared automatically 
-            #     # This task is as fot ActionType.PREPARE_NEXT_CLEANUP_CYCLE but it will set the cleanup_start_date to None
-            #     # We can use the value of cleanup_start_date==None as exit criteria and then verify the completed tasks and the cleanup results
-
-            #     # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
-            #     task_prepare_next_cleanup_cycle = CleanupTaskDTO(
-            #         calendar_id=calendar.id,
-            #         rootfolder_id=config.dto.rootfolder_id,
-            #         path=rootfolder.path,
-            #         task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
-            #         action_type=ActionType.STOP_AFTER_CLEANUP_CYCLE.value,
-            #         storage_id=None,  # Internal action
-            #         status=TaskStatus.PLANNED.value,
-            #         max_execution_hours=1
-            #     )
-            # else:    
-            #     # 7) PREPARE_NEXT_CLEANUP_CYCLE - Final step
-            #     # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle
-            #     task_prepare_next_cleanup_cycle = CleanupTaskDTO(
-            #         calendar_id=calendar.id,
-            #         rootfolder_id=config.dto.rootfolder_id,
-            #         path=rootfolder.path,
-            #         task_offset=max(retention_review_duration, retention_review_duration + 2),  # 2 days after cleaning starts
-            #         action_type=ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value,
-            #         storage_id=None,  # Internal action
-            #         status=TaskStatus.PLANNED.value,
-            #         max_execution_hours=1
-            #     )
-            # session.add(task_prepare_next_cleanup_cycle)
-
             session.commit()
             return calendar
 
-
     @staticmethod
-    def extract_active_calendar_for_rootfolder(rootfolder: dtos.RootFolderDTO) -> tuple[scheduler_dtos.CleanupCalendarDTO, list[scheduler_dtos.CleanupTaskDTO]]:
-        calendar: scheduler_dtos.CleanupCalendarDTO = None
-        tasks: list[scheduler_dtos.CleanupTaskDTO] = []
+    def update_calendars_and_tasks() -> dict[str, any]:
+        # Periodically check all active calendars and their tasks to:
+        # 1. Activate PLANNED tasks that are ready for execution
+        # 2. Check if RESERVED tasks have exceeded their max execution time and mark them as FAILED
+        # 3. Mark calendars as COMPLETED when all their tasks are completed
+        # 4. Mark calendars as FAILED if any of their tasks failed
+        
+        # A task transitions from PLANNED to ACTIVATED only when both conditions are met:
+        # - The scheduled date has been reached or exceeded
+        # - All previous tasks in the calendar are completed
+        #Returns:
+        #    Dictionary with summary of actions taken
         with Session(Database.get_engine()) as session:
-            calendar = session.exec(
-                select(CleanupCalendarDTO).where(
-                    (CleanupCalendarDTO.rootfolder_id == rootfolder.id) & 
-                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
-                )
-            ).first()
+
+            # Get all ACTIVE calendars and update their status before any task is activated
+            active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                    CleanupCalendarDTO.status == CalendarStatus.ACTIVE ) ).all()
             
-            if calendar:
+            calendars_completed = 0
+            calendars_failed = 0
+            tasks_activated = 0
+            task_timeouts = 0
+            
+            for calendar in active_calendars:
+
+                # Get all tasks for this calendar, ordered by days_offset then by ID
                 tasks = session.exec(
                     select(CleanupTaskDTO)
                     .where(CleanupTaskDTO.calendar_id == calendar.id)
-                    .order_by(CleanupTaskDTO.task_offset, CleanupTaskDTO.id)
+                    .order_by(CleanupTaskDTO.action_type)     #trying to pospone dependencies on dates til later in the process old order=>     .order_by(CleanupTaskDTO.task_offset, CleanupTaskDTO.id)
                 ).all()
-        
-        return calendar, tasks
 
+                if not tasks:
+                    tasks = []
+
+                completed, failed, task_timeouts = CleanupScheduler.update_calendar_and_verify_tasks(session, calendar, tasks)
+                calendars_completed  += completed
+                calendars_failed     += failed
+                task_timeouts        += task_timeouts
+
+                tasks_activated_ = CleanupScheduler.activate_planned_tasks(session, calendar, tasks)
+                tasks_activated += tasks_activated_
+            
+            # Commit all changes
+            session.commit()
+            
+            return {
+                "message": f"Scheduler run completed",
+                "calendars_processed": len(active_calendars),
+                "calendars_completed": calendars_completed,
+                "calendars_failed": calendars_failed,
+                "tasks_activated": tasks_activated,
+                "tasks_failed_timeout": task_timeouts
+            }
+
+    # scheduler functions
+    @staticmethod
+    def update_calendar_and_verify_tasks(session: Session, calendar: CleanupCalendarDTO, tasks: list[CleanupTaskDTO]) -> tuple[int, int, int]:
+
+        calendars_completed = 0
+        calendars_failed = 0
+        tasks_failed_timeout = 0
+
+        if len(tasks) == 0:
+            # No tasks for this calendar - this shouldn't happen, but mark as failed
+            calendar.status = CalendarStatus.FAILED
+            session.add(calendar)
+            calendars_failed += 1
+        
+        # Check if any task has failed
+        failed_tasks = [t for t in tasks if t.status == TaskStatus.FAILED.value]
+        if failed_tasks:
+            # If any task failed, mark the calendar as FAILED
+            calendar.status = CalendarStatus.FAILED
+            session.add(calendar)
+            calendars_failed += 1
+        
+
+        # Check for reserved tasks that have exceeded their max execution time
+        reserved_tasks = [task for task in tasks if task.status == TaskStatus.RESERVED.value and task.reserved_at]
+        now = datetime.now(timezone.utc)
+        for task in reserved_tasks:
+            # Check if execution time has been exceeded
+            execution_duration = now - task.reserved_at
+            max_duration = timedelta(hours=task.max_execution_hours)
+            
+            if execution_duration > max_duration:
+                # Mark task as failed due to timeout
+                task.status = TaskStatus.FAILED.value
+                task.status_message = f"Task exceeded maximum execution time of {task.max_execution_hours} hours"
+                task.completed_at = now
+                session.add(task)
+                tasks_failed_timeout += 1
+                
+                # Mark calendar as failed too
+                calendar.status = CalendarStatus.FAILED
+                session.add(calendar)
+                calendars_failed += 1
+        
+        # Check if all tasks are completed
+        all_completed = all(t.status == TaskStatus.COMPLETED.value for t in tasks)
+        if all_completed:
+            calendar.status = CalendarStatus.COMPLETED
+            session.add(calendar)
+            calendars_completed += 1
+
+        return calendars_completed, calendars_failed, tasks_failed_timeout
+
+    @staticmethod
+    def activate_planned_tasks(session: Session, calendar: CleanupCalendarDTO, ordered_tasks: list[CleanupTaskDTO]) -> int:
+        tasks_activated = 0
+
+        # Activate PLANNED tasks if ready
+        # Logic: Activate tasks only when:
+        #   1. The scheduled date (start_date + days_offset) has been reached or exceeded
+        #   2. All previous tasks in the calendar are completed (sequential execution)
+        planned_tasks = [t for t in ordered_tasks if t.status == TaskStatus.PLANNED.value]
+        today = date.today()
+        
+        for task in planned_tasks:
+            # Calculate the scheduled date for this task
+            scheduled_date = calendar.start_date + timedelta(days=task.task_offset)
+            
+            # Check if the scheduled date has been reached
+            if today < scheduled_date:
+                # Not ready yet, skip this task
+                continue
+            
+            # Check if all previous tasks are completed
+            previous_tasks = ordered_tasks[:ordered_tasks.index(task)]
+            all_previous_completed = all(
+                t.status == TaskStatus.COMPLETED.value for t in previous_tasks
+            )
+            
+            if not all_previous_completed:
+                # Tasks must be done sequentially so break 
+                break
+            
+            # All prerequisites met (date reached and previous tasks completed), activate the task
+            task.status = TaskStatus.ACTIVATED.value
+            session.add(task)
+            tasks_activated += 1
+            print(f"Activated task {task.id} for calendar {task}")
+
+        return tasks_activated
+    
     @staticmethod
     def deactivate_calendar(rootfolder_id:int) -> None:
         """Deactivate all active calendars and their tasks for a given rootfolder.
@@ -384,8 +326,7 @@ class CleanupScheduler:
         """
         with Session(Database.get_engine()) as session:
             # Get all active calendars for this rootfolder
-            active_calendars = session.exec(
-                select(CleanupCalendarDTO).where(
+            active_calendars = session.exec( select(CleanupCalendarDTO).where(
                     (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
                     (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
                 )
@@ -419,142 +360,335 @@ class CleanupScheduler:
             session.commit()
 
 
-
-
-class AgentInterfaceMethods:
-    #agent interface methods
+class CleanupScheduler:
+    # Dynamic scheduler that creates tasks just-in-time (JIT) directly in ACTIVATED state.
+    
+    # Differences from CleanupScheduler:
+    # - Tasks are created only when needed, not all upfront
+    # - Tasks go directly to ACTIVATED state (no PLANNED state)
+    # - Calendar tracks progress via next_task_index to know which task to create next
+    # - Task sequence is defined in _get_task_definitions() method
+    
+    # Define the task sequence and their properties
     @staticmethod
-    def reserve_task(agent: AgentInfo) -> CleanupTaskDTO:
-        agent_action_types:list[str] = agent.action_types if not agent.action_types is None else []
-        agent_storage_ids:list[str]|None = agent.supported_storage_ids if not agent.supported_storage_ids is None else []
-
-        if (len(agent_action_types)==0):
-            raise HTTPException(status_code=404, detail=f"The agent {agent.agent_id} failed to provide the action types it can support ")
-
-        with Session(Database.get_engine()) as session:
-            tasks:list[CleanupTaskDTO]= []   
-            if agent_storage_ids is not None and len(agent_storage_ids)>0:
-                tasks = session.exec(
-                    select(CleanupTaskDTO).where( (CleanupTaskDTO.status == TaskStatus.ACTIVATED.value) &
-                        (CleanupTaskDTO.action_type.in_(agent_action_types)) &
-                        (CleanupTaskDTO.storage_id.in_(agent_storage_ids))
-                    )
-                ).all()
-            else:
-                tasks = session.exec(
-                    select(CleanupTaskDTO).where( (CleanupTaskDTO.status == TaskStatus.ACTIVATED.value) &
-                        (CleanupTaskDTO.action_type.in_(agent_action_types)) &
-                        (CleanupTaskDTO.storage_id == None)
-                    )
-                ).all()
+    def _get_task_definitions(retention_review_duration: float) -> list[dict]:
+        # Returns the sequence of tasks to be created for a cleanup calendar.
+        # Each task definition contains the parameters needed to create a CleanupTaskDTO.        
+        # Args:
+        #     retention_review_duration: The duration of the retention review phase in days
+        # Returns:
+        #     List of task definition dictionaries with keys:
+        #     - action_type: ActionType enum value
+        #     - task_offset: Days from calendar start_date
+        #     - needs_storage_id: Whether this task requires storage_id
+        #     - max_execution_hours: Maximum hours for task execution
         
-            if len(tasks) == 0:
-                return None
-            else:
-                reserved_task = tasks[0]
-                #@TODO: hmm is this a hack or a the start of a better design ?
-                if reserved_task.action_type == ActionType.CLEAN_ROOTFOLDER:
-                    cleanup_db_actions.register_cleaning_start(reserved_task.rootfolder_id)
-
-                reserved_task.status = TaskStatus.RESERVED.value
-                reserved_task.reserved_by_agent_id = agent.agent_id
-                reserved_task.reserved_at = datetime.now(timezone.utc)
-                session.add(reserved_task)
-                session.commit()
-                session.refresh(reserved_task)  # Ensure all attributes are loaded before detaching
-                return reserved_task
+        return [
+            {
+                "action_type": ActionType.SCAN_ROOTFOLDER.value,
+                "task_offset": 0,
+                "needs_storage_id": True,
+                "max_execution_hours": 48
+            },
+            {
+                "action_type": ActionType.START_RETENTION_REVIEW.value,
+                "task_offset": 0,
+                "needs_storage_id": False,
+                "max_execution_hours": 1
+            },
+            {
+                "action_type": ActionType.SEND_INITIAL_NOTIFICATION.value,
+                "task_offset": 0,
+                "needs_storage_id": False,
+                "max_execution_hours": 1
+            },
+            {
+                "action_type": ActionType.SEND_FINAL_NOTIFICATION.value,
+                "task_offset": max(retention_review_duration, retention_review_duration - 7),
+                "needs_storage_id": False,
+                "max_execution_hours": 1
+            },
+            {
+                "action_type": ActionType.CLEAN_ROOTFOLDER.value,
+                "task_offset": retention_review_duration,
+                "needs_storage_id": True,
+                "max_execution_hours": 48
+            },
+            {
+                "action_type": ActionType.FINISH_CLEANUP_CYCLE.value,
+                "task_offset": max(retention_review_duration, retention_review_duration + 1),
+                "needs_storage_id": False,
+                "max_execution_hours": 1
+            }
+        ]
 
     @staticmethod
-    def task_progress(task_id: str, progress_message: str|None = None) -> dict[str,str]:
+    def create_calendars_for_cleanup_configuration_ready_to_start() -> str:
+        # Fetch all cleanup configurations that are ready to start a new cleanup cycle.
+        # Creates calendars but NO tasks upfront - tasks are created JIT.        
+        # Returns:
+        #     String message indicating how many calendars were generated
+
+        today = date.today()
         
         with Session(Database.get_engine()) as session:
-            task = session.exec( select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id)) ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-            
-            if task.status  != TaskStatus.RESERVED.value:
-                raise HTTPException(status_code=400, detail=f"The task with id {task_id} is not in RESERVED state and cannot be updated to INPROGRESS") 
+            configs = session.exec( select(dtos.CleanupConfigurationDTO).where(
+                    (dtos.CleanupConfigurationDTO.cycletime > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanupfrequency > 0) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date != None) &
+                    (dtos.CleanupConfigurationDTO.cleanup_start_date <= today) &
+                    (dtos.CleanupConfigurationDTO.cleanup_progress.in_([
+                        dtos.CleanupProgress.ProgressEnum.INACTIVE.value,
+                        dtos.CleanupProgress.ProgressEnum.DONE.value
+                    ]))
+                )
+            ).all()
 
-            task.status = TaskStatus.RESERVED.value
-            task.status_message = progress_message
-            session.add(task)
-            session.commit()
+            state_configs:list[cleanup_dtos.CleanupState] = [cleanup_dtos.CleanupState(config) for config in configs]
+            calendars:list[scheduler_dtos.CleanupCalendarDTO] = []
+            for config in state_configs:
+                if config.can_start_cleanup_now():
+                    if config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.DONE.value:
+                        config.dto.cleanup_start_date = datetime.now()
+                        config.save_to_db(session)
+                    calendar:scheduler_dtos.CleanupCalendarDTO = CleanupScheduler.generate_cleanup_calendar(config)    
+                    calendars.append(calendar)
 
-            return {"message": f"Task {task_id} updated to status {task.status}"}
-
+            return f"Generated or found {len(calendars)} calendars (JIT mode)."
+    
     @staticmethod
-    def task_completion(task_id: int, status: str, status_message: str|None = None) -> dict[str,str]:
-        # validate that status is valid
-        if status not in [TaskStatus.COMPLETED.value, TaskStatus.FAILED.value]:
-            raise HTTPException(status_code=404, detail=f"The task status {status} is not valid. Must be one of {[TaskStatus.COMPLETED.value, TaskStatus.FAILED.value]}")
+    def generate_cleanup_calendar(config: cleanup_dtos.CleanupState, stop_after_cleanup_cycle: bool=False) -> "CleanupCalendarDTO":
+        # Generate a cleanup calendar WITHOUT pre-creating tasks.
+        # Tasks will be created just-in-time by update_calendars_and_tasks().
 
         with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
+            # Check if there is already an active calendar for this rootfolder
+            calendar: CleanupCalendarDTO = session.exec( select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.rootfolder_id == config.dto.rootfolder_id) & 
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value) ) ).first()
+            if calendar is not None:
+                return calendar
 
-            if task.status not in [TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]:
-                raise HTTPException(status_code=400, detail=f"The task with id {task_id} is not valid. Must be one of {[TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]}")
-
-            task.status = status
-            task.status_message = status_message
-            task.completed_at = datetime.now(timezone.utc)
-            
-            #@TODO: hmm is this a hack or a the start of a better design ?
-            if task.action_type == ActionType.CLEAN_ROOTFOLDER:
-                cleanup_db_actions.register_cleanup_done(task.rootfolder_id)
-
-            session.add(task)
-            session.commit()
-            return {"message": f"Task {task_id} updated to status {status}"}
-
-
-    @staticmethod
-    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list[dtos.FileInfo]) -> dict[str, str]:
-        from datamodel.dtos import FileInfo
-        #validate the task_id as a minimum security check
-        with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-
-        return db_api.insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
-
-
-    # return the list of FileInfo objects for folders that are marked for cleanup in the given rootfolder
-    @staticmethod
-    def task_read_folders_marked_for_cleanup(task_id: int) -> list[dtos.FileInfo]:
-        from datamodel.dtos import FileInfo, RootFolderDTO, FolderNodeDTO
-        #validate the task_id as a minimum security check
-        with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-
-            # Get rootfolder to access simulationdomain_id
-            rootfolder = session.exec(
-                select(RootFolderDTO).where(RootFolderDTO.id == task.rootfolder_id)
-            ).first()
+            # No active calendar so go ahead
+            from datamodel.dtos import RootFolderDTO
+            rootfolder = session.exec(select(RootFolderDTO).where(RootFolderDTO.id == config.dto.rootfolder_id)).first()
             if not rootfolder:
-                raise HTTPException(status_code=404, detail=f"The rootfolder with id {task.rootfolder_id} was not found")
+                raise HTTPException(status_code=404, detail="RootFolder not found")
 
-            # Get folder type dictionary (by name)
-            nodetype_dict_by_name = db_api.read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
-            retention_dict_by_name = db_api.read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
-            
-            # Convert to ID-based dictionaries
-            nodetype_dict  = {ft.id: ft for ft in nodetype_dict_by_name.values()}
-            retention_dict = {rt.id: rt for rt in retention_dict_by_name.values()}
+            # Create calendar only - NO tasks created here
+            calendar: CleanupCalendarDTO = CleanupCalendarDTO(
+                rootfolder_id=config.dto.rootfolder_id,
+                start_date=config.dto.cleanup_start_date,
+                status=CalendarStatus.ACTIVE.value
+            )
+            session.add(calendar)
+            session.commit()
+            session.refresh(calendar)
+            return calendar
 
-            # Get simulations marked for cleanup
-            simulations:list[FolderNodeDTO] = db_api.read_folders_marked_for_cleanup(task.rootfolder_id)
+    @staticmethod
+    def update_calendars_and_tasks() -> dict[str, any]:
+        # Periodically check all active calendars and create/activate tasks just-in-time.
+        # JIT task creation logic:
+        # 1. Check if the last task is completed
+        # 2. If yes, create the next task directly in ACTIVATED state
+        # 3. Check RESERVED tasks for timeouts
+        # 4. Mark calendar as COMPLETED when all tasks in sequence are done        
+        # Returns:
+        #     Dictionary with summary of actions taken
+
+        with Session(Database.get_engine()) as session:
+            # Get all ACTIVE calendars
+            active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                    CleanupCalendarDTO.status == CalendarStatus.ACTIVE ) ).all()
             
-            # Convert each FolderNodeDTO to FileInfo using get_fileinfo()
-            file_infos:list[FileInfo] = [folder.get_fileinfo(session, nodetype_dict, retention_dict) for folder in simulations]
-        return file_infos
+            calendars_completed = 0
+            calendars_failed = 0
+            tasks_created = 0
+            task_timeouts = 0
+            
+            for calendar in active_calendars:
+                # Get all existing tasks for this calendar
+                tasks = session.exec( select(CleanupTaskDTO)
+                    .where(CleanupTaskDTO.calendar_id == calendar.id)
+                    .order_by(CleanupTaskDTO.id)  # Order by creation time
+                ).all()
+
+                # Check calendar and task status
+                completed, failed, timeouts = CleanupScheduler.update_calendar_and_verify_tasks( session, calendar, tasks )
+                calendars_completed += completed
+                calendars_failed += failed
+                task_timeouts += timeouts
+
+                # Try to create next task if calendar is still active
+                if calendar.status == CalendarStatus.ACTIVE.value:
+                    created = CleanupScheduler.create_next_task_if_ready(session, calendar, tasks)
+                    tasks_created += created
+            
+            # Commit all changes
+            session.commit()
+            
+            return {
+                "message": f"Scheduler run completed (JIT mode)",
+                "calendars_processed": len(active_calendars),
+                "calendars_completed": calendars_completed,
+                "calendars_failed": calendars_failed,
+                "tasks_created": tasks_created,
+                "tasks_failed_timeout": task_timeouts
+            }
+
+    @staticmethod
+    def update_calendar_and_verify_tasks(session: Session, calendar: CleanupCalendarDTO, tasks: list[CleanupTaskDTO]) -> tuple[int, int, int]:
+        # Verify task statuses and update calendar status accordingly.        
+        # Returns:
+        #    tuple: (calendars_completed, calendars_failed, tasks_failed_timeout)
+        calendars_completed = 0
+        calendars_failed = 0
+        tasks_failed_timeout = 0
+
+        # Check if any task has failed
+        failed_tasks = [t for t in tasks if t.status == TaskStatus.FAILED.value]
+        if failed_tasks:
+            calendar.status = CalendarStatus.FAILED
+            session.add(calendar)
+            calendars_failed += 1
+            return calendars_completed, calendars_failed, tasks_failed_timeout
+
+        # Check for reserved tasks that have exceeded their max execution time
+        reserved_tasks = [task for task in tasks if task.status == TaskStatus.RESERVED.value and task.reserved_at]
+        now = datetime.now(timezone.utc)
+        for task in reserved_tasks:
+            execution_duration = now - task.reserved_at
+            max_duration = timedelta(hours=task.max_execution_hours)
+            
+            if execution_duration > max_duration:
+                task.status = TaskStatus.FAILED.value
+                task.status_message = f"Task exceeded maximum execution time of {task.max_execution_hours} hours"
+                task.completed_at = now
+                session.add(task)
+                tasks_failed_timeout += 1
+                
+                # Mark calendar as failed too
+                calendar.status = CalendarStatus.FAILED
+                session.add(calendar)
+                calendars_failed += 1
+
+        # Get the rootfolder configuration to determine total expected tasks
+        config = session.exec( select(dtos.CleanupConfigurationDTO).where(
+                dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id ) ).first()
+        
+        if config:
+            retention_review_duration = config.cleanupfrequency if config.cleanupfrequency > 0 else 7.0
+            task_definitions = CleanupScheduler._get_task_definitions(retention_review_duration)
+            expected_task_count = len(task_definitions)
+            
+            # Check if all expected tasks are completed
+            completed_task_count = len([t for t in tasks if t.status == TaskStatus.COMPLETED.value])
+            if completed_task_count >= expected_task_count:
+                calendar.status = CalendarStatus.COMPLETED
+                session.add(calendar)
+                calendars_completed += 1
+
+        return calendars_completed, calendars_failed, tasks_failed_timeout
+
+    @staticmethod
+    def create_next_task_if_ready(session: Session, calendar: CleanupCalendarDTO, existing_tasks: list[CleanupTaskDTO]) -> int:
+        """
+        Create the next task in the sequence if conditions are met.
+        
+        Conditions:
+        1. Previous task (if any) must be COMPLETED
+        2. Scheduled date for next task must be reached
+        3. Next task doesn't already exist
+        
+        Returns:
+            int: 1 if task was created, 0 otherwise
+        """
+        # Get rootfolder and config
+        rootfolder = session.exec( select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == calendar.rootfolder_id) ).first()
+        
+        config = session.exec( select(dtos.CleanupConfigurationDTO).where(
+                dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id )).first()
+        
+        if not rootfolder or not config:
+            return 0
+
+        # Get task definitions
+        retention_review_duration = config.cleanupfrequency if config.cleanupfrequency > 0 else 7.0
+        task_definitions = CleanupScheduler._get_task_definitions(retention_review_duration)
+        
+        # Determine which task to create next (based on how many tasks exist)
+        next_task_index = len(existing_tasks)
+        
+        # Check if we've created all tasks already
+        if next_task_index >= len(task_definitions):
+            return 0
+        
+        # Check if previous task is completed (or this is the first task)
+        if next_task_index > 0:
+            last_task = existing_tasks[-1]
+            if last_task.status != TaskStatus.COMPLETED.value:
+                return 0  # Wait for previous task to complete
+        
+        # Get the next task definition
+        next_task_def = task_definitions[next_task_index]
+        
+        # Check if scheduled date has been reached
+        scheduled_date = calendar.start_date + timedelta(days=next_task_def["task_offset"])
+        today = date.today()
+        if today < scheduled_date:
+            return 0  # Not time yet
+        
+        # Create the task directly in ACTIVATED state
+        new_task = CleanupTaskDTO(
+            calendar_id=calendar.id,
+            rootfolder_id=calendar.rootfolder_id,
+            path=rootfolder.path,
+            task_offset=next_task_def["task_offset"],
+            action_type=next_task_def["action_type"],
+            storage_id=rootfolder.storage_id if next_task_def["needs_storage_id"] else None,
+            status=TaskStatus.ACTIVATED.value,  # JIT: Direct to ACTIVATED
+            max_execution_hours=next_task_def["max_execution_hours"]
+        )
+        
+        session.add(new_task)
+        print(f"Created JIT task {next_task_def['action_type']} for calendar {calendar.id}")
+        return 1
+    
+    @staticmethod
+    def deactivate_calendar(rootfolder_id: int) -> None:
+        # Deactivate all the rootfolder active calendars and their tasks for a given rootfolder.
+        with Session(Database.get_engine()) as session:
+            # Get all active calendars for this rootfolder
+            active_calendars = session.exec(
+                select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
+                )
+            ).all()
+            
+            for calendar in active_calendars:
+                # Mark calendar as INTERRUPTED
+                calendar.status = CalendarStatus.INTERRUPTED.value
+                session.add(calendar)
+                
+                # Get all non-terminal tasks for this calendar
+                tasks = session.exec(
+                    select(CleanupTaskDTO).where(
+                        (CleanupTaskDTO.calendar_id == calendar.id) &
+                        (CleanupTaskDTO.status.in_([
+                            TaskStatus.ACTIVATED.value,  # JIT mode uses ACTIVATED, not PLANNED
+                            TaskStatus.RESERVED.value,
+                            TaskStatus.INPROGRESS.value
+                        ]))
+                    )
+                ).all()
+                
+                # Mark all non-terminal tasks as FAILED
+                for task in tasks:
+                    task.status = TaskStatus.FAILED.value
+                    task.status_message = "Task cancelled due to calendar deactivation"
+                    task.completed_at = datetime.now(timezone.utc)
+                    session.add(task)
+            
+            session.commit()

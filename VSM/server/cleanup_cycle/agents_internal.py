@@ -1,8 +1,9 @@
 import asyncio
 from datetime import date, timedelta
-from cleanup_cycle.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler, AgentInterfaceMethods
 from cleanup_cycle import cleanup_db_actions
+from cleanup_cycle.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
+from cleanup_cycle.scheduler_db_actions import CleanupScheduler
+from cleanup_cycle.agent_task_manager import CleanupTaskManager
 
 # ----------------- AgentTemplate -----------------
 from abc import ABC, abstractmethod
@@ -30,14 +31,14 @@ class AgentTemplate(ABC):
         self.complete_task()
 
     def reserve_task(self):
-        self.task = AgentInterfaceMethods.reserve_task(self.agent_info)
+        self.task = CleanupTaskManager.reserve_task(self.agent_info)
 
     def complete_task(self ):
         if self.task is not None:
             if self.error_message is not None:
-                AgentInterfaceMethods.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
+                CleanupTaskManager.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
             else:
-                AgentInterfaceMethods.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
+                CleanupTaskManager.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
 
     @abstractmethod
     def execute_task(self):
@@ -50,13 +51,13 @@ class AgentCalendarCreation(AgentTemplate):
     # this ia a fake agent because it does not require a task and will always be run when called
     # In fact the agent calls the scheduler to create calendars and tasks for rootfolder that are ready to start cleanup cycles
     def __init__(self):
-        super().__init__("AgentCalendarCreation", [ActionType.CREATE_CLEANUP_CALENDAR.value])
+        super().__init__("AgentCalendarCreation", [])
 
     def run(self):
         #self.reserve_task()
         #if self.task is not None:
         #asyncio.run(self.execute_task())
-        asyncio.run( self.execute_task())
+        self.execute_task()
         #self.complete_task()
 
     def execute_task(self):
@@ -94,6 +95,14 @@ class AgentCleanupCycleFinishing(AgentTemplate):
 class AgentNotification(AgentTemplate):
     def __init__(self):
         super().__init__("AgentNotification", [ActionType.SEND_INITIAL_NOTIFICATION.value, ActionType.SEND_FINAL_NOTIFICATION.value])
+    
+    def run(self):
+        self.reserve_task()
+        if self.task is not None:
+            self.execute_task()
+            #asyncio.run(self.execute_task())
+        self.complete_task()
+
     
     def send_notification(self, message: str, receivers: list[str]) -> None:
         # Send email notification to the specified receivers.
@@ -162,7 +171,6 @@ class AgentNotification(AgentTemplate):
         from fastapi import Query, HTTPException
         from db.database import Database
         from datamodel import dtos
-        from cleanup_cycle import cleanup_dtos
         with Session(Database.get_engine()) as session:
             rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == self.task.rootfolder_id)).first()
             config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session) if rootfolder is not None else None
@@ -187,4 +195,4 @@ class AgentNotification(AgentTemplate):
                     self.error_message = f"No receivers found for RootFolder with ID {self.task.rootfolder_id}."                
                 else:
                     self.send_notification(message, receivers)
-
+                    self.success_message = f"Notification task {self.task.action_type} executed for rootfolder {self.task.rootfolder_id}"

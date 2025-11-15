@@ -1,7 +1,25 @@
 import random
 from typing import Callable
 from contextlib import contextmanager
+from abc import ABC, abstractmethod
 from cleanup_cycle import agents_internal, agent_on_premise_scan, agent_on_premise_clean
+
+
+class AgentCallbackHandler(ABC):
+    #Abstract base class for handling agent execution callbacks.
+    
+    @abstractmethod
+    def on_agent_prerun(self, agent_info: agents_internal.AgentInfo, task: agents_internal.CleanupTaskDTO | None) -> None:
+        #Called before an agent runs with agent_info and the task being executed to be executed.
+        pass
+    
+    @abstractmethod
+    def on_agent_postrun(self, agent_info: agents_internal.AgentInfo, task: agents_internal.CleanupTaskDTO | None, 
+                         error_message: str | None, success_message: str | None) -> None:
+        #Called before an agent runs with agent_info and the task being executed to be executed.
+        # error_message: Error message if the agent failed
+        # success_message: Success message if the agent succeeded
+        pass
 
 class InternalAgentFactory:
     # Factory for managing internal agents with support for dependency injection.   
@@ -87,21 +105,31 @@ class InternalAgentFactory:
     @staticmethod
     def run_internal_agents(
         agents: list[agents_internal.AgentTemplate] | None = None,
-        run_randomized: bool = False
+        run_randomized: bool = False,
+        callback_handler: AgentCallbackHandler | None = None
     ) -> dict[str, any]:
         # Run internal agents.        
         # Args:
         #     agents: Optional list of agents to run. If None, uses registered/default agents.
-        #     run_randomized: If True, shuffle agent execution order            
+        #     run_randomized: If True, shuffle agent execution order
+        #     callback_handler: Optional handler for agent execution callbacks
         # Returns:
         #     Dictionary with execution results
 
         agent_list = agents if agents is not None else InternalAgentFactory.get_internal_agents()
         
-        if run_randomized:
-            random.shuffle(agent_list)
+        #if run_randomized:
+        #    random.shuffle(agent_list)
         
         for agent in agent_list:
+            # Call prerun callback if handler provided
+            if callback_handler is not None:
+                callback_handler.on_agent_prerun(agent.agent_info, agent.task)
+            
             agent.run()
+            
+            # Call postrun callback if handler provided
+            if callback_handler is not None:
+                callback_handler.on_agent_postrun(agent.agent_info, agent.task, agent.error_message, agent.success_message)
         
         return {"message": f"Internal agents called successfully ({len(agent_list)} agents)"}

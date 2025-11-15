@@ -4,7 +4,7 @@ Test the scan agent without requiring a database.
 Test Steps:
 1. Create simulation data as in "test_scheduler_and_agents_with_full_cleanup_round"
 2. Run a scan using the on_premise_scan_agent:
-   - Use ProgressWriter to avoid AgentInterfaceMethods.task_progress (which requires DB)
+   - Use ProgressWriter to avoid CleanupTaskManager.task_progress (which requires DB)
    - Call execute_task() directly (not run() which would try to reserve/complete tasks via DB)
    - Override task_insert_or_update_simulations_in_db() to capture results locally
 3. Verify the scan identified the simulation "leafs" correctly
@@ -17,7 +17,7 @@ from unittest.mock import patch
 
 from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
 from cleanup_cycle.scheduler_dtos import ActionType, CleanupTaskDTO
-from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods
+from cleanup_cycle.agent_task_manager import CleanupTaskManager
 from datamodel.dtos import FileInfo
 from tests.integration.testdata_for_import import RootFolderWithMemoryFolders
 from tests.integration import test_scheduler_and_agents
@@ -87,12 +87,12 @@ class TestOnPremiseScanAgent:
         # Set the task on the agent (bypass reserve_task())
         agent.task = mock_task
         
-        # Mock AgentInterfaceMethods.task_progress to avoid DB calls
+        # Mock CleanupTaskManager.task_progress to avoid DB calls
         def mock_task_progress(task_id: int, message: str):
             agent.progress_messages.append(message)
             return mock_task
         
-        with patch.object(AgentInterfaceMethods, 'task_progress', side_effect=mock_task_progress):
+        with patch.object(CleanupTaskManager, 'task_progress', side_effect=mock_task_progress):
             # Execute the task directly (bypass run() which would try to reserve/complete via DB)
             agent.execute_task()
         

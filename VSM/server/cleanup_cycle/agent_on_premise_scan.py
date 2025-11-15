@@ -1,7 +1,7 @@
 import os
 import csv
 from datetime import date, datetime
-from cleanup_cycle.scheduler_db_actions import AgentInterfaceMethods
+from cleanup_cycle.agent_task_manager import CleanupTaskManager
 from cleanup_cycle.agents_internal import AgentTemplate
 from cleanup_cycle.scan.scan import do_scan, ScanResult 
 from cleanup_cycle.scheduler_dtos import ActionType
@@ -21,7 +21,7 @@ class AgentScanProgressWriter(ProgressWriter):
     def write_realtime_progress(self, nb_processed_folders:int, mean_dirs_second:int, io_queue_qsize:int, active_threads:int):    
         #report real-time progress to the task.
         msg: str = f"\rFolders processed; pr second, queue_size, threads: {nb_processed_folders}; {mean_dirs_second}; {io_queue_qsize}; {active_threads}"
-        self.task = AgentInterfaceMethods.task_progress(self.agentScanRootFolder.task.id, msg)
+        self.task = CleanupTaskManager.task_progress(self.agentScanRootFolder.task.id, msg)
 
     def open(self, output_path: str):
         super().open(output_path)
@@ -50,6 +50,13 @@ class AgentScanVTSRootFolder(AgentTemplate):
                 self.temporary_result_folder = None
         
         self.nb_scan_thread: int = int(os.getenv('SCAN_THREADS', 256))  # number of scanning threads
+    
+    def run(self):
+        self.reserve_task()
+        if self.task is not None:
+            self.execute_task()
+            #asyncio.run(self.execute_task())
+        self.complete_task()
 
     def execute_task(self):
         if self.temporary_result_folder is None:
@@ -73,17 +80,18 @@ class AgentScanVTSRootFolder(AgentTemplate):
             self.error_message = str(e)
             return
         
-        AgentInterfaceMethods.task_progress(self.task.id, f"Identified {len(extracted_simulations)} simulations and ignored {n_hierarchical_simulations} hierarchical simulations")
+        CleanupTaskManager.task_progress(self.task.id, f"Identified {len(extracted_simulations)} simulations and ignored {n_hierarchical_simulations} hierarchical simulations")
         if len(extracted_simulations) == 0:
             self.error_message = "No simulations were found during the scan."
             return
         
         self.task_insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
+        self.success_message = f"Scanned {len(extracted_simulations)} simulations in rootfolder {self.task.rootfolder_id}"        
 
     def task_insert_or_update_simulations_in_db(self, task_id: int, extracted_simulations: list["FileInfo"]) -> dict[str, str]:
         #@TODO would have been more useful to return the number of simulations that were inserted/updated. 
-        # This must however come from AgentInterfaceMethods.task_insert_or_update_simulations_in_db
-        result: dict[str, str] = AgentInterfaceMethods.task_insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
+        # This must however come from CleanupTaskManager.task_insert_or_update_simulations_in_db
+        result: dict[str, str] = CleanupTaskManager.task_insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
         return result
 
 
