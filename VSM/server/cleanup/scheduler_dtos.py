@@ -1,6 +1,7 @@
 from enum import Enum
 from datetime import date, datetime
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Column
+from sqlalchemy import JSON
 from pydantic import BaseModel
 
 
@@ -42,16 +43,16 @@ class TaskStatus(str, Enum):
 # Agent can pickup the following types of tasks
 class ActionType(str, Enum):
     """Types of actions that can be scheduled in the calendar."""
-    #CLOSE_FINISHED_CALENDARS  = "0 - close_finished_calendars"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
-    CREATE_CLEANUP_CALENDAR   = "1 - create_cleanup_calendar"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
-    SCAN_ROOTFOLDER           = "2 - scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. 0 day into START_RETENTION_REVIEW. Can take upto one day
-    START_RETENTION_REVIEW    = "3 - start_retention_review"                    # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
-    SEND_INITIAL_NOTIFICATION = "4 - send_notification"                         # internal email agent: Notify stakeholders about the new retention review. 1 day into the RETENTION_REVIEW phase. Takes less than a minute
-    SEND_FINAL_NOTIFICATION   = "5 - send_notification"                         # internal email agent: Notify stakeholders about the ongoing retention review. About a week before end of RETENTION_REVIEW phase. Takes less than a minute
-    CLEAN_ROOTFOLDER          = "6 - clean_simulations"                         # storage agent: clean marked simulations. 0 day into the CLEANING phase. Can take upto a day
-    FINISH_CLEANUP_CYCLE      = "7 - finish_cleanup_cycle"                      # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type.
-    #PREPARE_NEXT_CLEANUP_CYCLE= "8 - prepare_next_cleanup_cycle"                # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
-    #STOP_AFTER_CLEANUP_CYCLE  = "9 - stop_after_cleanup_cycle"                   # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle. Before exit set the start date to None and progress to INACTIVE
+    #CLOSE_FINISHED_CALENDARS  = "0 - close_finished_calendars"                 # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
+    CREATE_CLEANUP_CALENDAR     = "1 - create_cleanup_calendar"                   # Internal CleanupProgress Agent: call generate_cleanup_calendar when the cleanup is ready to start. Takes less than 5 minutes
+    SCAN_ROOTFOLDER             = "2 - scan_rootfolder"                           # storage agent: scan the rootfolder for simulations. 0 day into START_RETENTION_REVIEW. Can take upto one day
+    MARK_SIMULATIONS_FOR_REVIEW = "3 - mark_simulations_for_review"                    # Internal CleanupProgress Agent: call cleanup_cycle_startInitialize. Takes less than 5 minutes
+    SEND_INITIAL_NOTIFICATION   = "4 - send_notification"                         # internal email agent: Notify stakeholders about the new retention review. 1 day into the RETENTION_REVIEW phase. Takes less than a minute
+    SEND_FINAL_NOTIFICATION     = "5 - send_notification"                         # internal email agent: Notify stakeholders about the ongoing retention review. About a week before end of RETENTION_REVIEW phase. Takes less than a minute
+    CLEAN_ROOTFOLDER            = "6 - clean_simulations"                         # storage agent: clean marked simulations. 0 day into the CLEANING phase. Can take upto a day
+    UNMARK_SIMULATIONS_AFTER_REVIEW  = "7 - removed still maked simulation"                      # Internal CleanupProgress Agent: call cleanup_cycle_finishing to change the remaining marked retention to the next retention type.
+    FINALISE_CLEANUP_CYCLE           = "8 - finalise_cleanup_cycle"                    # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle.
+    #STOP_AFTER_CLEANUP_CYCLE  = "9 - stop_after_cleanup_cycle"                 # Internal CleanupProgress Agent: execute the last step in the cleanup cycle by calling prepare_next_cleanup_cycle. Before exit set the start date to None and progress to INACTIVE
 
 class AgentInfo(BaseModel):
     """Represents the agent Information that is required to reserve and report on tasks.
@@ -81,6 +82,12 @@ class CleanupTaskBase(SQLModel):
     # Info from an agent to match a task
     action_type: str                    = Field(description="Type of action to perform")
     storage_id: str | None              = Field(description="Storage platform where the rootfolder is located")
+ 
+    # State management - NEW: Principled state transition support
+    precondition_states: list[str]         = Field(default=[], sa_column=Column(JSON), description="Accepted CleanupProgress states at task reservation")
+    target_state: str | None               = Field(default=None, description="CleanupProgress state to transition to for work execution")
+    state_transition_on_reservation: bool  = Field(default=False, description="Whether to transition state when task is reserved")
+    state_verification_on_completion: bool = Field(default=True, description="Whether to verify state matches target_state at completion")
  
     # Execution tracking
     status: str                         = Field(default=None, description="TaskStatus")

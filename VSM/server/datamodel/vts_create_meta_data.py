@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, FolderTypeDTO, CleanupFrequencyDTO, CycleTimeDTO
+from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, FolderTypeDTO, CleanupFrequencyDTO, LeadTimeDTO
 from datamodel.retentions import RetentionTypeEnum, RetentionTypeDTO
 
 def insert_vts_metadata_in_db(session:Session):
@@ -15,7 +15,7 @@ def insert_vts_metadata_in_db(session:Session):
 
     # **Retention Catalog** (key=retention_label, value=days_to_cleanup):
     # - **`marked`** (0 days): Mandatory state. This state is for simulation were the retention expired (`retention_expiration_date <= cleanup_round_start_date`). Changing to this retention sets `retention_expiration_date = cleanup_round_start_date`
-    # - **`next`** (cleanupfrequency days): Mandatory state. New simulations created in the current cleanup round, that are not path-protected, will be marked for cleanup in the next cleanup round by setting setting `retention_expiration_date = modified_date` for new simulations. Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_round_start_date + cleanupfrequency`
+    # - **`next`** (frequency days): Mandatory state. New simulations created in the current cleanup round, that are not path-protected, will be marked for cleanup in the next cleanup round by setting setting `retention_expiration_date = modified_date` for new simulations. Changing the retention of other simulations to this state sets `retention_expiration_date = cleanup_round_start_date + frequency`
     # - **`90d`** (90 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 90 days`
     # - **`180d`** (180 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 180 days`
     # - **`365d`** (365 days): Changing to this retention sets `retention_expiration_date = cleanup_round_start_date + 365 days`
@@ -65,16 +65,16 @@ def insert_vts_metadata_in_db(session:Session):
     #    print(f" - {cleanup.name} (ID: {cleanup.id})")
 
 
-    session.add(CycleTimeDTO(name="inactive", days=-1, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="1 week",   days= 7, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="2 weeks",  days=14, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="3 weeks",  days=21, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="4 weeks",  days=28, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="6 weeks",  days=42, simulationdomain_id=sim_id ))
-    session.add(CycleTimeDTO(name="8 weeks",  days=56, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="inactive", days=-1, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="1 week",   days= 7, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="2 weeks",  days=14, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="3 weeks",  days=21, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="4 weeks",  days=28, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="6 weeks",  days=42, simulationdomain_id=sim_id ))
+    session.add(LeadTimeDTO(name="8 weeks",  days=56, simulationdomain_id=sim_id ))
     session.commit()
 
-    #days_to_analyse = session.exec(select(CycleTimeDTO)).all()
+    #days_to_analyse = session.exec(select(LeadTimeDTO)).all()
     #print("Test data for days to analyse inserted successfully:")
     #for days in days_to_analyse:
     #    print(f" - {days.name} (ID: {days.id})")

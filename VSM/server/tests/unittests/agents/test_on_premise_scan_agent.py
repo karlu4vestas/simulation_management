@@ -15,9 +15,9 @@ import shutil
 import pytest
 from unittest.mock import patch
 
-from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
-from cleanup_cycle.scheduler_dtos import ActionType, CleanupTaskDTO
-from cleanup_cycle.agent_task_manager import CleanupTaskManager
+from cleanup.agent_on_premise_scan import AgentScanVTSRootFolder
+from cleanup.scheduler_dtos import ActionType, CleanupTaskDTO
+from cleanup.agent_task_manager import AgentTaskManager
 from datamodel.dtos import FileInfo
 from tests.integration.testdata_for_import import RootFolderWithMemoryFolders
 from tests.integration import test_scheduler_and_agents
@@ -36,8 +36,7 @@ class MockAgentScanVTSRootFolder(AgentScanVTSRootFolder):
         self.n_hierarchical_simulations: int = 0
         self.progress_messages: list[str] = []
     
-    def task_insert_or_update_simulations_in_db(self, task_id: int, 
-                                                 extracted_simulations: list[FileInfo]) -> dict[str, str]:
+    def insert_or_update_simulations_in_db(self, task_id: int, extracted_simulations: list[FileInfo]) -> dict[str, str]:
         """Override to capture simulations locally instead of inserting to DB."""
         self.extracted_simulations = extracted_simulations
         return {"status": "success", "count": str(len(extracted_simulations))}
@@ -92,7 +91,7 @@ class TestOnPremiseScanAgent:
             agent.progress_messages.append(message)
             return mock_task
         
-        with patch.object(CleanupTaskManager, 'task_progress', side_effect=mock_task_progress):
+        with patch.object(AgentTaskManager, 'task_progress', side_effect=mock_task_progress):
             # Execute the task directly (bypass run() which would try to reserve/complete via DB)
             agent.execute_task()
         

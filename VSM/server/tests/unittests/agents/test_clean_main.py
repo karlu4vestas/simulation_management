@@ -4,11 +4,11 @@ import pytest
 import os
 import shutil
 from datetime import date
-from cleanup_cycle.clean_agent.clean_main import clean_main
+from cleanup.clean_agent.clean_main import clean_main
 from datamodel.dtos import FileInfo, FolderTypeEnum
 from datamodel.retentions import ExternalRetentionTypes
-from cleanup_cycle.clean_agent.clean_parameters import CleanMode
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
+from cleanup.clean_agent.clean_parameters import CleanMode
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressWriter
 from tests import test_storage
 
 # Global test storage location

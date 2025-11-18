@@ -72,7 +72,7 @@ def sample_data():
             "folder_id": 1,
             "owner": "JD",
             "approvers": "AB,CD",
-            "cleanupfrequency": "inactive"
+            "frequency": "inactive"
         },
         "folder_node_basic": {
             "parent_id": 0,
@@ -117,8 +117,8 @@ def sample_root_folder_data():
         "path": "/test/folder",
         "owner": "JD",
         "approvers": "AB,CD",
-        "cycletime": 30,
-        "cleanupfrequency": 7
+        "leadtime": 30,
+        "frequency": 7
     }
 
 
@@ -147,8 +147,8 @@ def sample_folder_node_data(test_session):
         path="/test/folder",
         owner="TestUser",
         approvers="TestApprover",
-        cycletime=30,
-        cleanupfrequency=7
+        leadtime=30,
+        frequency=7
     )
     test_session.add(root_folder)
     test_session.commit()
@@ -181,8 +181,8 @@ def test_root_folder(test_session):
         path="/test/folder",
         owner="TestUser",
         approvers="TestApprover",
-        cycletime=30,
-        cleanupfrequency=7
+        leadtime=30,
+        frequency=7
     )
     test_session.add(root_folder)
     test_session.commit()

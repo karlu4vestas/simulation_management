@@ -1,83 +1,41 @@
 import os
+import csv
 import shutil
 import pytest
 from datetime import date
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlmodel import Session
+from sqlmodel import Session, select
+from db import db_api
+from db.database import Database
 
 from datamodel import dtos
+from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
 from app.web_api import run_scheduler_tasks
-from db import db_api
-from cleanup_cycle import cleanup_db_actions, cleanup_dtos
-from cleanup_cycle.agent_on_premise_scan import AgentScanVTSRootFolder
-from cleanup_cycle.agent_on_premise_clean import AgentCleanVTSRootFolder
-from cleanup_cycle.scheduler_dtos import ActionType, CleanupTaskDTO, TaskStatus
-from cleanup_cycle.agents_internal import (
-    AgentTemplate,
+from cleanup.agent_on_premise_scan  import AgentScanVTSRootFolder
+from cleanup.agent_on_premise_clean import AgentCleanVTSRootFolder
+from cleanup.scheduler_dtos import AgentInfo, CalendarStatus, CleanupCalendarDTO, CleanupTaskDTO
+from cleanup.agent_runner import AgentCallbackHandler, InternalAgentFactory
+from cleanup.agents_internal import (
     AgentCalendarCreation,
-    AgentCleanupCycleStart,
+    AgentMarkSimulationsPreReview,
     AgentNotification,
-    AgentCleanupCycleFinishing,
-    #AgentCleanupCyclePrepareNext
+    AgentUnmarkSimulationsPostReview,
+    AgentFinaliseCleanupCycle
 )
-from cleanup_cycle.agent_runner import InternalAgentFactory
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler
 
-from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations
 from .testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 from tests import test_storage
-from cleanup_cycle import cleanup_db_actions
-
 
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
-    
-# class ForTestAgentCleanupCyclePrepareNextAndStop(AgentTemplate):
-#     def __init__(self):
-#         super().__init__("TestAgentCleanupCyclePrepareNextAndStop", [ActionType.STOP_AFTER_CLEANUP_CYCLE.value])
-
-#     def reserve_task(self):
-#         self.task = CleanupTaskManager.reserve_task(self.agent_info)
-
-#     def execute_task(self):
-#         cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id, prepare_next_cycle_and_stop=True)
-#         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id} but the Cleanup cycle is stopped here by setting cleanup_start_date=None"
-
-class ForTestAgentCalendarCreation(AgentTemplate):
-    # this ia a fake agent because it does not require a task and will always be run when called
-    # In fact the agent calls the scheduler to create calendars and tasks for rootfolder that are ready to start cleanup cycles
-    def __init__(self):
-        super().__init__("AgentCalendarCreation", [])
-
-    # run without reservation because not calendar exists for this agent
-    def run(self):
-        self.execute_task()
-
-    def execute_task(self):
-        msg: str = CleanupScheduler.create_calendars_for_cleanup_configuration_ready_to_start()
-        CleanupScheduler.update_calendars_and_tasks() # prepare so the next task can be activated right away
-        self.success_message = f"CalendarCreation done with: {msg}"
-
-# class ForTestAgentCalendarClosure(AgentTemplate):
-#     # this ia a fake agent because it does not require a task and will always be run when called
-#     # In fact the agent calls the scheduler to close calendars that finishes
-#     def __init__(self):
-#         super().__init__("ForTestAgentCalendarClosure", [ActionType.CLOSE_FINISHED_CALENDARS.value])
-#     # run without reservation because not calendar exists for this agent
-#     def run(self):
-#          self.execute_task()
-
-#     def execute_task(self):
-#         msg: str = cleanup_db_actions.close_finished_calenders()
-#         self.success_message = f"ForTestAgentCalendarClosure done with: {msg}"
 
 #implementation of class AgentCallbackHandler(ABC):
-# the implementation also get the CleanupState.cleanup_progress by load it using rootfolder_id from CleanupTaskDTO
+# the implementation also get the CleanupState.progress by load it using rootfolder_id from CleanupTaskDTO
 # Data are saved to a two list of AgentExecutionRecord for later verification of the pre and post run data in the test  
 
 @dataclass
@@ -88,60 +46,30 @@ class AgentExecutionRecord:
     action_types: list[str]
     task_id: int | None
     rootfolder_id: int | None
-    cleanup_progress: dtos.CleanupProgress.ProgressEnum | None
+    progress: dtos.CleanupProgress.Progress | None
     error_message: str | None
     success_message: str | None
-
-from cleanup_cycle.agent_runner import AgentCallbackHandler
-from cleanup_cycle.scheduler_dtos import AgentInfo
 
 class TestAgentCallbackHandler(AgentCallbackHandler):
     """Callback handler for testing that collects agent execution data"""
     
     def __init__(self):
-        self.prerun_records: list[AgentExecutionRecord] = []
         self.postrun_records: list[AgentExecutionRecord] = []
-    
-    def on_agent_prerun(self, agent_info: AgentInfo, task: CleanupTaskDTO | None) -> None:
-        """Collect data before agent runs"""
-        cleanup_progress = None
-        rootfolder_id = None
-        calendar_id = None
-        
-        if task:
-            calendar_id = task.calendar_id if hasattr(task, 'calendar_id') else None
-            if task.rootfolder_id:
-                rootfolder_id = task.rootfolder_id
-                cleanup_config = db_api.get_cleanup_configuration_by_rootfolder_id(task.rootfolder_id)
-                if cleanup_config:
-                    cleanup_progress = dtos.CleanupProgress.ProgressEnum(cleanup_config.cleanup_progress)
-        
-        record = AgentExecutionRecord(
-            agent_id=agent_info.agent_id,
-            action_types=agent_info.action_types,
-            task_id=task.id if task else None,
-            calendar_id=calendar_id,
-            rootfolder_id=rootfolder_id,
-            cleanup_progress=cleanup_progress,
-            error_message=None,
-            success_message=None
-        )
-        self.prerun_records.append(record)
     
     def on_agent_postrun(self, agent_info: AgentInfo, task: CleanupTaskDTO | None, 
                          error_message: str | None, success_message: str | None) -> None:
         """Collect data after agent completes"""
-        cleanup_progress = None
+        progress = None
         rootfolder_id = None
         calendar_id = None
         
         if task:
             calendar_id = task.calendar_id if hasattr(task, 'calendar_id') else None
             if task.rootfolder_id:
-                rootfolder_id = task.rootfolder_id
+                rootfolder_id  = task.rootfolder_id
                 cleanup_config = db_api.get_cleanup_configuration_by_rootfolder_id(task.rootfolder_id)
                 if cleanup_config:
-                    cleanup_progress = dtos.CleanupProgress.ProgressEnum(cleanup_config.cleanup_progress)
+                    progress = dtos.CleanupProgress.Progress(cleanup_config.progress)
         
         record = AgentExecutionRecord(
             agent_id=agent_info.agent_id,
@@ -149,44 +77,23 @@ class TestAgentCallbackHandler(AgentCallbackHandler):
             task_id=task.id if task else None,
             calendar_id=calendar_id,
             rootfolder_id=rootfolder_id,
-            cleanup_progress=cleanup_progress,
+            progress=progress,
             error_message=error_message,
             success_message=success_message
         )
         self.postrun_records.append(record)
     
-    def save_records_to_csv(self, prerun_path: str, postrun_path: str) -> None:
-        """Save prerun and postrun records to CSV files
-        
-        Args:
-            prerun_path: Path where prerun records should be saved
-            postrun_path: Path where postrun records should be saved
-        """
-        import csv
-        
+    def save_records_to_csv(self, postrun_path: str) -> None:
+        # Save prerun and postrun records to CSV files        
+        # Args:
+        #     postrun_path: Path where postrun records should be saved
+       
         # Ensure directories exist
-        os.makedirs(os.path.dirname(prerun_path), exist_ok=True)
         os.makedirs(os.path.dirname(postrun_path), exist_ok=True)
         
         # Define CSV headers
         headers = ['calendar_id', 'agent_id', 'action_types', 'task_id', 'rootfolder_id', 
-                   'cleanup_progress', 'error_message', 'success_message']
-        
-        # Save prerun records
-        with open(prerun_path, 'w', newline='') as f:
-            writer = csv.writer(f, delimiter=';')
-            writer.writerow(headers)
-            for record in self.prerun_records:
-                writer.writerow([
-                    record.calendar_id or '',
-                    record.agent_id,
-                    '|'.join(record.action_types) if record.action_types else '',
-                    record.task_id or '',
-                    record.rootfolder_id or '',
-                    record.cleanup_progress.value if record.cleanup_progress else '',
-                    record.error_message or '',
-                    record.success_message or ''
-                ])
+                   'progress', 'error_message', 'success_message']
         
         # Save postrun records
         with open(postrun_path, 'w', newline='') as f:
@@ -199,7 +106,7 @@ class TestAgentCallbackHandler(AgentCallbackHandler):
                     '|'.join(record.action_types) if record.action_types else '',
                     record.task_id or '',
                     record.rootfolder_id or '',
-                    record.cleanup_progress.value if record.cleanup_progress else '',
+                    record.progress.value if record.progress else '',
                     record.error_message or '',
                     record.success_message or ''
                 ])
@@ -230,9 +137,9 @@ class TestSchedulerAndAgents:
         return rootfolder, cleanup_config
     
     @staticmethod
-    def generate_simulations_folder_and_files(rootdir: str, rootfolder_data:RootFolderWithMemoryFolders) -> GeneratedSimulationsResult:
+    def generate_simulations_folder_and_files(rootdir: str, rootfolder_data:RootFolderWithMemoryFolders, remove_rootdir:bool=True) -> GeneratedSimulationsResult:
         #remove old test data
-        if os.path.isdir(rootdir):
+        if remove_rootdir and os.path.isdir(rootdir):
             shutil.rmtree(rootdir)
 
         # generate the simulations but before that all paths must be adjusted to point to the test storage location
@@ -243,8 +150,22 @@ class TestSchedulerAndAgents:
                                                                                         SimulationType.VTS) for folder in leaf_folders]        
         gen_sim_results: GeneratedSimulationsResult     = generate_simulations(rootdir, simulation_folders)
         return gen_sim_results
+    
+    @staticmethod
+    def get_completed_calendars(rootfolder_id:int=None) -> list[CleanupCalendarDTO]:
+        with Session(Database.get_engine()) as session:
+            # Get all active calendars for this rootfolder
+            if rootfolder_id is None:
+                active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.status == CalendarStatus.COMPLETED.value) )).all()
+            else:
+                active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                        (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
+                        (CleanupCalendarDTO.status == CalendarStatus.COMPLETED.value) )).all()
+            return active_calendars
 
-    def test_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data):
+
+    def run_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data, data_keys:list[str], number_of_runs:int, run_random:bool=False):
         # The purpose of this test is to test 
         # 1) the scheduling of tasks 
         # 2) that agent tasks are executed as expected
@@ -254,12 +175,20 @@ class TestSchedulerAndAgents:
         #    - we will run with no active path protections so the retention will be numeric in the database
         #    - simulations are marked for cleanup and cleaned as expected and cleanup after the cleanup round is completed
 
+        #Furthermore the test can be used to 
+        # 1) verify that each sequntual run (run_random=False) creates a new cleanup calendar and completes it 
+        #    because the list of Agents has ben setup in their natural order of execution
+        # 2) verify that when run_random=True the same agents can be executed in random order and still complete the cleanup round successfully.
+        #    However, when agents are executed out of their natural order their attemtps to reserve a task will often fail because the status of the calender is not ready.
+        #    In other word multiple calls to run_scheduler_tasks will be required to complete a calendar 
+        #  Notice that option 2 represents that conditions in a production
+
         # Notice 
         #  1) that the condition to ensure that some simulations get marked for cleanup is that.
-        #     The date of the CleanupConfigurationDTO' cleanup_start_date + cycletime is before the simulations modified date
-        #     The easiest way to use modified date = today and cleanup_start_date = today-cycletime-1
-        #  2) A cleanup_round required the passage of time equal to the cleanupfrequency to finalize the round. 
-        #     That is we must either simulate or let time pass. cleanupfrequency was changed to float in order to allow a second to pass (that is 1/(24*60*60) of a day) in this way 
+        #     The date of the CleanupConfigurationDTO' start_date + leadtime is before the simulations modified date
+        #     The easiest way to use modified date = today and start_date = today-leadtime-1
+        #  2) A cleanup_round required the passage of time equal to the frequency to finalize the round. 
+        #     That is we must either simulate or let time pass. frequency was changed to float in order to allow a second to pass (that is 1/(24*60*60) of a day) in this way 
         #     we can let time pass in the test by running the scheduler and wait a second before next run of the scheduler
 
         # The plan is as follows:
@@ -283,17 +212,18 @@ class TestSchedulerAndAgents:
         insert_vts_metadata_in_db(integration_session)
 
         mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
-            cycletime=7,
-            cleanupfrequency=1./(24*60*60),  # set to one second for the test
-            cleanup_start_date=date.today() - timedelta(days=8),  #8 = cycletime+1 ensure that simulations are marked for cleanup
-            cleanup_progress=dtos.CleanupProgress.ProgressEnum.INACTIVE
+            leadtime=7,
+            frequency=1./(24*60*60),  # set to one second for the test
+            start_date=date.today() - timedelta(days=8),  #8 = leadtime+1 ensure that simulations are marked for cleanup
+            progress=dtos.CleanupProgress.Progress.INACTIVE
         )
         
         runtime_callback: TestAgentCallbackHandler = TestAgentCallbackHandler()
-        #Get one rootfolders and it list of leaf folders
-        rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data["first_rootfolder"]        
         # setup folder for the test
         io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
+        if os.path.isdir(io_dir_for_storage_test):
+            shutil.rmtree(io_dir_for_storage_test)
+
         # Now we are ready for the test. We have:simuulations on desk and rootfolder with an inactive cleanup configuration in the db
         # Lets define the environment variables needed by the scheduler and agents
 
@@ -306,30 +236,78 @@ class TestSchedulerAndAgents:
         os.environ['CLEAN_SIM_WORKERS'] = str(1)
         os.environ['CLEAN_DELETION_WORKERS'] = str(2)
         os.environ['CLEAN_MODE'] = 'ANALYSE'
+        n_calendars_completed: int=0;
+        class DataSet:
+            data_key:str
+            rootfolder_data:RootFolderWithMemoryFolders
+            gen_sim_results: GeneratedSimulationsResult
+            root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO]
+            def __init__(self, data_key, rootfolder_data, gen_sim_results, root_cleanup_config):
+                self.data_key = data_key
+                self.rootfolder_data = rootfolder_data
+                self.gen_sim_results = gen_sim_results
+                self.root_cleanup_config = root_cleanup_config
+            def get_rootfolder_id(self) -> int:
+                return self.root_cleanup_config[0].id    
 
-        for i in range(1):
-            gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data)
-            root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO] = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
+        n_calendars_completed:int = 0
+        n_actual_runs:int = 0
+        for n_actual_runs in range(number_of_runs):
+
+            # generate new data for each iteration
+            for data_key in data_keys:
+                rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data[data_key]        
+                gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(io_dir_for_storage_test, rootfolder_data, remove_rootdir=False)
+                root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO] = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
+
                   
             # Create fresh test-specific agents for each iteration to avoid stale state
             # (they will pick up the environment variables set above)
             test_agents = [
-                #ForTestAgentCalendarClosure(),
-                ForTestAgentCalendarCreation(),
+                AgentCalendarCreation(),
                 AgentScanVTSRootFolder(),       # Uses SCAN_TEMP_FOLDER, SCAN_THREADS env vars
-                AgentCleanupCycleStart(),
+                AgentMarkSimulationsPreReview(),
                 AgentNotification(),
                 AgentNotification(),
                 AgentCleanVTSRootFolder(),      # Uses CLEAN_TEMP_FOLDER, CLEAN_SIM_WORKERS, etc. env vars
-                AgentCleanupCycleFinishing(),
-                #AgentCleanupCyclePrepareNext(),
-                #ForTestAgentCleanupCyclePrepareNextAndStop()
+                AgentUnmarkSimulationsPostReview(),
+                AgentFinaliseCleanupCycle(),
             ]
-            with InternalAgentFactory.with_agents(test_agents):
-                # Step 3: Run scheduler to create scan tasks and execute the scan
-                run_scheduler_tasks(runtime_callback)
+
+            if run_random:
+                with InternalAgentFactory.with_agents(test_agents):
+                    run_scheduler_tasks(runtime_callback, run_randomized=True)
+                    n_calendars_completed = len(TestSchedulerAndAgents.get_completed_calendars() )
+                    if n_calendars_completed >= len(data_keys): #cannot pervent the creation of a new calendar while the we await that at least two gets completed 
+                        break
+
+            else:    
+                with InternalAgentFactory.with_agents(test_agents):
+                    run_scheduler_tasks(runtime_callback)
+
 
         runtime_callback.save_records_to_csv(
-            prerun_path=os.path.join(io_dir_for_storage_test, "agent_prerun_records.csv"),
             postrun_path=os.path.join(io_dir_for_storage_test, "agent_postrun_records.csv")
         )
+
+        n_calendars_completed = len(TestSchedulerAndAgents.get_completed_calendars() )
+        return n_calendars_completed,n_actual_runs+1
+        pass #just for breakpoint so we can inspect the database after the test run
+
+    def test_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data):
+        number_of_runs=2
+        n_calendars_completed,n_actual_runs = self.run_scheduler_and_agents_with_full_cleanup_round(integration_session, cleanup_scenario_data, 
+                                                                                      data_keys=["first_rootfolder"], 
+                                                                                      #cleanup_scenario_data, data_keys=["first_rootfolder", "second_rootfolder_part_one"], 
+                                                                                      number_of_runs=number_of_runs, run_random=False)
+        assert n_calendars_completed == number_of_runs
+
+    def test_random_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data):
+        #data_keys = ["first_rootfolder"]
+        data_keys:list[str] = ["first_rootfolder", "second_rootfolder_part_one"]
+        number_of_runs=7 * len(data_keys) # in the worst case the maximum number of agents required to complete a calendar is 7
+        n_calendars_completed,n_actual_runs = self.run_scheduler_and_agents_with_full_cleanup_round(integration_session, cleanup_scenario_data, 
+                                                                                      data_keys=data_keys, 
+                                                                                      number_of_runs=number_of_runs, run_random=True)
+        print(f"n_calendars_completed, n_actual_runs: {n_calendars_completed}, {n_actual_runs}")
+        assert n_calendars_completed == len(data_keys)

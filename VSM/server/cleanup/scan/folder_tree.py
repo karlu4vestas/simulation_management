@@ -214,7 +214,7 @@ def main1():
 def main2():
     from tests import test_storage
     from queue import Queue
-    from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+    from cleanup.clean_agent.simulation_file_registry import SimulationFileRegistry
 
     TEST_STORAGE_LOCATION = test_storage.LOCATION
     # Create and manage test directory for simulations

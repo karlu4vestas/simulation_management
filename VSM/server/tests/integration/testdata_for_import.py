@@ -14,20 +14,20 @@ from datamodel.retentions import ExternalRetentionTypes
 
 @dataclass
 class CleanupConfiguration: 
-    """In-memory cleanup configuration for test data setup."""
-    cycletime: int                                          # days from initialization of the simulations til it can be cleaned
-    cleanupfrequency: int                                   # number of days between cleanup rounds
-    cleanup_start_date: date | None = None                  # at what date did the current cleanup round start
-    cleanup_progress: dtos.CleanupProgress.ProgressEnum = dtos.CleanupProgress.ProgressEnum.INACTIVE  # current state of the cleanup round
+    # In-memory cleanup configuration for test data setup.
+    leadtime: int                                          # days from initialization of the simulations til it can be cleaned
+    frequency: int                                   # number of days between cleanup rounds
+    start_date: date | None = None                  # at what date did the current cleanup round start
+    progress: dtos.CleanupProgress.Progress = dtos.CleanupProgress.Progress.INACTIVE  # current state of the cleanup round
     
     def to_dto(self, rootfolder_id: int) -> dtos.CleanupConfigurationDTO:
-        """Convert to CleanupConfigurationDTO for database insertion."""
+        # Convert to CleanupConfigurationDTO for database insertion.
         return dtos.CleanupConfigurationDTO(
             rootfolder_id=rootfolder_id,
-            cycletime=self.cycletime,
-            cleanupfrequency=self.cleanupfrequency,
-            cleanup_start_date=self.cleanup_start_date,
-            cleanup_progress=self.cleanup_progress.value
+            leadtime=self.leadtime,
+            frequency=self.frequency,
+            start_date=self.start_date,
+            progress=self.progress.value
         )
 
 
@@ -430,16 +430,16 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
 def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, cleanup_configuration:CleanupConfiguration, folders: list[InMemoryFolderNode]):
     """Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
     - before_leafs:       retention period starts and ends before the cleanup round start
-                          => modified date = from "cleanup_start_date - retention_period - random_interval - 1"
-                             modified date+retention_period to "cleanup_start_date - random_interval - 1"
+                          => modified date = from "start_date - retention_period - random_interval - 1"
+                             modified date+retention_period to "start_date - random_interval - 1"
 
     - before_after_leafs: retention period starts before and ends after the cleanup
-                          => modified date = from "cleanup_start_date - retention_period/2 - random_interval" 
-                             modified date+retention_period to "cleanup_start_date - random_interval - 1"
+                          => modified date = from "start_date - retention_period/2 - random_interval" 
+                             modified date+retention_period to "start_date - random_interval - 1"
 
     - after_leafs:        retention period starts after the cleanup round
-                          => modified date = from "cleanup_start_date + 1 + random_interval" onwards
-                          modified date + retention_period to  "cleanup_start_date + retention_period + 1 + random_interval"
+                          => modified date = from "start_date + 1 + random_interval" onwards
+                          modified date + retention_period to  "start_date + retention_period + 1 + random_interval"
     """
     leafs = [folder for folder in folders if folder.is_leaf]
     
@@ -452,25 +452,25 @@ def randomize_modified_dates_of_leaf_folders(rootfolder:RootFolderDTO, cleanup_c
     
     rand: random.Random = random.Random()  # Use non-deterministic seed for true randomization
     ran_interval_days = 10
-    retention_period_days = cleanup_configuration.cycletime
-    cleanup_start_date = cleanup_configuration.cleanup_start_date
+    retention_period_days = cleanup_configuration.leadtime
+    start_date = cleanup_configuration.start_date
 
     # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
     # Date range: [cleanup_start - retention - random_days - 1] to [cleanup_start - random_days - 1]
     for leaf in before_leafs:
-        leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days + rand.randint(1, ran_interval_days)  + 1)
+        leaf.modified_date = start_date - timedelta(days=retention_period_days + rand.randint(1, ran_interval_days)  + 1)
         leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE
     
     # Group 2: before_after_leafs - retention spans across cleanup (partially in retention)
     # Date range: [cleanup_start - retention/2 - random_days] to [cleanup_start - random_days - 1]
     for leaf in before_after_leafs:
-        leaf.modified_date = cleanup_start_date - timedelta(days=retention_period_days // 2 + rand.randint(1, ran_interval_days) )
+        leaf.modified_date = start_date - timedelta(days=retention_period_days // 2 + rand.randint(1, ran_interval_days) )
         leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE_AFTER
 
     # Group 3: after_leafs - modified dates after cleanup starts (will NOT be cleaned up)
     # Date range: [cleanup_start + 1 + random_days] onwards (up to +60 days)
     for leaf in after_leafs:
-        leaf.modified_date = cleanup_start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
+        leaf.modified_date = start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
         leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.AFTER
     
 
@@ -483,7 +483,7 @@ def generate_cleanup_scenario_data():
     # The root folder's cleanup configuration is not initialised means that assumes default values
 
     number_of_rootfolders = 2
-    cleanup_configuration = CleanupConfiguration(cycletime=30, cleanupfrequency=7, cleanup_start_date=date(2000, 1, 1))
+    cleanup_configuration = CleanupConfiguration(leadtime=30, frequency=7, start_date=date(2000, 1, 1))
 
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0

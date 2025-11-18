@@ -145,16 +145,16 @@ namespace VSM.Client.Pages
             public override bool Enabled { get { return shared_params.vts_simulationDomain != null; } }
             protected override string FormatResult(List<CleanupFrequencyDTO> result) => $"Number of cleanup frequencies retrieved: {result.Count}";
         }
-        public class CycleTimesTest : EndpointTest<List<CycleTimeDTO>>
+        public class CycleTimesTest : EndpointTest<List<LeadTimeDTO>>
         {
-            protected override async Task<List<CycleTimeDTO>> GetDataAsync()
+            protected override async Task<List<LeadTimeDTO>> GetDataAsync()
             {
                 if (!Enabled)
                     throw new Exception("Simulation domain not set. Run SimulationdomainsTest first.");
-                return shared_params.vts_simulationDomain != null ? await API.Instance.GetCycleTimes(shared_params.vts_simulationDomain.Id) : new List<CycleTimeDTO>();
+                return shared_params.vts_simulationDomain != null ? await API.Instance.GetCycleTimes(shared_params.vts_simulationDomain.Id) : new List<LeadTimeDTO>();
             }
             public override bool Enabled { get { return shared_params.vts_simulationDomain != null && shared_params.vts_simulationDomain.Id > 0; } }
-            protected override string FormatResult(List<CycleTimeDTO> result) => $"Number of cycle times retrieved: {result.Count}";
+            protected override string FormatResult(List<LeadTimeDTO> result) => $"Number of cycle times retrieved: {result.Count}";
         }
 
         public class RetentionTypesTest : EndpointTest<RetentionTypesDTO>
@@ -179,7 +179,7 @@ namespace VSM.Client.Pages
             }
             public override bool Enabled { get { return shared_params.rootfolder != null; } }
 
-            protected override string FormatResult(CleanupConfigurationDTO? result) => result != null ? $"Cleanup configurations. Cycletime {result.CycleTime} days, CleanupFrequency {result.CleanupFrequency} days" : "No cleanup configuration retrieved";
+            protected override string FormatResult(CleanupConfigurationDTO? result) => result != null ? $"Cleanup configurations. LeadTime {result.LeadTime} days, Frequency {result.Frequency} days" : "No cleanup configuration retrieved";
         }
         public class GetFoldersByRootFolderIdTest : EndpointTest<List<FolderNodeDTO>>
         {

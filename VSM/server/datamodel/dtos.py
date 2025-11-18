@@ -44,19 +44,19 @@ class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
 
 # how long time does the engineer require to analyse a simulation before it expires and can be cleaned
 # see values in vts_create_meta_data
-class CycleTimeBase(SQLModel):
+class LeadTimeBase(SQLModel):
     simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
     name: str                 = Field(default="")
     days: int                 = Field(default=0)
 
-class CycleTimeDTO(CycleTimeBase, table=True):
+class LeadTimeDTO(LeadTimeBase, table=True):
     id: int | None            = Field(default=None, primary_key=True)
 
 # The configuration can be used as follow:
-#   a) deactivating cleanup is done by setting cleanupfrequency to None
-#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. If cleanup_round_start_date is not set then we assume today
-#   c) cycletime can be set with cleanup is inactive cleanupfrequency is None
-#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
+#   a) deactivating cleanup is done by setting frequency to None
+#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. If cleanup_round_start_date is not set then we assume today
+#   c) leadtime can be set with cleanup is inactive frequency is None
+#   d) progress to describe where the rootfolder is in the cleanup round: 
 #      - inactive
 #      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
 #      - cleaning: this is the last phase in which the actual cleaning happens
@@ -65,74 +65,68 @@ class CycleTimeDTO(CycleTimeBase, table=True):
 #STARTING_RETENTION_REVIEW  is the only phase where the backend is allowed to mark simulation for cleanup.
 #Simulations imported in this phase must postpone possible marked for cleanup to the next cleanup round
 class CleanupProgress:
-    class ProgressEnum(str, Enum):
+    class Progress(str, Enum):
         """Enumeration of cleanup round progress states."""
-        INACTIVE                    = "inactive"    # No cleanup is active
-        STARTING_RETENTION_REVIEW   = "starting_retention_review"      # This is the only phase where the backend is allowed to mark simulation for cleanup.
-        RETENTION_REVIEW            = "retention_review"      # Markup phase - users can adjust what simulations will be cleaned. 
-        CLEANING                    = "cleaning"    # Actual cleaning is happening
-        FINISHING                   = "finish_cleanup_round"    # finish the cleanup round
-        DONE                        = "cleanup_is_done"    # Cleanup round is complete, waiting for next round
+        INACTIVE                      = "inactive"                      # No cleanup is active
+        SCANNING                      = "scanning"                      # This is the only phase where the backend is allowed to mark simulation for cleanup.
+        MARKING_FOR_RETENTION_REVIEW  = "marking_for_retention_review"  # This is the only phase where the backend is allowed to mark simulation for cleanup.
+        RETENTION_REVIEW              = "retention_review"              # Markup phase - users can adjust what simulations will be cleaned. 
+        CLEANING                      = "cleaning"                      # Actual cleaning is happening
+        UNMARKING_AFTER_REVIEW        = "unmarking_after_review"        # setting the retention of still marked simulation to a retention after "marked" -that would probably be +7d(next)
+        DONE                          = "cleanup_is_done"               # Cleanup round is complete, waiting for next round
 
     # Define valid state transitions
-    valid_transitions: dict["CleanupProgress.ProgressEnum", list["CleanupProgress.ProgressEnum"]] = {
-        ProgressEnum.INACTIVE: [ProgressEnum.STARTING_RETENTION_REVIEW],
-        ProgressEnum.STARTING_RETENTION_REVIEW: [ProgressEnum.RETENTION_REVIEW],
-        ProgressEnum.RETENTION_REVIEW: [ProgressEnum.CLEANING, ProgressEnum.INACTIVE],
-        ProgressEnum.CLEANING: [ProgressEnum.FINISHING, ProgressEnum.INACTIVE],
-        ProgressEnum.FINISHING: [ProgressEnum.DONE, ProgressEnum.INACTIVE],
-        ProgressEnum.DONE: [ProgressEnum.INACTIVE, ProgressEnum.STARTING_RETENTION_REVIEW],
+    valid_transitions: dict["CleanupProgress.Progress", list["CleanupProgress.Progress"]] = {
+        Progress.INACTIVE:                     [Progress.SCANNING],
+        Progress.SCANNING:                     [Progress.MARKING_FOR_RETENTION_REVIEW, Progress.INACTIVE],
+        Progress.MARKING_FOR_RETENTION_REVIEW: [Progress.RETENTION_REVIEW, Progress.INACTIVE],
+        Progress.RETENTION_REVIEW:             [Progress.CLEANING, Progress.INACTIVE],
+        Progress.CLEANING:                     [Progress.UNMARKING_AFTER_REVIEW, Progress.INACTIVE],
+        Progress.UNMARKING_AFTER_REVIEW:       [Progress.DONE, Progress.INACTIVE],
+        Progress.DONE:                         [Progress.SCANNING, Progress.INACTIVE]
     }
     
     # Define the natural progression through cleanup states
-    next_natural_state: dict["CleanupProgress.ProgressEnum", "CleanupProgress.ProgressEnum"] = {
-        ProgressEnum.INACTIVE: ProgressEnum.STARTING_RETENTION_REVIEW,
-        ProgressEnum.STARTING_RETENTION_REVIEW: ProgressEnum.RETENTION_REVIEW,
-        ProgressEnum.RETENTION_REVIEW: ProgressEnum.CLEANING,
-        ProgressEnum.CLEANING: ProgressEnum.FINISHING,
-        ProgressEnum.FINISHING: ProgressEnum.DONE,
-        ProgressEnum.DONE: ProgressEnum.STARTING_RETENTION_REVIEW,
+    next_natural_state: dict["CleanupProgress.Progress", "CleanupProgress.Progress"] = {
+        Progress.INACTIVE:                      Progress.SCANNING,
+        Progress.SCANNING:                      Progress.MARKING_FOR_RETENTION_REVIEW,
+        Progress.MARKING_FOR_RETENTION_REVIEW:  Progress.RETENTION_REVIEW,
+        Progress.RETENTION_REVIEW:              Progress.CLEANING,
+        Progress.CLEANING:                      Progress.UNMARKING_AFTER_REVIEW,
+        Progress.UNMARKING_AFTER_REVIEW:        Progress.DONE,
+        Progress.DONE:                          Progress.SCANNING
     }
 
 # The configuration can be used as follow:
-#   a) deactivating cleanup is done by setting cleanupfrequency to None
-#   b) activating a cleanup round requires that cleanupfrequency is set and that the cycletime is > 0. 
+#   a) deactivating cleanup is done by setting frequency to None
+#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. 
 #        If cleanup_round_start_date is not set then we assume today
-#   c) cycletime: is minimum number of days from last modification of a simulation til it can be cleaned
-#        It can be set with cleanup is inactive cleanupfrequency is None
-#   d) cleanup_progress to describe where the rootfolder is in the cleanup round: 
-#      - inactive: going from an activate state to inactive will set the cleanup_start_date to None. 
-#                  If inactivate state and cleanupfrequency, cycletime and cleanup_start_date will start the cleanup when the cleanup_start_date is reached.
+#   c) leadtime: is minimum number of days from last modification of a simulation til it can be cleaned
+#        It can be set with cleanup is inactive frequency is None
+#   d) progress to describe where the rootfolder is in the cleanup round: 
+#      - inactive: going from an activate state to inactive will set the start_date to None. 
+#                  If inactivate state and frequency, leadtime and start_date will start the cleanup when the start_date is reached.
 #      - started:  the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
 #      - cleaning: this is the last phase in which the actual cleaning happens
 #      - finished: the cleanup round is finished and we wait for the next round
 class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
-    rootfolder_id: int              = Field(default=None, foreign_key="rootfolderdto.id")
-    cycletime: int                  = Field(default=0)  # days a simulation must be available before cleanup can start. 
-    cleanupfrequency: float         = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
-    cleanup_start_date: date | None = Field(default=None)
-    cleanup_progress: str           = Field(default=CleanupProgress.ProgressEnum.INACTIVE.value)
+    rootfolder_id: int      = Field(default=None, foreign_key="rootfolderdto.id")
+    leadtime: int           = Field(default=0)  # days a simulation must be available before cleanup can start. 
+    frequency: float        = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
+    start_date: date | None = Field(default=None)
+    progress: str           = Field(default=CleanupProgress.Progress.INACTIVE.value)
 
 class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     """Cleanup configuration as separate table."""
     id: int | None = Field(default=None, primary_key=True)
 
-    # def __eq__(self, other):
-    #     if not isinstance(other, CleanupConfigurationDTO):
-    #         return False
-    #     return (self.cycletime == other.cycletime and 
-    #             self.cleanupfrequency == other.cleanupfrequency and 
-    #             self.cleanup_start_date == other.cleanup_start_date and
-    #             self.cleanup_progress == other.cleanup_progress)
-
     def is_valid(self) -> bool:
-        # has cleanup_frequency and cycle_time been set. 
-        # If cleanup_start_date is None then cleanup_progress must be INACTIVE
-        is_valid: bool = (self.cleanupfrequency is not None and self.cleanupfrequency > 0) and \
-                         (self.cycletime is not None and self.cycletime > 0) and \
-                         ((self.cleanup_progress == CleanupProgress.ProgressEnum.INACTIVE.value) \
-                          or self.cleanup_start_date is not None)
+        # has cleanup_frequency and leadtime been set. 
+        # If start_date is None then progress must be INACTIVE
+        is_valid: bool = (self.frequency is not None and self.frequency > 0) and \
+                         (self.leadtime is not None and self.leadtime > 0) and \
+                         ( self.progress == CleanupProgress.Progress.INACTIVE.value  or self.start_date is not None )
         return is_valid
     
 # path protection for a specific path in a rootfolder
@@ -147,7 +141,7 @@ class PathProtectionDTO(PathProtectionBase, table=True):
 
 
 
-#storage_id:  @TODO the default = "local" must eb fixed when moving to other remote platofrms
+#storage_id:  @TODO the default = "local" must be fixed when moving to remote storage platforms
 class RootFolderBase(SQLModel):
     simulationdomain_id: int              = Field(foreign_key="simulationdomaindto.id") 
     folder_id: int | None                 = Field(default=None, foreign_key="foldernodedto.id") 
@@ -190,10 +184,10 @@ class RootFolderBase(SQLModel):
             raise HTTPException(status_code=404, detail="unable to save cleanup configuration")
 
         if config is not None:
-            config.cycletime          = cleanup_configuration.cycletime
-            config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
-            config.cleanup_start_date = cleanup_configuration.cleanup_start_date
-            config.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress
+            config.leadtime   = cleanup_configuration.leadtime
+            config.frequency  = cleanup_configuration.frequency
+            config.start_date = cleanup_configuration.start_date
+            config.progress   = cleanup_configuration.progress if cleanup_configuration.progress is None else cleanup_configuration.progress
 
         session.add(self)
         session.commit()

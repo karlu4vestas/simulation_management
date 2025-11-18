@@ -42,15 +42,15 @@ def read_retentiontypes_by_domain_id(simulationdomain_id: int):
 def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str, "RetentionTypeDTO"]:
     return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
-def read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
+def read_frequency_by_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cleanupfrequency = session.exec(select(dtos.CleanupFrequencyDTO).where(dtos.CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
-        if not cleanupfrequency or len(cleanupfrequency) == 0:
-            raise HTTPException(status_code=404, detail="CleanupFrequency not found")
-        return cleanupfrequency
+        frequency = session.exec(select(dtos.CleanupFrequencyDTO).where(dtos.CleanupFrequencyDTO.simulationdomain_id == simulationdomain_id)).all()
+        if not frequency or len(frequency) == 0:
+            raise HTTPException(status_code=404, detail="Frequency not found")
+        return frequency
 #@app.get("/simulationdomain/{simulationdomain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
-def read_cleanupfrequency_name_dict_by_domain_id(simulationdomain_id: int):
-    return {cleanup.name.lower(): cleanup for cleanup in read_cleanupfrequency_by_domain_id(simulationdomain_id)}
+def read_frequency_name_dict_by_domain_id(simulationdomain_id: int):
+    return {cleanup.name.lower(): cleanup for cleanup in read_frequency_by_domain_id(simulationdomain_id)}
 
 
 def read_folder_types_pr_domain_id(simulationdomain_id: int):
@@ -66,11 +66,11 @@ def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
 
 def read_cycle_time_by_domain_id(simulationdomain_id: int):
     with Session(Database.get_engine()) as session:
-        cycle_time = session.exec(select(dtos.CycleTimeDTO).where(dtos.CycleTimeDTO.simulationdomain_id == simulationdomain_id)).all()
+        cycle_time = session.exec(select(dtos.LeadTimeDTO).where(dtos.LeadTimeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not cycle_time or len(cycle_time) == 0:
-            raise HTTPException(status_code=404, detail="CycleTime not found")
+            raise HTTPException(status_code=404, detail="LeadTime not found")
         return cycle_time
-#@app.get("/simulationdomain/{simulationdomain_id}/cycletimes/dict", response_model=dict[str,CycleTimeDTO]) # do not expose before needed
+#@app.get("/simulationdomain/{simulationdomain_id}/leadtimes/dict", response_model=dict[str,LeadTimeDTO]) # do not expose before needed
 def read_cycle_time_dict_by_domain_id(simulationdomain_id: int):
     return {cycle.name.lower(): cycle for cycle in read_cycle_time_by_domain_id(simulationdomain_id)}
 
@@ -159,7 +159,7 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, "Retenti
 
 def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, "RetentionTypeDTO"]:
     retention_types_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
-    #filter to keep only retentions with at cycletime
+    #filter to keep only retentions with at leadtime
     return {key:retention for key,retention in retention_types_dict.items() if retention.days_to_cleanup is not None}
 
 def read_folders( rootfolder_id: int ):
@@ -196,10 +196,10 @@ def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.Cleanup
         if existing_cleanup_config:
             return existing_cleanup_config
         
-        from cleanup_cycle.scheduler_db_actions import CleanupScheduler
+        from cleanup.scheduler_db_actions import CleanupScheduler
         cleanup_config.rootfolder_id = rootfolder_id
         cleanup_config.rootfolder_id = rootfolder_id
-        cleanup_config.cleanup_progress = dtos.CleanupProgress.ProgressEnum.INACTIVE
+        cleanup_config.progress = dtos.CleanupProgress.Progress.INACTIVE
         CleanupScheduler.deactivate_calendar(cleanup_config.rootfolder_id)
         session.add(cleanup_config)
         session.commit()
@@ -227,11 +227,11 @@ def update_cleanup_configuration_by_rootfolder_id(rootfolder_id: int, cleanup_co
         cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         # Update the DTO with values from the incoming dataclass
         # any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
-        cleanup_config.cycletime          = cleanup_configuration.cycletime
-        cleanup_config.cleanupfrequency   = cleanup_configuration.cleanupfrequency
-        cleanup_config.cleanup_start_date = cleanup_configuration.cleanup_start_date
-        cleanup_config.cleanup_progress   = dtos.CleanupProgress.ProgressEnum.INACTIVE 
-        #config_dto.cleanup_progress   = cleanup_configuration.cleanup_progress if cleanup_configuration.cleanup_progress is None else cleanup_configuration.cleanup_progress 
+        cleanup_config.leadtime          = cleanup_configuration.leadtime
+        cleanup_config.frequency   = cleanup_configuration.frequency
+        cleanup_config.start_date = cleanup_configuration.start_date
+        cleanup_config.progress   = dtos.CleanupProgress.Progress.INACTIVE 
+        #config_dto.progress   = cleanup_configuration.progress if cleanup_configuration.progress is None else cleanup_configuration.progress 
         rootfolder.save_cleanup_configuration(session, cleanup_config)
 
         #if cleanup_configuration.can_start_cleanup():
@@ -613,9 +613,9 @@ def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]
 
         #cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
-        # However, when a cleanup round is started they have time at "rootfolder.cycletime" to adjust retention
+        # However, when a cleanup round is started they have time at "rootfolder.leadtime" to adjust retention
         #if not cleanup_config.is_valid():
-        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing cleanupfrequency, cleanup_round_start_date or cycletime ")
+        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing frequency, cleanup_round_start_date or leadtime ")
 
         # Get retention types for calculations
         #retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 

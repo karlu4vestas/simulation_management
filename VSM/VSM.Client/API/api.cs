@@ -55,13 +55,13 @@ namespace VSM.Client.SharedAPI
 
             return all_frequencies;
         }
-        public async Task<List<CycleTimeDTO>> GetCycleTimes(int simulationDomainId)
+        public async Task<List<LeadTimeDTO>> GetCycleTimes(int simulationDomainId)
         {
-            List<CycleTimeDTO> all_cycle_times = await httpClient.GetFromJsonAsync<List<CycleTimeDTO>>($"http://127.0.0.1:5173/v1/simulationdomains/{simulationDomainId}/cycletimes/", new JsonSerializerOptions
+            List<LeadTimeDTO> all_cycle_times = await httpClient.GetFromJsonAsync<List<LeadTimeDTO>>($"http://127.0.0.1:5173/v1/simulationdomains/{simulationDomainId}/leadtimes/", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-            }) ?? new List<CycleTimeDTO>();
+            }) ?? new List<LeadTimeDTO>();
 
             return all_cycle_times;
         }
@@ -100,7 +100,7 @@ namespace VSM.Client.SharedAPI
         {
             try
             {
-                var updateData = new { cleanupfrequency = cleanup_configuration.CleanupFrequency, cycletime = cleanup_configuration.CycleTime };
+                var updateData = new { frequency = cleanup_configuration.Frequency, leadtime = cleanup_configuration.LeadTime };
                 var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,

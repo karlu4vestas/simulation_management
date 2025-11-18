@@ -15,7 +15,7 @@ namespace VSM.Client.Datamodel
         private SimulationDomainDTO? Domain { get; set; }
         public List<RootFolder> UsersRootFolders { get; set; } = new List<RootFolder>();
         public List<CleanupFrequencyDTO> CleanupFrequencies { get; set; } = new List<CleanupFrequencyDTO>();
-        public List<CycleTimeDTO> CycleTimes { get; set; } = new List<CycleTimeDTO>();
+        public List<LeadTimeDTO> CycleTimes { get; set; } = new List<LeadTimeDTO>();
         private static byte _current_id = 0;
         public byte NewID
         {

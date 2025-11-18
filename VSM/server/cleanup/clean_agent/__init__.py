@@ -24,11 +24,11 @@ Example usage:
     )
 """
 
-from cleanup_cycle.clean_agent.clean_main import clean_main
-from cleanup_cycle.clean_agent.clean_parameters import CleanMode, CleanParameters
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
-from cleanup_cycle.clean_agent.simulation import BaseSimulation, Simulation
-from cleanup_cycle.clean_agent.thread_safe_counters import ThreadSafeCounter, ThreadSafeDeletionCounter, DeletionCounts
+from cleanup.clean_agent.clean_main import clean_main
+from cleanup.clean_agent.clean_parameters import CleanMode, CleanParameters
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
+from cleanup.clean_agent.simulation import BaseSimulation, Simulation
+from cleanup.clean_agent.thread_safe_counters import ThreadSafeCounter, ThreadSafeDeletionCounter, DeletionCounts
 
 __all__ = [
     'clean_main',

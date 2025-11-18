@@ -2,13 +2,14 @@ import os
 import time as time_module
 import tempfile
 from datetime import datetime
-from cleanup_cycle.scheduler_dtos import ActionType 
-from cleanup_cycle.agent_task_manager import CleanupTaskManager 
-from cleanup_cycle.agents_internal import AgentTemplate
+from cleanup import agent_db_interface
+from cleanup.scheduler_dtos import ActionType 
+from cleanup.agent_task_manager import AgentTaskManager 
+from cleanup.agents_internal import AgentTemplate
 from datamodel.dtos import FileInfo
-from cleanup_cycle.clean_agent.clean_main import clean_main, CleanupResult
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
-from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
+from cleanup.clean_agent.clean_main import clean_main, CleanupResult
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressReporter, CleanProgressWriter
+from cleanup.clean_agent.clean_parameters import CleanMeasures, CleanMode
 
 def as_date_time(timestamp): return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d_%H-%M-%S')
 
@@ -29,7 +30,7 @@ class AgentCleanProgressWriter(CleanProgressWriter):
             f"Queue: {deletion_queue_size}; "
             f"Threads: {active_threads}"
         )
-        CleanupTaskManager.task_progress(self.agentCleanRootFolder.task.id, msg)
+        AgentTaskManager.task_progress(self.agentCleanRootFolder.task.id, msg)
 
     def open(self, output_path: str):
         super().open(output_path)
@@ -80,25 +81,29 @@ class AgentCleanVTSRootFolder(AgentTemplate):
             self.error_message = "Temporary result folder is not set"
             return
             
-        simulations: list[FileInfo] = CleanupTaskManager.task_read_folders_marked_for_cleanup(self.task.id)
-        CleanupTaskManager.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
+        simulations: list[FileInfo] = agent_db_interface.task_read_folders_marked_for_cleanup(self.task.id)
+        AgentTaskManager.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
         
         clean_result: CleanupResult = None
         if len(simulations) > 0:
             clean_result: CleanupResult = self.clean_simulations(simulations)
             # Report summary
             measures = clean_result.measures
-            CleanupTaskManager.task_progress( self.task.id,
+            AgentTaskManager.task_progress( self.task.id,
                 f"Cleanup completed: {measures.simulations_processed} processed, "
                 f"{measures.simulations_cleaned} cleaned, {measures.simulations_issue} issues, "
                 f"{measures.simulations_skipped} skipped"
             )
             # Update simulations in database with cleanup results
             if len(clean_result.results) > 0:
-                result: dict[str, str] = CleanupTaskManager.task_insert_or_update_simulations_in_db( self.task.id, clean_result.results)
-
-                CleanupTaskManager.task_progress( self.task.id, f"Insertion completed: {len(clean_result.results)} simulations inserted" )
+                result: dict[str, str] = self.insert_or_update_simulations_in_db( self.task.id, clean_result.results)
+                AgentTaskManager.task_progress( self.task.id, f"Insertion completed: {len(clean_result.results)} simulations inserted" )
+                
         self.success_message = f"Cleaned {len(simulations)} simulations in rootfolder {self.task.rootfolder_id}"
+
+    def insert_or_update_simulations_in_db(self, task_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+        # The purpose of this intermediate method is to allow overriding in the unit tests so that test can be run without a database
+        return agent_db_interface.task_clean_insert_or_update_simulations_in_db(task_id, simulations)
 
     def clean_simulations(self, simulations: list[FileInfo]) -> CleanupResult | None:
         

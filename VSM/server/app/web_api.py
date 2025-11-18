@@ -3,9 +3,9 @@ from typing import Optional
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
-from cleanup_cycle import cleanup_db_actions
+from cleanup import agent_db_interface
 from datamodel.retentions import RetentionTypeDTO, FolderRetention
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO, PathProtectionDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO, PathProtectionDTO
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db import db_api
@@ -85,15 +85,15 @@ def fs_read_folder_types_pr_domain_id(simulationdomain_id: int):
     return db_api.read_folder_types_pr_domain_id(simulationdomain_id)
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
-@app.get("/v1/simulationdomains/{simulationdomain_id}/cycletimes/", response_model=list[CycleTimeDTO])
+@app.get("/v1/simulationdomains/{simulationdomain_id}/leadtimes/", response_model=list[LeadTimeDTO])
 def fs_read_cycle_time_by_domain_id(simulationdomain_id: int):
     return db_api.read_cycle_time_by_domain_id(simulationdomain_id)
 
 
 # The cycle time for one simulation is the time from initiating the simulation, til cleanup the simulation. 
 @app.get("/v1/simulationdomains/{simulationdomain_id}/cleanupfrequencies/", response_model=list[CleanupFrequencyDTO])
-def fs_read_cleanupfrequency_by_domain_id(simulationdomain_id: int):
-    return db_api.read_cleanupfrequency_by_domain_id(simulationdomain_id)
+def fs_read_frequency_by_domain_id(simulationdomain_id: int):
+    return db_api.read_frequency_by_domain_id(simulationdomain_id)
 
 #-----------------end retrieval of metadata for a simulation domain -------------------
 
@@ -110,7 +110,7 @@ def fs_read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Quer
 # update a rootfolder's cleanup_configuration
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
 def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
-    return cleanup_db_actions.update_rootfolder_cleanup_configuration(rootfolder_id, cleanup_configuration)
+    return agent_db_interface.update_rootfolder_cleanup_configuration(rootfolder_id, cleanup_configuration)
 
 
 
@@ -154,7 +154,7 @@ def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
     return db_api.delete_pathprotection(rootfolder_id, protection_id)
 
     
-# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.cleanupfrequency and rootfolder.cycletime msut be set
+# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.frequency and rootfolder.leadtime msut be set
 # it will adjust the expiration dates to the user selected retention categories in the webclient
 #   the expiration date for non-numeric retentions is set to None
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type
@@ -166,8 +166,8 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler, CleanupTaskDTO
-from cleanup_cycle.scheduler_dtos import AgentInfo
+from cleanup.scheduler_db_actions import CleanupScheduler, CleanupTaskDTO
+from cleanup.scheduler_dtos import AgentInfo
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
     return AgentInfo.reserve_task(agent)
@@ -185,12 +185,12 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
     return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
 
 #-----------------Scheduler API -------------------
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler
-from cleanup_cycle.agent_runner import InternalAgentFactory, AgentCallbackHandler
+from cleanup.scheduler_db_actions import CleanupScheduler
+from cleanup.agent_runner import InternalAgentFactory, AgentCallbackHandler
 
-def run_scheduler_tasks(callback_handler: AgentCallbackHandler = None):
+def run_scheduler_tasks(callback_handler: AgentCallbackHandler = None, run_randomized: bool = False):
     #callback_handler: Optional handler for agent execution callbacks with on_agent_prerun and on_agent_postrun methods
-    InternalAgentFactory.run_internal_agents(callback_handler=callback_handler)
+    InternalAgentFactory.run_internal_agents(callback_handler=callback_handler, run_randomized=run_randomized)
     CleanupScheduler.update_calendars_and_tasks() # just as precaution. this is actualle done on complettion of each task
 
 @app.post("/v1/scheduler/update_calendars_and_tasks")

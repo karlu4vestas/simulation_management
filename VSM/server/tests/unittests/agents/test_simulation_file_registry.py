@@ -6,7 +6,7 @@ import shutil
 import tempfile
 from queue import Queue
 from multiprocessing.pool import ThreadPool
-from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from cleanup.clean_agent.simulation_file_registry import SimulationFileRegistry
 from tests import test_storage
 
 # Global test storage location

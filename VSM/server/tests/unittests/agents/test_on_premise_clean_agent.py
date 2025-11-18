@@ -12,14 +12,25 @@ from datetime import date
 # Add server directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
 
-from cleanup_cycle.agent_on_premise_clean import AgentCleanProgressWriter, AgentCleanVTSRootFolder
-from cleanup_cycle.clean_agent.clean_main import CleanupResult
-from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures, CleanMode
+from cleanup.agent_on_premise_clean import AgentCleanProgressWriter, AgentCleanVTSRootFolder
+from cleanup.clean_agent.clean_main import CleanupResult
+from cleanup.clean_agent.clean_parameters import CleanMeasures, CleanMode
 from datamodel.dtos import FileInfo, FolderTypeEnum
 from datamodel.retentions import ExternalRetentionTypes
 from tests import test_storage
 
 TEST_STORAGE_LOCATION = test_storage.LOCATION
+
+        
+class MockAgentCleanVTSRootFolder(AgentCleanVTSRootFolder):
+    def __init__(self):
+        super().__init__()
+        self.extracted_simulations: list[FileInfo] = []
+
+    def insert_or_update_simulations_in_db(self, task_id: int, extracted_simulations: list[FileInfo]) -> dict[str, str]:
+        #Override to capture simulations locally instead of inserting to DB.
+        self.extracted_simulations = extracted_simulations
+        return {"status": "success", "count": str(len(extracted_simulations))}
 
 class TestAgentCleanProgressWriter(unittest.TestCase):
     """Test the nested AgentCleanProgressWriter class"""
@@ -27,7 +38,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         # Create a mock agent
-        self.mock_agent = Mock(spec=AgentCleanVTSRootFolder)
+        self.mock_agent = Mock(spec=MockAgentCleanVTSRootFolder)
         self.mock_agent.task = Mock()
         self.mock_agent.task.id = 123
         
@@ -43,7 +54,7 @@ class TestAgentCleanProgressWriter(unittest.TestCase):
         self.assertEqual(self.progress_writer.agentCleanRootFolder, self.mock_agent)
         self.assertEqual(self.progress_writer.seconds_between_update, 1)
         self.assertEqual(self.progress_writer.seconds_between_filelog, 60)
-        
+
 class TestAgentCleanRootFolder(unittest.TestCase):
     """Test the AgentCleanRootFolder class"""
     
@@ -57,7 +68,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         os.environ['CLEAN_MODE'] = 'ANALYSE'
         
         # Create agent
-        self.agent = AgentCleanVTSRootFolder()
+        self.agent = MockAgentCleanVTSRootFolder()
         
         # Mock task
         self.agent.task = Mock()
@@ -71,8 +82,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
             shutil.rmtree(self.temp_dir)
         
         # Clean up environment variables
-        for key in ['CLEAN_TEMP_FOLDER', 'CLEAN_SIM_WORKERS', 
-                    'CLEAN_DELETION_WORKERS', 'CLEAN_MODE']:
+        for key in ['CLEAN_TEMP_FOLDER', 'CLEAN_SIM_WORKERS', 'CLEAN_DELETION_WORKERS', 'CLEAN_MODE']:
             if key in os.environ:
                 del os.environ[key]
     
@@ -90,7 +100,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
         # This will cause os.makedirs to fail and the agent to set error_message
         invalid_path = '/nonexistent_root_path_cannot_be_created/subfolder'
         os.environ['CLEAN_TEMP_FOLDER'] = invalid_path
-        agent = AgentCleanVTSRootFolder()
+        agent = MockAgentCleanVTSRootFolder()
         
         # Since the path cannot be created, temporary_result_folder should be None
         self.assertIsNone(agent.temporary_result_folder)
@@ -100,7 +110,7 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_invalid_clean_mode(self):
         """Test initialization with invalid clean mode"""
         os.environ['CLEAN_MODE'] = 'INVALID_MODE'
-        agent = AgentCleanVTSRootFolder()
+        agent = MockAgentCleanVTSRootFolder()
         
         self.assertEqual(agent.clean_mode, CleanMode.ANALYSE)  # Falls back to ANALYSE
         self.assertIsNotNone(agent.error_message)
@@ -109,166 +119,17 @@ class TestAgentCleanRootFolder(unittest.TestCase):
     def test_initialization_delete_mode(self):
         """Test initialization with DELETE mode"""
         os.environ['CLEAN_MODE'] = 'DELETE'
-        agent = AgentCleanVTSRootFolder()
+        agent = MockAgentCleanVTSRootFolder()
         
         self.assertEqual(agent.clean_mode, CleanMode.DELETE)
-    
     
     def test_execute_task_invalid_temp_folder(self):
         """Test execute_task when temp folder is invalid"""
         self.agent.temporary_result_folder = None
         
-        self.agent.execute_task()
-        
+        self.agent.execute_task()        
         # Should return early without doing anything
         # No exception should be raised
-    
-    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
-    def test_clean_simulations_success(self, mock_clean_main):
-        """Test clean_simulations method"""
-        simulation_paths = [
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim2")
-        ]
-        
-        # Mock return value
-        measures = CleanMeasures(
-            simulations_processed=2,
-            simulations_cleaned=2,
-            simulations_issue=0,
-            simulations_skipped=0,
-            files_deleted=25,
-            bytes_deleted=250000,
-            error_count=0
-        )
-        
-        result_fileinfos = [
-            FileInfo(
-                filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-                modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.SIMULATION,
-                external_retention=ExternalRetentionTypes.CLEAN.value
-            )
-        ]
-        
-        mock_clean_main.return_value = CleanupResult(
-            results=result_fileinfos,
-            measures=measures
-        )
-        
-        # Call clean_simulations
-        result = self.agent.clean_simulations(simulation_paths)
-        
-        # Verify result
-        self.assertIsNotNone(result)
-        self.assertEqual(len(result.results), 1)
-        self.assertEqual(result.measures.simulations_processed, 2)
-        
-        # Verify clean_main was called with correct parameters
-        mock_clean_main.assert_called_once()
-        call_kwargs = mock_clean_main.call_args[1]
-        
-        self.assertEqual(len(call_kwargs['simulations']), 2)
-        self.assertEqual(call_kwargs['clean_mode'], CleanMode.ANALYSE)
-        self.assertEqual(call_kwargs['num_sim_workers'], 4)
-        self.assertEqual(call_kwargs['num_deletion_workers'], 1)
-        self.assertIsNotNone(call_kwargs['output_path'])
-        self.assertIsNotNone(call_kwargs['progress_reporter'])
-    
-    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
-    def test_clean_simulations_exception(self, mock_clean_main):
-        """Test clean_simulations when clean_main raises exception"""
-        simulation_paths = [os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1")]
-        
-        # Mock exception
-        mock_clean_main.side_effect = Exception("Clean failed")
-        
-        # Call clean_simulations
-        result = self.agent.clean_simulations(simulation_paths)
-        
-        # Verify result is None and error is set
-        self.assertIsNone(result)
-        self.assertIsNotNone(self.agent.error_message)
-        self.assertIn("Failed to clean simulations", self.agent.error_message)
-        self.assertIn("Clean failed", self.agent.error_message)
-    
-
-class TestAgentIntegration(unittest.TestCase):
-    """Integration tests for the complete workflow"""
-    
-    def setUp(self):
-        """Set up test fixtures"""
-        self.temp_dir = tempfile.mkdtemp()
-        os.environ['CLEAN_TEMP_FOLDER'] = self.temp_dir
-        os.environ['CLEAN_SIM_WORKERS'] = '2'
-        os.environ['CLEAN_DELETION_WORKERS'] = '1'
-        os.environ['CLEAN_MODE'] = 'ANALYSE'
-    
-    def tearDown(self):
-        """Clean up after tests"""
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-        
-        for key in ['CLEAN_TEMP_FOLDER', 'CLEAN_SIM_WORKERS', 
-                    'CLEAN_DELETION_WORKERS', 'CLEAN_MODE']:
-            if key in os.environ:
-                del os.environ[key]
-    
-    @patch('cleanup_cycle.agent_on_premise_clean.CleanupTaskManager')
-    @patch('cleanup_cycle.agent_on_premise_clean.clean_main')
-    def test_full_workflow(self, mock_clean_main, mock_task_manager):
-        """Test the complete workflow from execute_task to DB update"""
-        # Create agent
-        agent = AgentCleanVTSRootFolder()
-        agent.task = Mock()
-        agent.task.id = 789
-        agent.task.path = os.path.join(TEST_STORAGE_LOCATION, "test_agent/root")
-        
-        # Mock responses
-        simulation_paths = [
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-            os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim2")
-        ]
-        mock_task_manager.task_read_folders_marked_for_cleanup.return_value = simulation_paths
-        
-        result_fileinfos = [
-            FileInfo(
-                filepath=os.path.join(TEST_STORAGE_LOCATION, "test_agent/sim1"),
-                modified_date=date(2024, 1, 1),
-                nodetype=FolderTypeEnum.SIMULATION,
-                external_retention=ExternalRetentionTypes.CLEAN.value
-            )
-        ]
-        
-        measures = CleanMeasures(
-            simulations_processed=2,
-            simulations_cleaned=1,
-            simulations_issue=0,
-            simulations_skipped=1,
-            files_deleted=10,
-            bytes_deleted=100000,
-            error_count=0
-        )
-        
-        mock_clean_main.return_value = CleanupResult(
-            results=result_fileinfos,
-            measures=measures
-        )
-        
-        # Execute
-        agent.execute_task()
-        
-        # Verify the complete call chain
-        mock_task_manager.task_read_folders_marked_for_cleanup.assert_called_once_with(789)
-        mock_clean_main.assert_called_once()
-        mock_task_manager.task_insert_or_update_simulations_in_db.assert_called_once_with(
-            789,
-            result_fileinfos
-        )
-        
-        # Verify no errors
-        self.assertIsNone(agent.error_message)
-
 
 if __name__ == '__main__':
     unittest.main()

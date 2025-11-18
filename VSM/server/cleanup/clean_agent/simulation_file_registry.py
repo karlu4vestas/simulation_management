@@ -12,7 +12,7 @@ import time
 from queue import Queue
 from typing import Optional, Callable
 
-from cleanup_cycle.clean_agent.file_utilities import FileStatistics, get_size_stat_from_file_entries
+from cleanup.clean_agent.file_utilities import FileStatistics, get_size_stat_from_file_entries
 
 
 class SimulationFileRegistry:

@@ -9,11 +9,11 @@ import os
 import shutil
 from datetime import date
 from dataclasses import dataclass
-from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
+from cleanup.clean_agent.clean_main import CleanupResult, clean_main
 from datamodel.dtos import FileInfo, FolderTypeEnum
 from datamodel.retentions import ExternalRetentionTypes
-from cleanup_cycle.clean_agent.clean_parameters import CleanMode
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
+from cleanup.clean_agent.clean_parameters import CleanMode
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressWriter
 from tests import test_storage
 
 
@@ -55,15 +55,11 @@ class TestCleanMainDatabaseUsage:
         ]
         
         # Convert to FileInfo list (as would be done in production)
-        simulations = [
-            FileInfo(
-                filepath=row[0],
-                modified_date=row[1],
-                nodetype=FolderTypeEnum.SIMULATION,
-                external_retention=ExternalRetentionTypes.NUMERIC
-            )
-            for row in db_results
-        ]
+        simulations = [ FileInfo( filepath=row[0],
+                                  modified_date=row[1],
+                                  nodetype=FolderTypeEnum.SIMULATION,
+                                 external_retention=ExternalRetentionTypes.NUMERIC )
+                        for row in db_results ]
         
         # Call clean_main
         result = clean_main(

@@ -1,14 +1,14 @@
 import os
 import csv
 from datetime import date, datetime
-from cleanup_cycle.agent_task_manager import CleanupTaskManager
-from cleanup_cycle.agents_internal import AgentTemplate
-from cleanup_cycle.scan.scan import do_scan, ScanResult 
-from cleanup_cycle.scheduler_dtos import ActionType
+from cleanup.agent_task_manager import agent_db_interface,  AgentTaskManager
+from cleanup.agents_internal import AgentTemplate
+from cleanup.scan.scan import do_scan, ScanResult 
+from cleanup.scheduler_dtos import ActionType
 from datamodel.dtos import FileInfo, FolderTypeEnum
 from datamodel.retentions import ExternalRetentionTypes
-from cleanup_cycle.scan.ProgressWriter import ProgressWriter, ProgressReporter
-from cleanup_cycle.scan.folder_tree import FolderTree, FolderTreeNode
+from cleanup.scan.ProgressWriter import ProgressWriter, ProgressReporter
+from cleanup.scan.folder_tree import FolderTree, FolderTreeNode
 from db import db_api
 #from cleanup_cycle.scan.progress_reporter import ProgressReporter
 
@@ -21,7 +21,7 @@ class AgentScanProgressWriter(ProgressWriter):
     def write_realtime_progress(self, nb_processed_folders:int, mean_dirs_second:int, io_queue_qsize:int, active_threads:int):    
         #report real-time progress to the task.
         msg: str = f"\rFolders processed; pr second, queue_size, threads: {nb_processed_folders}; {mean_dirs_second}; {io_queue_qsize}; {active_threads}"
-        self.task = CleanupTaskManager.task_progress(self.agentScanRootFolder.task.id, msg)
+        self.task = AgentTaskManager.task_progress(self.agentScanRootFolder.task.id, msg)
 
     def open(self, output_path: str):
         super().open(output_path)
@@ -74,26 +74,25 @@ class AgentScanVTSRootFolder(AgentTemplate):
         try:
             extracted_simulations: list[FileInfo]
             n_hierarchical_simulations: int
-            extracted_simulations, n_hierarchical_simulations = extract_simulations(scan_result.scan_output_files[0], 
-                                                                                       AgentScanVTSRootFolder.vts_name_set, AgentScanVTSRootFolder.htc_word )
+            extracted_simulations, n_hierarchical_simulations = extract_simulations( scan_result.scan_output_files[0], 
+                                                                                     AgentScanVTSRootFolder.vts_name_set, 
+                                                                                     AgentScanVTSRootFolder.htc_word )
         except (FileNotFoundError, ValueError) as e:
             self.error_message = str(e)
             return
         
-        CleanupTaskManager.task_progress(self.task.id, f"Identified {len(extracted_simulations)} simulations and ignored {n_hierarchical_simulations} hierarchical simulations")
+        AgentTaskManager.task_progress(self.task.id, f"Identified {len(extracted_simulations)} simulations and ignored {n_hierarchical_simulations} hierarchical simulations")
         if len(extracted_simulations) == 0:
             self.error_message = "No simulations were found during the scan."
             return
         
-        self.task_insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
+        self.insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
+
         self.success_message = f"Scanned {len(extracted_simulations)} simulations in rootfolder {self.task.rootfolder_id}"        
-
-    def task_insert_or_update_simulations_in_db(self, task_id: int, extracted_simulations: list["FileInfo"]) -> dict[str, str]:
-        #@TODO would have been more useful to return the number of simulations that were inserted/updated. 
-        # This must however come from CleanupTaskManager.task_insert_or_update_simulations_in_db
-        result: dict[str, str] = CleanupTaskManager.task_insert_or_update_simulations_in_db(self.task.id, extracted_simulations)
-        return result
-
+    
+    def insert_or_update_simulations_in_db(self, task_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+        # The purpose of this intermediate method is to allow overriding in the unit tests so that test can be run without a database
+        return agent_db_interface.task_scan_insert_or_update_simulations_in_db(task_id, simulations)
 
     def scan_metadata(self, path: str, meta_file_path: str, nb_scan_thread:int) -> ScanResult:
         # @todo should be done in separate agent that can only scan and deliver the metadata file

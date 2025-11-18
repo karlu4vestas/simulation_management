@@ -46,7 +46,7 @@ namespace VSM.Client.Datamodel
         public string Name { get; set; } = "";
         public int Days { get; set; }
     }
-    public class CycleTimeDTO
+    public class LeadTimeDTO
     {
         public int Id { get; set; }
         public int simulationdomain_id { get; set; }
@@ -55,15 +55,15 @@ namespace VSM.Client.Datamodel
     }
     public class CleanupConfigurationDTO
     {
-        public int CycleTime { get; set; }
+        public int LeadTime { get; set; }
 
-        public int CleanupFrequency { get; set; }
+        public int Frequency { get; set; }
 
-        // if cleanupfrequency is set then cycletime must also be set
-        public bool IsValid { get { return CleanupFrequency == 0 || CycleTime > 0; } }
+        // if frequency is set then leadtime must also be set
+        public bool IsValid { get { return Frequency == 0 || LeadTime > 0; } }
 
         /// Return true if cleanup can be started with this configuration
-        public bool CanStartCleanup { get { return CleanupFrequency > 0 && CycleTime > 0; } }
+        public bool CanStartCleanup { get { return Frequency > 0 && LeadTime > 0; } }
     }
 
     public class FolderNodeDTO
@@ -88,9 +88,9 @@ namespace VSM.Client.Datamodel
         public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public int Cycletime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
-        public int Cleanupfrequency { get; set; } = 0; // number of days between cleanup rounds
-        public DateTime? Cleanup_Round_Start_Date { get; set; } = null; // at what date have the user set the cleanup to start
+        public int LeadTime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
+        public int Frequency { get; set; } = 0; // number of days between cleanup rounds
+        public DateTime? Start_Date { get; set; } = null; // at what date have the user set the cleanup to start
     }
     // so far we know: 
     // InnerNode, 

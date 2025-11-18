@@ -5,8 +5,8 @@ import os
 import sys
 import time
 import math
-from cleanup_cycle.scan import RobustIO
-from cleanup_cycle.clean_agent.clean_parameters import CleanMeasures
+from cleanup.scan import RobustIO
+from cleanup.clean_agent.clean_parameters import CleanMeasures
 
 
 class CleanProgressReporter(ABC):

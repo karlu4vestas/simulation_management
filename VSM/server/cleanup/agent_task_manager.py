@@ -4,16 +4,16 @@ from fastapi import HTTPException
 from db.database import Database
 from db import db_api
 from datamodel import dtos
-from cleanup_cycle import cleanup_db_actions
-from cleanup_cycle.scheduler_dtos import TaskStatus, ActionType, AgentInfo, CleanupTaskDTO 
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler
+from cleanup import agent_db_interface
+from cleanup.scheduler_dtos import TaskStatus, ActionType, AgentInfo, CleanupTaskDTO 
+from cleanup.scheduler_db_actions import CleanupScheduler
 
-class CleanupTaskManager:
+class AgentTaskManager:
     
     #agent interface methods
     @staticmethod
     def reserve_task(agent: AgentInfo) -> CleanupTaskDTO:
-        agent_action_types:list[str] = agent.action_types if not agent.action_types is None else []
+        agent_action_types:list[str]     = agent.action_types if not agent.action_types is None else []
         agent_storage_ids:list[str]|None = agent.supported_storage_ids if not agent.supported_storage_ids is None else []
 
         if (len(agent_action_types)==0):
@@ -40,9 +40,28 @@ class CleanupTaskManager:
                 return None
             else:
                 reserved_task = tasks[0]
-                #@TODO: hmm is this a hack or a the start of a better design ?
-                if reserved_task.action_type == ActionType.CLEAN_ROOTFOLDER:
-                    cleanup_db_actions.register_cleaning_start(reserved_task.rootfolder_id)
+                
+                # Generic state verification and transition logic
+                if reserved_task.precondition_states is not None and len(reserved_task.precondition_states) > 0:
+                    # Load the cleanup configuration to check current state
+                    from cleanup.cleanup_dtos import CleanupState
+                    cleanup_config = CleanupState.load_by_rootfolder_id(reserved_task.rootfolder_id)
+                    
+                    # Verify current state is one of the allowed precondition states
+                    if cleanup_config.progress not in reserved_task.precondition_states:
+                        raise HTTPException(
+                            status_code=400, 
+                            detail=f"Task {reserved_task.id} ({reserved_task.action_type}) requires one of states {reserved_task.precondition_states} but current state is {cleanup_config.progress}"
+                        )
+                    
+                    # Transition to target state if required
+                    if reserved_task.state_transition_on_reservation:
+                        if not cleanup_config.transition_to(dtos.CleanupProgress.Progress(reserved_task.target_state)):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Failed to transition from {cleanup_config.progress} to {reserved_task.target_state} for task {reserved_task.id}"
+                            )
+                        cleanup_config.save_to_db(session)
 
                 reserved_task.status = TaskStatus.RESERVED.value
                 reserved_task.reserved_by_agent_id = agent.agent_id
@@ -86,63 +105,26 @@ class CleanupTaskManager:
             if task.status not in [TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]:
                 raise HTTPException(status_code=400, detail=f"The task with id {task_id} is not valid. Must be one of {[TaskStatus.RESERVED.value, TaskStatus.INPROGRESS.value]}")
 
+            # State verification at completion
+            if status == TaskStatus.COMPLETED.value and task.state_verification_on_completion:
+                if task.target_state is not None:
+                    # Load the cleanup configuration to verify current state
+                    from cleanup.cleanup_dtos import CleanupState
+                    cleanup_config = CleanupState.load_by_rootfolder_id(task.rootfolder_id)
+                    
+                    # Verify we're still in the expected target state
+                    if cleanup_config.progress != task.target_state:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Task {task_id} ({task.action_type}) expected state {task.target_state} at completion but current state is {cleanup_config.progress}"
+                        )
+
             task.status = status
             task.status_message = status_message
             task.completed_at = datetime.now(timezone.utc)
             
-            #@TODO: hmm is this a hack or a the start of a better design ?
-            if task.action_type == ActionType.CLEAN_ROOTFOLDER:
-                cleanup_db_actions.register_cleanup_done(task.rootfolder_id)
-
             session.add(task)
             session.commit()
 
             CleanupScheduler.update_calendars_and_tasks() # prepare so the next task
             return {"message": f"Task {task_id} updated to status {status}"}
-
-
-    @staticmethod
-    def task_insert_or_update_simulations_in_db(task_id: int, simulations: list[dtos.FileInfo]) -> dict[str, str]:
-        #validate the task_id as a minimum security check
-        with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-
-        return db_api.insert_or_update_simulations_in_db(task.rootfolder_id, simulations)
-
-
-    # return the list of FileInfo objects for folders that are marked for cleanup in the given rootfolder
-    @staticmethod
-    def task_read_folders_marked_for_cleanup(task_id: int) -> list[dtos.FileInfo]:
-        #validate the task_id as a minimum security check
-        with Session(Database.get_engine()) as session:
-            task = session.exec(
-                select(CleanupTaskDTO).where((CleanupTaskDTO.id == task_id))
-            ).first()
-            if not task:
-                raise HTTPException(status_code=404, detail=f"The task with id {task_id} was not found")
-
-            # Get rootfolder to access simulationdomain_id
-            rootfolder = session.exec(
-                select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == task.rootfolder_id)
-            ).first()
-            if not rootfolder:
-                raise HTTPException(status_code=404, detail=f"The rootfolder with id {task.rootfolder_id} was not found")
-
-            # Get folder type dictionary (by name)
-            nodetype_dict_by_name = db_api.read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
-            retention_dict_by_name = db_api.read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
-            
-            # Convert to ID-based dictionaries
-            nodetype_dict  = {ft.id: ft for ft in nodetype_dict_by_name.values()}
-            retention_dict = {rt.id: rt for rt in retention_dict_by_name.values()}
-
-            # Get simulations marked for cleanup
-            simulations:list[dtos.FolderNodeDTO] = db_api.read_folders_marked_for_cleanup(task.rootfolder_id)
-            
-            # Convert each FolderNodeDTO to FileInfo using get_fileinfo()
-            file_infos:list[dtos.FileInfo] = [folder.get_fileinfo(session, nodetype_dict, retention_dict) for folder in simulations]
-        return file_infos

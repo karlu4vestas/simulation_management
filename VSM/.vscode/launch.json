@@ -270,12 +270,12 @@
       }
     },
     {
-      "name": "Debug test_cleanup_with_ondisk_simulations",
+      "name": "Debug test_2_verify_retentions_after_import_and_start_of_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_with_ondisk_simulations.py::TestCleanupWithOnDiskSimulations::test_cleanup_cycle_ondisk_simulations",
+        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_2_verify_retentions_after_import_and_start_of_cleanup_round",
         "-v",
         "-s",
         "--tb=short"

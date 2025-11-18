@@ -5,7 +5,7 @@ from collections import namedtuple
 from enum import Enum
 from queue import Queue
 from threading import Event
-from cleanup_cycle.clean_agent.thread_safe_counters import DeletionCounts, ThreadSafeCounter, ThreadSafeDeletionCounter
+from cleanup.clean_agent.thread_safe_counters import DeletionCounts, ThreadSafeCounter, ThreadSafeDeletionCounter
 from datamodel.dtos import FileInfo
 
 # Named tuple for returning cleanup measures

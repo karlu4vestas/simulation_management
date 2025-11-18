@@ -49,8 +49,8 @@ class Database:
         # List of all table models that should be checked (including metadata tables). 
         # even if the below doess not containt all DTO mapped to a table the check is solid enough
         from datamodel.retentions import RetentionTypeDTO
-        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO,CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO
-        table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, CycleTimeDTO, CleanupConfigurationDTO]
+        from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO,CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO
+        table_models = [RootFolderDTO, FolderNodeDTO, FolderTypeDTO, RetentionTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO]
         
         try:
             with Session(self._engine) as session:

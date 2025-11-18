@@ -4,7 +4,7 @@ from datetime import timedelta
 from sqlmodel import Session
 import pytest
 
-from cleanup_cycle.cleanup_db_actions import cleanup_cycle_start
+from cleanup import agents_internal
 
 from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
 from datamodel import dtos
@@ -14,7 +14,7 @@ from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db import db_api
 from db.db_api import exist_rootfolder
 from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
-from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_cleanupfrequency_by_domain_id, read_cycle_time_by_domain_id   
+from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_frequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder
 
 from datamodel import dtos, retentions
@@ -88,7 +88,7 @@ class TestCleanupWorkflows:
         #verify that the domain has the necessary configuration data
         assert len(read_retentiontypes_by_domain_id(simulation_domain_id)) > 0
         assert len(read_folder_types_pr_domain_id(simulation_domain_id)) > 0
-        assert len(read_cleanupfrequency_by_domain_id(simulation_domain_id)) > 0
+        assert len(read_frequency_by_domain_id(simulation_domain_id)) > 0
         assert len(read_cycle_time_by_domain_id(simulation_domain_id)) > 0
 
     def setup_basic_dataset_io( self, integration_session, scenario_key:str, cleanup_scenario_data) -> DataIOSet:
@@ -120,10 +120,10 @@ class TestCleanupWorkflows:
                 cleanup_config_dto:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
 
                 in_memory_config:CleanupConfiguration   = cleanup_scenario_data.get("cleanup_configuration", None)
-                cleanup_config_dto.cycletime            = in_memory_config.cycletime
-                cleanup_config_dto.cleanupfrequency     = in_memory_config.cleanupfrequency
-                cleanup_config_dto.cleanup_start_date   = in_memory_config.cleanup_start_date
-                cleanup_config_dto.cleanup_progress     = in_memory_config.cleanup_progress
+                cleanup_config_dto.leadtime            = in_memory_config.leadtime
+                cleanup_config_dto.frequency     = in_memory_config.frequency
+                cleanup_config_dto.start_date   = in_memory_config.start_date
+                cleanup_config_dto.progress     = in_memory_config.progress
                 integration_session.add(cleanup_config_dto)
                 integration_session.commit()
             else: #this case is activate for "root2_part2_data"
@@ -364,7 +364,7 @@ class TestCleanupWorkflows:
                         # NUMERIC RETENTION must be assigned undefined so it can be imported even if it the cleanup configuration is incomplete
                         assert folder.retention_id == data_set.undefined_retention.id
                     elif sim_folder.retention == ExternalRetentionTypes.NUMERIC:
-                        if data_set.retention_calculator.cleanup_progress == dtos.CleanupProgress.ProgressEnum.INACTIVE:
+                        if data_set.retention_calculator.progress == dtos.CleanupProgress.Progress.INACTIVE:
                             # if the cleanup configuration is incomplete then the external NUMERIC retention must be converted to undefined retention
                             assert folder.retention_id == data_set.undefined_retention.id,  \
                                 f"data_set.key={data_set.key}, folder={folder.path}. Retention should have been numeric or undefined but is {folder.retention_id}"
@@ -385,8 +385,23 @@ class TestCleanupWorkflows:
                     assert folder.retention_id is None, f"data_set.key={data_set.key}: Folder {folder.path} is an inner node and must have retention_id=None but has retention_id={folder.retention_id}"
 
         return data_io_sets
-
     
+    def cleanup_cycle_start(self, rootfolder_id:int ):
+        # we must force the cleanup progress state to SCANNING then MARKING_FOR_RETENTION_REVIEW before starting the cleanup cycle
+        # This is normally done by a scheduled job but here we need to do it manually to be able to test the start of the cleanup round 
+        from cleanup import cleanup_dtos
+        cleanup_state:cleanup_dtos.CleanupState = cleanup_dtos.CleanupState.load_by_rootfolder_id(rootfolder_id)
+        if not (cleanup_state.transition_to( dtos.CleanupProgress.Progress.SCANNING ) and \
+                cleanup_state.transition_to( dtos.CleanupProgress.Progress.MARKING_FOR_RETENTION_REVIEW ) ):
+            raise ValueError(f"Unable to transition cleanup state to SCANNING then MARKING_FOR_RETENTION_REVIEW for rootfolder_id={rootfolder_id}")
+        cleanup_state.save_to_db()
+        
+        agents_internal.AgentMarkSimulationsPreReview.mark_simulations(rootfolder_id )
+
+        #simulations are now marked for retention review. Transition to RETENTION_REVIEW
+        cleanup_state.transition_to( dtos.CleanupProgress.Progress.RETENTION_REVIEW )
+        cleanup_state.save_to_db()
+
     def verify_retentions_after_start_of_cleanup_round(self, integration_session, data_sets: list[DataIOSet]) -> list[DataIOSet]:
         # Verify that retentions are updated correctly due to the start of the cleanup round
         for data_set in data_sets:
@@ -398,7 +413,7 @@ class TestCleanupWorkflows:
 
             #prepare
             # lookup of input folders
-            # the list of folders be marked for cleanup because the "modified_date+cycle_time" is before the "cleanup_start_date" and the folder is not in path retention (there is no path protections yet)
+            # the list of folders be marked for cleanup because the "modified_date+cycle_time" is before the "start_date" and the folder is not in path retention (there is no path protections yet)
             input_leafs_lookup: dict[str, InMemoryFolderNode] = {normalize_path(folder.path): folder for folder in data_set.input.folders if folder.is_leaf}
             data_set.input_leafs_to_be_marked_dict = data_set.input.get_leafs_to_be_marked_dict(data_set.path_protections_paths)
 
@@ -409,7 +424,7 @@ class TestCleanupWorkflows:
             assert len(marked_folders) == 0, f"before starting cleanup round number of simulations marked for cleanup should be zero"
 
             # step 1.1: start the cleanup round and
-            cleanup_cycle_start(rootfolder.id )
+            self.cleanup_cycle_start(rootfolder.id )
             data_set.output = RootFolderWithFolderNodeDTOList(rootfolder=rootfolder, folders=read_folders(rootfolder.id), path_protections=db_api.read_pathprotections(rootfolder.id))
             output_leafs_after_start: dict[str,FolderNodeDTO] = {normalize_path(folder.path): folder for folder in data_set.output.folders if folder.nodetype_id == data_set.nodetype_leaf}
 
@@ -460,7 +475,7 @@ class TestCleanupWorkflows:
 
         # First entry validation: When calling this the first part of the second rootfolder is imported and a cleanup round is started
         cleanup_config:dtos.CleanupConfigurationDTO = root2_part1_data.output.rootfolder.get_cleanup_configuration(integration_session)
-        assert cleanup_config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"the second root folders part one must have been started for you to use this function. CleanupProgress is {cleanup_config.cleanup_progress}"
+        assert cleanup_config.progress == dtos.CleanupProgress.Progress.RETENTION_REVIEW, f"the second root folders part one must have been started for you to use this function. CleanupProgress is {cleanup_config.progress}"
 
         # Second entry validation:
         #   Also verify that the folders planned to be marked for cleanup can be extracted from the db. 
@@ -677,7 +692,7 @@ class TestCleanupWorkflows:
         rootfolder:RootFolderDTO                    = root1_data_set.output.rootfolder
         marked_folders:list[FolderNodeDTO]          = read_folders_marked_for_cleanup(rootfolder.id)
         cleanup_config:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
-        assert cleanup_config.cleanup_progress == dtos.CleanupProgress.ProgressEnum.RETENTION_REVIEW, f"The rootfolder should be RETENTION_REVIEW but is {cleanup_config.cleanup_progress}"
+        assert cleanup_config.progress == dtos.CleanupProgress.Progress.RETENTION_REVIEW, f"The rootfolder should be RETENTION_REVIEW but is {cleanup_config.progress}"
 
         # emulate a change of one retention from marked to a retention after it
         # Pick the last marked folder for change and remove it from the list of marked folders to keep track of how many are left      
@@ -701,7 +716,7 @@ class TestCleanupWorkflows:
         #  - change one path protected simulation. Expected is that it is still path protected
         sim_changed_by_import_ui:FolderNodeDTO = marked_folders[-1]
         del marked_folders[-1]
-        #sim_changed_by_import_ui.modified_date = sim_changed_by_import_ui.modified_date + timedelta(days=cleanup_config.cleanupfrequency + 1)
+        #sim_changed_by_import_ui.modified_date = sim_changed_by_import_ui.modified_date + timedelta(days=cleanup_config.frequency + 1)
         sim_changed_by_import_ui.modified_date = sim_changed_by_import_ui.modified_date + timedelta(days=1)
         fileinfo_sim_changed_by_import_ui:FileInfo = FileInfo(filepath=sim_changed_by_import_ui.path, 
                                                               modified_date=sim_changed_by_import_ui.modified_date, 

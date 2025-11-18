@@ -1,9 +1,13 @@
-import asyncio
 from datetime import date, timedelta
-from cleanup_cycle import cleanup_db_actions
-from cleanup_cycle.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
-from cleanup_cycle.scheduler_db_actions import CleanupScheduler
-from cleanup_cycle.agent_task_manager import CleanupTaskManager
+from sqlmodel import Session, select
+from fastapi import HTTPException
+from db.database import Database
+from datamodel import dtos, retentions
+from cleanup import agent_db_interface
+from cleanup.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
+from cleanup.scheduler_db_actions import CleanupScheduler
+from cleanup.agent_task_manager import AgentTaskManager
+from db import db_api
 
 # ----------------- AgentTemplate -----------------
 from abc import ABC, abstractmethod
@@ -27,18 +31,17 @@ class AgentTemplate(ABC):
         self.reserve_task()
         if self.task is not None:
             self.execute_task()
-            #asyncio.run(self.execute_task())
         self.complete_task()
 
     def reserve_task(self):
-        self.task = CleanupTaskManager.reserve_task(self.agent_info)
+        self.task = AgentTaskManager.reserve_task(self.agent_info)
 
     def complete_task(self ):
         if self.task is not None:
             if self.error_message is not None:
-                CleanupTaskManager.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
+                AgentTaskManager.task_completion(self.task.id, TaskStatus.FAILED.value, self.error_message)
             else:
-                CleanupTaskManager.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
+                AgentTaskManager.task_completion(self.task.id, TaskStatus.COMPLETED.value, "Task executed successfully")
 
     @abstractmethod
     def execute_task(self):
@@ -53,43 +56,91 @@ class AgentCalendarCreation(AgentTemplate):
     def __init__(self):
         super().__init__("AgentCalendarCreation", [])
 
+    #overide this because no task reservation is needed
     def run(self):
-        #self.reserve_task()
-        #if self.task is not None:
-        #asyncio.run(self.execute_task())
         self.execute_task()
-        #self.complete_task()
 
     def execute_task(self):
         msg: str = CleanupScheduler.create_calendars_for_cleanup_configuration_ready_to_start()
+        CleanupScheduler.update_calendars_and_tasks() # prepare so the next task can be activated right away
         self.success_message = f"CalendarCreation done with: {msg}"
 
-class AgentCleanupCycleStart(AgentTemplate):
+class AgentMarkSimulationsPreReview(AgentTemplate):
 
     def __init__(self):
-        super().__init__("AgentCleanupCycleStart", [ActionType.START_RETENTION_REVIEW.value])
+        super().__init__("AgentCleanupCycleStart", [ActionType.MARK_SIMULATIONS_FOR_REVIEW.value])
 
     def execute_task(self):
-        cleanup_db_actions.cleanup_cycle_start(self.task.rootfolder_id)
+        AgentMarkSimulationsPreReview.mark_simulations(self.task.rootfolder_id)
         self.success_message = f"Cleanup cycle started for rootfolder {self.task.rootfolder_id}"
 
-class AgentCleanupCycleFinishing(AgentTemplate):
+    @staticmethod
+    def mark_simulations(rootfolder_id: int) -> dict[str, str]:
+        # recalculating retentions for all leaf folders in the rootfolder
+        db_api.apply_pathprotections(rootfolder_id)  # ThIS should noT be necessary but just to be sure that faulty transactions did not miss any pathprotections    
+        len_folders:int = 0
+        with Session(Database.get_engine()) as session:
+            rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+            cleanup_config:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session) if rootfolder else None
 
+            if not rootfolder or not cleanup_config:
+                raise HTTPException(status_code=404, detail="rootfolder or cleanup_config not found")
+
+            retention_calculator: retentions.RetentionCalculator = retentions.RetentionCalculator(rootfolder_id, cleanup_config.id, session)
+
+            # recalculate numeric retentions for all simulations.
+            # @TODO This can possibly be optimise by limiting the selection to folders with a numeric retentiontypes
+            nodetype_leaf_id: int = db_api.read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)[dtos.FolderTypeEnum.SIMULATION].id
+            folders = session.exec( select(dtos.FolderNodeDTO).where( (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) & \
+                                                                      (dtos.FolderNodeDTO.nodetype_id == nodetype_leaf_id) ) ).all()
+            
+            # update retention: This also mark simulations for cleanup if they are ready
+            for folder in folders:
+                folder.set_retention(retention_calculator.adjust_from_cleanup_configuration_and_modified_date(folder.get_retention(), folder.modified_date))
+                session.add(folder)
+            
+            session.commit()
+            len_folders = len(folders)
+
+        return {"message": f"new cleanup cycle started for : {rootfolder_id}. updated retention of {len_folders} folders" }
+
+
+class AgentUnmarkSimulationsPostReview(AgentTemplate):
+    #post pone the retention of marked simulations if any remaining in that state after the review and cleaning phase
     def __init__(self):
-        super().__init__("AgentCleanupCycleFinishing", [ActionType.FINISH_CLEANUP_CYCLE.value])
+        super().__init__("AgentUnmarkSimulationsPostReview", [ActionType.UNMARK_SIMULATIONS_AFTER_REVIEW.value])
 
     def execute_task(self):
-        cleanup_db_actions.cleanup_cycle_finishing(self.task.rootfolder_id)
+        AgentUnmarkSimulationsPostReview.unmark_simulations_post_review(self.task.rootfolder_id)
+        
         self.success_message = f"Cleanup cycle finishing for rootfolder {self.task.rootfolder_id}"
 
-# class AgentCleanupCyclePrepareNext(AgentTemplate):
-#     def __init__(self):
-#         super().__init__("AgentCleanupCyclePrepareNext", [ActionType.PREPARE_NEXT_CLEANUP_CYCLE.value])
+    @staticmethod
+    def unmark_simulations_post_review(rootfolder_id: int) -> dict[str, str]:
+        with Session(Database.get_engine()) as session:
+            rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
 
-#     def execute_task(self):
-#         cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
-#         self.success_message = f"Next cleanup cycle prepared for rootfolder {self.task.rootfolder_id}"
+            marked_simulations:list[dtos.FolderNodeDTO] = db_api.read_folders_marked_for_cleanup(rootfolder_id)
+            if len(marked_simulations) > 0:
+                # change the retention to the next retention after marked
+                retention_calculator: retentions.RetentionCalculator = retentions.RetentionCalculator(rootfolder_id, rootfolder.cleanup_config_id, session)
+                after_marked_retention_id:int                        = retention_calculator.get_retention_id_after_marked()
+                for folder in marked_simulations:
+                    folder.retention_id = after_marked_retention_id # thois that we not clean will marked for the next cleanup round
+                    session.add(folder)
 
+            session.commit()
+
+        return {"message": f"Finished cleanup cycle for rootfolder {rootfolder_id}"}
+
+class AgentFinaliseCleanupCycle(AgentTemplate):
+    def __init__(self):
+        super().__init__("AgentFinaliseCleanupCycle", [ActionType.FINALISE_CLEANUP_CYCLE.value])
+
+    def execute_task(self):
+        # nothing to do for now. WE just need this to go to the next state
+        # cleanup_db_actions.cleanup_cycle_prepare_next_cycle(self.task.rootfolder_id)
+        self.success_message = f"Current cleanup cycle was finalised for rootfolder {self.task.rootfolder_id}"
 
 
 class AgentNotification(AgentTemplate):
@@ -177,12 +228,12 @@ class AgentNotification(AgentTemplate):
             if rootfolder is None or config is None:
                 self.error_message = f"RootFolder with ID {self.task.rootfolder_id} not found."
             else:
-                enddate_for_cleanup_cycle: date = config.cleanup_start_date + timedelta(days=config.cleanupfrequency-1)
+                enddate_for_cleanup_cycle: date = config.start_date + timedelta(days=config.frequency-1)
                 initial_message: str = f"The review has started. Use it to review and adjust the retention of your simulation in particular those marked for cleanup \n" + \
                                     f"You have configure the cleanup rutine as follow " + \
-                                    f"Duration of the review periode is {config.cleanupfrequency} days; ending on {enddate_for_cleanup_cycle}." + \
-                                    f"Simulations will be marked for cleanup {config.cycletime} days from last modification date unless otherwise specified by retention settings."
-                final_message: str   = f"The retention review is about to end in {config.cleanupfrequency-self.task.task_offset-1} days."
+                                    f"Duration of the review periode is {config.frequency} days; ending on {enddate_for_cleanup_cycle}." + \
+                                    f"Simulations will be marked for cleanup {config.leadtime} days from last modification date unless otherwise specified by retention settings."
+                final_message: str   = f"The retention review is about to end in {config.frequency-self.task.task_offset-1} days."
 
                 message: str = initial_message if self.task.action_type == ActionType.SEND_INITIAL_NOTIFICATION.value else final_message
 

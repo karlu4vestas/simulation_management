@@ -4,10 +4,10 @@ import sys
 import time
 import threading
 from queue import Empty
-from cleanup_cycle.clean_agent.clean_parameters import CleanParameters, CleanMode
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressReporter
-from cleanup_cycle.clean_agent.simulation import Simulation, SimulationEvalResult
-from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from cleanup.clean_agent.clean_parameters import CleanParameters, CleanMode
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressReporter
+from cleanup.clean_agent.simulation import Simulation, SimulationEvalResult
+from cleanup.clean_agent.simulation_file_registry import SimulationFileRegistry
 from datamodel.retentions import ExternalRetentionTypes
 
 

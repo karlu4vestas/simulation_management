@@ -43,7 +43,7 @@ class RandomNodeType:
         if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
 
-def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:str, cleanupfrequency:int, cycle_time:int, path, levels):    
+def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:str, frequency:int, cycle_time:int, path, levels):    
     root_folder = RootFolderDTO(
         simulationdomain_id=domain_id,
         owner=owner,
@@ -55,8 +55,8 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     # Create cleanup config (NEW)
     cleanup_config = dtos.CleanupConfigurationDTO(
         rootfolder_id=root_folder.id,
-        cycletime=cycle_time,
-        cleanupfrequency=cleanupfrequency
+        leadtime=cycle_time,
+        frequency=frequency
     )
     session.add(cleanup_config)
     session.flush()  # Ensure cleanup config is persisted
@@ -69,7 +69,7 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
 def insert_test_folder_hierarchy_in_db(session:Session):
     vts_simulation_domain = session.exec(select(dtos.SimulationDomainDTO).where(dtos.SimulationDomainDTO.name == "vts")).first()
     domain_id=vts_simulation_domain.id if vts_simulation_domain and vts_simulation_domain.id else 0
-    frequency_name_dict:dict[str,CleanupFrequencyDTO] = db_api.read_cleanupfrequency_name_dict_by_domain_id(vts_simulation_domain.id)
+    frequency_name_dict:dict[str,CleanupFrequencyDTO] = db_api.read_frequency_name_dict_by_domain_id(vts_simulation_domain.id)
     if domain_id == 0:
         raise ValueError("vts simulation domain not found")
     cycle_time:int = 0 #days
@@ -222,7 +222,7 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
         raise ValueError("vts simulation domain not found")
     
     domain_id = vts_simulation_domain.id
-    frequency_name_dict: dict[str, CleanupFrequencyDTO] = db_api.read_cleanupfrequency_name_dict_by_domain_id(domain_id)
+    frequency_name_dict: dict[str, CleanupFrequencyDTO] = db_api.read_frequency_name_dict_by_domain_id(domain_id)
     cycle_time: int = 0  # days
     
     # Only create 2 small root folders with minimal depth for unit testing
@@ -233,4 +233,4 @@ def insert_minimal_test_data_for_unit_tests(session: Session):
     print("Minimal test data for unit tests inserted successfully:")
     for rf in root_folders:
         config:dtos.CleanupConfigurationDTO = rf.get_cleanup_configuration(session)
-        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers} Folder id: {rf.folder_id}, CleanUpFrequency: {config.cleanupfrequency}")
+        print(f" - {rf.path} (ID: {rf.id}), Owner: {rf.owner}, Approvers: {rf.approvers} Folder id: {rf.folder_id}, CleanUpFrequency: {config.frequency}")

@@ -43,13 +43,13 @@
 
                     <TemplateColumn Title="Retention period" Width="180px">
                         <ChildContent Context="folder">
-                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.CycleTime)}")
+                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.LeadTime)}")
                         </ChildContent>
                     </TemplateColumn>
 
                     <TemplateColumn Title="Cleanup frequency" Width="190px">
                         <ChildContent Context="folder">
-                            @($"{frequencyConverter.GetName(folder.CleanupConfiguration.CleanupFrequency)}")
+                            @($"{frequencyConverter.GetName(folder.CleanupConfiguration.Frequency)}")
                         </ChildContent>
                     </TemplateColumn>
 
@@ -85,7 +85,7 @@
                     <span style="width: 320px; display: inline-block;"> - days needed to analyse a simulation</span>
                 </div>
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Cleanup frequency</span>
-                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@cleanupfrequency_name"
+                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@frequency_name"
                         @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
                         ImmediateDelay="100" />
                     <span style="width: 260px; display: inline-block;"> Days between cleanups</span>
@@ -128,7 +128,7 @@
 
     bool has_loaded_rootFolders = false;
     CleanupConfigurationDTO cleanup_config = new CleanupConfigurationDTO();
-    string cleanupfrequency_name = "";
+    string frequency_name = "";
     string cycle_time_name = "";
     NamesDaysLookup frequencyConverter = new NamesDaysLookup();
     NamesDaysLookup cycleTimeConverter = new NamesDaysLookup();
@@ -179,25 +179,24 @@
         if (Library.Instance.SelectedRootFolder != null)
         {
             cleanup_config = Library.Instance.SelectedRootFolder.CleanupConfiguration;
-            cleanupfrequency_name = frequencyConverter.GetName(cleanup_config.CleanupFrequency);
-            cycle_time_name = cycleTimeConverter.GetName(cleanup_config.CycleTime);
+            frequency_name = frequencyConverter.GetName(cleanup_config.Frequency);
+            cycle_time_name = cycleTimeConverter.GetName(cleanup_config.LeadTime);
         }
         StateHasChanged();
     }
     private async Task UpdateCleanUpConfiguration()
     {
-        if (Library.Instance.SelectedRootFolder != null && cleanupfrequency_name.Length > 0 && cycle_time_name.Length > 0)
+        if (Library.Instance.SelectedRootFolder != null && frequency_name.Length > 0 && cycle_time_name.Length > 0)
         {
-            cleanup_config.CleanupFrequency = frequencyConverter.GetDays(cleanupfrequency_name);
-            cleanup_config.CycleTime = cycleTimeConverter.GetDays(cycle_time_name);
-
+            cleanup_config.Frequency = frequencyConverter.GetDays(frequency_name);
+            cleanup_config.LeadTime = cycleTimeConverter.GetDays(cycle_time_name);
             if (cleanup_config.CanStartCleanup)
             {
                 UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Library.Instance.SelectedRootFolder,
                 cleanup_config);
                 await cmd.Apply();
                 StateHasChanged();
-                Console.WriteLine($"new cleanupfrequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
+                Console.WriteLine($"new frequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
             }
         }
     }

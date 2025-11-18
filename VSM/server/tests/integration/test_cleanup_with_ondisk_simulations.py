@@ -19,14 +19,14 @@ from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 # Add the generate_vts_simulations directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../unittests/generate_vts_simulations'))
 
-from cleanup_cycle.clean_agent.file_utilities import FileStatistics
+from cleanup.clean_agent.file_utilities import FileStatistics
 from tests.generate_vts_simulations.main_GenerateSimulation import GeneratedSimulationsResult, SimulationTestSpecification, generate_simulations
 from tests.generate_vts_simulations.main_validate_cleanup import validate_cleanup
 
-from cleanup_cycle.clean_agent.clean_main import CleanupResult, clean_main
-from cleanup_cycle.clean_agent.clean_parameters import CleanMode
-from cleanup_cycle.clean_agent.clean_progress_reporter import CleanProgressWriter
-from cleanup_cycle.clean_agent.simulation_file_registry import SimulationFileRegistry
+from cleanup.clean_agent.clean_main import CleanupResult, clean_main
+from cleanup.clean_agent.clean_parameters import CleanMode
+from cleanup.clean_agent.clean_progress_reporter import CleanProgressWriter
+from cleanup.clean_agent.simulation_file_registry import SimulationFileRegistry
 from datamodel.dtos import FileInfo
 
 from tests import test_storage
@@ -72,7 +72,7 @@ class TestCleanupWithOnDiskSimulations:
     def scan_simulation_and_get_fileinfo(self, simulation_path: str) -> tuple[FileInfo, SimulationFileRegistry]:
         from datamodel.dtos import FileInfo, FolderTypeEnum
         from datamodel.retentions import ExternalRetentionTypes
-        # Build the FileInfo requred for cleanup
+        # Build the FileInfo required for cleanup
         # The cleanup algorithm will ignore cleanup if the simulations modified_date has changed, 
         # because changing the simulation is a legitimate way for the user to signal that i need to work on this simulation 
         #
