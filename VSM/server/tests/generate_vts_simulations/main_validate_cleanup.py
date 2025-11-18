@@ -3,24 +3,16 @@ import os
 import time
 import polars as pl 
 #from xlsxwriter import Workbook
-from tests import test_storage
 
 class CleanStatus(str,Enum):
     KEEP  = "keep"
     CLEAN = "clean"
 
-TEST_STORAGE_LOCATION = test_storage.LOCATION
-
-def validate_cleanup(validation_file) -> tuple[str, list[str]]:
-    #if __name__ == "__main__":
-    #Set up the signal handler for Ctrl+C    
-    #parser = argparse.ArgumentParser(description="Validate cleanup simulations of testdata")
-    #parser.add_argument("--validation_file", type=str, help="The list of file and their expected status for cleanup")
-    #args   = parser.parse_args()   
-    #validation_file = os.path.normpath(args.validation_file)
+def validate_cleanup(validation_file: str, simulation_scope:list[str]) -> tuple[str, list[str]]:
+    #Args: validation_file: path to the validation csv file
+    #      simulations_scope: list of simulation names that the validation must focus on
     validation_file = os.path.normpath(validation_file)
     
-
     if os.path.isfile(validation_file):
         base_path                      = os.path.split(validation_file)[0]
         str_now                        = time.strftime("%Y-%m-%d %H-%M-%S-", time.gmtime())        
@@ -30,6 +22,7 @@ def validate_cleanup(validation_file) -> tuple[str, list[str]]:
         print(f"reading validation file:{validation_file}\n")
         schema_overrides = {"path":pl.String,"expected_status":pl.String}
         validation = pl.read_csv(validation_file, schema_overrides=schema_overrides, encoding = "utf-8", separator=';', quote_char='"' )
+        validation = validation.filter( pl.col("simulation").str.contains_any(simulation_scope, ascii_case_insensitive=True) )
 
         #run through all files and register the existence status to the column "measured_status"
         path_existance = [CleanStatus.KEEP if os.path.exists(p) else CleanStatus.CLEAN for p in validation["path"].to_list()]
@@ -47,10 +40,6 @@ def validate_cleanup(validation_file) -> tuple[str, list[str]]:
                      )               
 
         validation = validation.select([ "expected_status", "test_status", "path_existance", "local_folder", "path", "simulation"])
-
-        # with open(test_results_path+".xlsx", "wb") as file:
-        #     with Workbook(file,) as writer:
-        #         validation.write_excel(workbook=writer,worksheet="test_results") 
         validation.write_csv(filepath_to_validation_results, separator=';')                
 
         #show the number of issues
@@ -61,6 +50,8 @@ def validate_cleanup(validation_file) -> tuple[str, list[str]]:
         raise FileNotFoundError(f"did not find:{validation_file}")
 
 def main():
+    from tests import test_storage
+    TEST_STORAGE_LOCATION = test_storage.LOCATION
     validation_file = os.path.join( TEST_STORAGE_LOCATION, "vts_clean_data/test/validation.csv")
     filepath_to_validation_results, failed_filepaths = validate_cleanup(validation_file)
     print(f"The comparison with the validation file be found here:{filepath_to_validation_results}\n")

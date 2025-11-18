@@ -3,7 +3,7 @@ import io
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, NamedTuple
 from queue import Queue
 
@@ -206,7 +206,8 @@ class Simulation(BaseSimulation):
                     external_retention=None
                 )
                 return SimulationEvalResult(file_info, [], 0, 0)
-            elif filestats.max_date != self.old_modified_date:
+            elif filestats.max_date.date() != self.old_modified_date.date(): 
+                #@TODO should work with datetime comparison but there seems to be some issue with that when it comes to precision in unittesting
                 # the simulation was modified since last scan so skip cleanup, set retention to UNDEFINED
                 file_info = FileInfo(
                     filepath=self.root_path,

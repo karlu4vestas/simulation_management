@@ -61,7 +61,7 @@ def read_folder_types_pr_domain_id(simulationdomain_id: int):
             raise HTTPException(status_code=404, detail="foldertypes not found")
         return folder_types
 #@app.get("/foldertypes/dict", response_model=dict[str,FolderTypeDTO]) #isadble webapi untill we need it
-def read_folder_type_dict_pr_domain_id(simulationdomain_id: int):
+def read_folder_type_dict_pr_domain_id(simulationdomain_id: int) -> dict[str, dtos.FolderTypeDTO]:
     return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulationdomain_id)}
 
 def read_cycle_time_by_domain_id(simulationdomain_id: int):
@@ -135,7 +135,13 @@ def insert_rootfolder(rootfolder:dtos.RootFolderDTO):
         if (rootfolder.id is None) or (rootfolder.id == 0):
             raise HTTPException(status_code=404, detail=f"Failed to provide {rootfolder.path} with an id")
         return rootfolder
-
+    
+def read_rootfolder_by_id(rootfolder_id: int):
+    with Session(Database.get_engine()) as session:
+        rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+        if not rootfolder:
+            raise HTTPException(status_code=404, detail="rootfolder not found")
+        return rootfolder
 
 def read_rootfolder_retentiontypes(rootfolder_id: int):
     retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retentiontypes_dict(rootfolder_id).values())

@@ -115,14 +115,14 @@ class CleanupScheduler:
         # Returns:
         #     String message indicating how many calendars were generated
 
-        today = date.today()
+        now = datetime.now()
         
         with Session(Database.get_engine()) as session:
             configs = session.exec( select(dtos.CleanupConfigurationDTO).where(
                     (dtos.CleanupConfigurationDTO.leadtime > 0) &
                     (dtos.CleanupConfigurationDTO.frequency > 0) &
                     (dtos.CleanupConfigurationDTO.start_date != None) &
-                    (dtos.CleanupConfigurationDTO.start_date <= today) &
+                    (dtos.CleanupConfigurationDTO.start_date <= now) &
                     (dtos.CleanupConfigurationDTO.progress.in_([
                         dtos.CleanupProgress.Progress.INACTIVE.value,
                         dtos.CleanupProgress.Progress.DONE.value
@@ -333,8 +333,8 @@ class CleanupScheduler:
         
         # Check if scheduled date has been reached
         scheduled_date = calendar.start_date + timedelta(days=next_task_def["task_offset"])
-        today = date.today()
-        if today < scheduled_date:
+        now = datetime.now()
+        if now < scheduled_date:
             return 0  # Not time yet
         
         # Create the task directly in ACTIVATED state

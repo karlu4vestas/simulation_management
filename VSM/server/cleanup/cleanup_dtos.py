@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 from sqlmodel import Session
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from datamodel import dtos
 from db import db_api
 from db.database import Database
@@ -48,11 +48,11 @@ class CleanupState:
     def can_start_cleanup_now(self) -> bool:
         # Return true if 
         # cleanup is ready to start at some point
-        # and the start_date is today or in the past
+        # and the start_date is now or in the past
         # and self.progress is INACTIVE or FINISHED
         
         # has valid configuration 
-        has_valid_configuration = self.is_valid() and self.dto.start_date is not None and self.dto.start_date <= date.today() 
+        has_valid_configuration = self.is_valid() and self.dto.start_date is not None and self.dto.start_date <= datetime.now() 
         if not has_valid_configuration:
             return False
 

@@ -54,7 +54,7 @@ class LeadTimeDTO(LeadTimeBase, table=True):
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
-#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. If cleanup_round_start_date is not set then we assume today
+#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. If cleanup_round_start_date is not set then we assume now
 #   c) leadtime can be set with cleanup is inactive frequency is None
 #   d) progress to describe where the rootfolder is in the cleanup round: 
 #      - inactive
@@ -100,7 +100,7 @@ class CleanupProgress:
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
 #   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. 
-#        If cleanup_round_start_date is not set then we assume today
+#        If cleanup_round_start_date is not set then we assume now
 #   c) leadtime: is minimum number of days from last modification of a simulation til it can be cleaned
 #        It can be set with cleanup is inactive frequency is None
 #   d) progress to describe where the rootfolder is in the cleanup round: 
@@ -111,11 +111,11 @@ class CleanupProgress:
 #      - finished: the cleanup round is finished and we wait for the next round
 class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
-    rootfolder_id: int      = Field(default=None, foreign_key="rootfolderdto.id")
-    leadtime: int           = Field(default=0)  # days a simulation must be available before cleanup can start. 
-    frequency: float        = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
-    start_date: date | None = Field(default=None)
-    progress: str           = Field(default=CleanupProgress.Progress.INACTIVE.value)
+    rootfolder_id: int          = Field(default=None, foreign_key="rootfolderdto.id")
+    leadtime: int               = Field(default=0)  # days a simulation must be available before cleanup can start. 
+    frequency: float            = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
+    start_date: datetime | None = Field(default=None)
+    progress: str               = Field(default=CleanupProgress.Progress.INACTIVE.value)
 
 class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     """Cleanup configuration as separate table."""
@@ -216,10 +216,10 @@ class FolderNodeBase(SQLModel):
     path: str                             = Field(default="")  # full path
     path_ids: str                         = Field(default="")  # full path represented as 0/1/2/3 where each number is the folder id and 0 means root
     nodetype_id: int                      = Field(foreign_key="foldertypedto.id")
-    modified_date: date | None            = None # must actually be mandatory but lets wait until the test data is fixed 
+    modified_date: datetime | None        = None # must actually be mandatory but lets wait until the test data is fixed 
     retention_id: int | None              = Field(default=None, foreign_key="retentiontypedto.id")
     pathprotection_id: int | None         = Field(default=None, foreign_key="pathprotectiondto.id")
-    expiration_date: date | None          = None
+    expiration_date: datetime | None      = None
 
     # we should gravitate towards using the Retention dataclass to enforce consistency between retention_id and pathprotection_id nad possibly expiration_date
     def get_retention(self) -> "Retention":

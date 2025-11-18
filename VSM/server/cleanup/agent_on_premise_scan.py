@@ -63,7 +63,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
             return
 
         root_folder_name: str  = os.path.basename(self.task.path)
-        date_time_str: str     = date.today().strftime("%Y%m%d-%H%M%S")
+        date_time_str: str     = datetime.now().strftime("%Y%m%d-%H%M%S")
         metadata_file: str     = os.path.join(self.temporary_result_folder, date_time_str+"_"+root_folder_name+"_metadata.csv")
 
         scan_result:ScanResult = self.scan_metadata(self.task.path, metadata_file, self.nb_scan_thread)
@@ -114,7 +114,7 @@ def extract_simulations(scan_result_file: str, vts_name_set:frozenset, htc_word:
     # Notice that the modified date from the load_all_paths is the max date of alle subfolders and files.
     # The metadata scan includes the entire foldertree this is why we can convert a node' path to a modified date below.
     try:
-        folder_modified_date_dict: dict[str, date] = load_all_paths(scan_result_file)
+        folder_modified_date_dict: dict[str, datetime] = load_all_paths(scan_result_file)
     except (FileNotFoundError, ValueError) as e:
         raise ValueError(f"Failed to extract simulations: {str(e)}") from e
     
@@ -138,23 +138,22 @@ def extract_simulations(scan_result_file: str, vts_name_set:frozenset, htc_word:
     print(f"Total number of simulations_without_sub_simulations: {len(simulations_without_sub_simulations)}")
     print( "\n".join(simulations_without_sub_simulations) )
 
-    simulations_without_sub_simulations_modified_date:list[date]  = [ folder_modified_date_dict[p] for p in simulations_without_sub_simulations] 
+    simulations_without_sub_simulations_modified_date:list[datetime]  = [ folder_modified_date_dict[p] for p in simulations_without_sub_simulations] 
 
     len_simulations_with_sub_simulations:int    = len(tree.findall(lambda node: node.get_attr(vts_hierarchical_label,False)))
     tree = None
 
     #the current scan for simulations does not evaluate whether the simulation was cleaned or has issues. 
     simulations_without_sub_simulations:list[FileInfo] = [ FileInfo( filepath = path,
-                                                                        modified_date = modified_date,
-                                                                        nodetype = FolderTypeEnum.SIMULATION,
-                                                                        external_retention = ExternalRetentionTypes.NUMERIC.value
-                                                                    )
+                                                                     modified_date = modified_date,
+                                                                     nodetype = FolderTypeEnum.SIMULATION,
+                                                                     external_retention = ExternalRetentionTypes.NUMERIC.value )
                                                             for path, modified_date in zip(simulations_without_sub_simulations, simulations_without_sub_simulations_modified_date)]
     
     return simulations_without_sub_simulations, len_simulations_with_sub_simulations    
     
 @staticmethod
-def load_all_paths(scan_output_file: str) -> dict[str, date]:
+def load_all_paths(scan_output_file: str) -> dict[str, datetime]:
     # The scan output file is a csv file with a header like:"folder";"min_modified";"max_modified";"min_accessed";"max_accessed";"files"
     # Load folder and max_modified from the CSV as fast as possible
     if not os.path.exists(scan_output_file):
@@ -182,7 +181,7 @@ def load_all_paths(scan_output_file: str) -> dict[str, date]:
         # Read only the folder and max_modified columns from each row
         # Parse datetime from string (adjust format as needed based on actual CSV format)
         try:
-            folder_modified_data: dict[str, date] = {row[folder_idx]: date.fromisoformat(row[max_modified_idx]) 
+            folder_modified_data: dict[str, datetime] = {row[folder_idx]: datetime.fromisoformat(row[max_modified_idx]) 
                                     for row in reader if row and len(row) > max(folder_idx, max_modified_idx)}
         except (ValueError, IndexError) as e:
             raise ValueError(f"Failed to parse folder data from {scan_output_file}: {str(e)}") from e

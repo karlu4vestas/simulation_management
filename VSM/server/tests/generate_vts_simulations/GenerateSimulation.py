@@ -1,8 +1,5 @@
 import os
-import re
-import io
-import string
-import random
+from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 
 from tests.generate_vts_simulations.GenerateTimeseries import CleanStatus, Base_Simulation_Generator, GenerateTimeseries
@@ -20,8 +17,8 @@ class GenerateSimulation (Base_Simulation_Generator) :
 
     #input_selector must be 0 or 1
     def __init__(self, base_path:str, loadcase_ranges_filepath:str, 
-                 sim_type: SimulationType, sim_loadcase_type: SimulationLoadcaseType, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames):
-        super().__init__(base_path, loadcase_ranges_filepath, sim_type, sim_loadcase_type, timeseries_names_vs_loadcase)
+                 sim_type: SimulationType, sim_loadcase_type: SimulationLoadcaseType, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames, modified_date:datetime=None):
+        super().__init__(base_path, loadcase_ranges_filepath, sim_type, sim_loadcase_type, timeseries_names_vs_loadcase, modified_date)
         self.keep_files_defined_by_parent = None
         self.timeseries_generators:list[GenerateTimeseries] = [ 
                                         Generate_clean_all_pr_ext(self, 0,         ["INT"],            [".int", ".tff"] ), 
@@ -49,8 +46,8 @@ class GenerateSimulation (Base_Simulation_Generator) :
 
 
     def generate_INPUTS(self) -> tuple[dict[str,CleanStatus], dict[str,list[str]]]:        
-        input_path:str            = os.path.join(self.base_path,"INPUTS")
-        input_files:dict[str,CleanStatus] = {path:CleanStatus.KEEP for path in generate_random_files(10, input_path, ["set"])}
+        input_path:str                    = os.path.join(self.base_path,"INPUTS")
+        input_files:dict[str,CleanStatus] = {path:CleanStatus.KEEP for path in generate_random_files(10, input_path, ["set"], self.modified_date) }
 
         setfiles_names:dict[str,list[str]] = {}
         #generate one or two .set files acccording to the simulation_loadcase_type
@@ -58,7 +55,7 @@ class GenerateSimulation (Base_Simulation_Generator) :
             set_filepath_1:str = os.path.join(input_path,"loadcase_set_1.set")
 
             #call the generator to create the set file and get its set names
-            out, names = write_synthetic_setfile(set_filepath_1, self.number_ofLoadcase, 2025, self.loadcase_ranges_filepath)
+            out, names = write_synthetic_setfile(set_filepath_1, self.number_ofLoadcase, 2025, self.loadcase_ranges_filepath, self.modified_date)
             setfiles_names[set_filepath_1] = names
 
             input_files[set_filepath_1] = CleanStatus.KEEP
@@ -66,9 +63,9 @@ class GenerateSimulation (Base_Simulation_Generator) :
             set_filepath_1:str = os.path.join(input_path,"loadcase_set_1.set")
             loadcase_path_2:str = os.path.join(input_path,"loadcase_set_2.set")
             #call the generator to create the set files and get their set names
-            out, names = write_synthetic_setfile(set_filepath_1, self.number_ofLoadcase, 2025, self.loadcase_ranges_filepath)
+            out, names = write_synthetic_setfile(set_filepath_1, self.number_ofLoadcase, 2025, self.loadcase_ranges_filepath, self.modified_date)
             setfiles_names[set_filepath_1] = names
-            out, names = write_synthetic_setfile(loadcase_path_2, self.number_ofLoadcase, 3030, self.loadcase_ranges_filepath)
+            out, names = write_synthetic_setfile(loadcase_path_2, self.number_ofLoadcase, 3030, self.loadcase_ranges_filepath, self.modified_date)
             setfiles_names[loadcase_path_2] = names
 
             input_files[set_filepath_1]  = CleanStatus.KEEP

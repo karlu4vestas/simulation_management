@@ -2,9 +2,12 @@ import os
 import csv
 import time
 import shutil
+from datetime import datetime
 from typing import NamedTuple
+from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
 
+from tests.generate_vts_simulations import main_validate_cleanup
 from tests.generate_vts_simulations.GenerateTimeseries import CleanStatus, SimulationType, SimulationLoadcaseType, TimeseriesNames_vs_LoadcaseNames
 from tests.generate_vts_simulations.GenerateSimulation import GenerateSimulation
 from tests import test_storage
@@ -16,29 +19,38 @@ TEST_STORAGE_LOCATION = test_storage.LOCATION
 path_to_loadcases_configuration_file:str = os.path.normpath("tests/generate_vts_simulations/loadcases/loadcases_ranges.json")
 
 
-
-class GeneratedSimulationsResult(NamedTuple):
+@dataclass
+class GeneratedSimulationsResult:
     # Result from generating simulations with validation data
     simulation_paths: list[str]  # List of simulation folder paths for easy iteration
     simulations_csv_file: str  # Path to CSV file listing all simulation folders
     validation_csv_file: str  # Path to CSV file with expected cleanup validation
     validations: dict[str, CleanStatus]  # Dict mapping file paths to expected cleanup status
 
+    def assert_simulations_count(self)->None:
+        filepath_to_validation_results, failed_filepaths = main_validate_cleanup.validate_cleanup(self.validation_csv_file)
+
+        str_paths = "\n".join( failed_filepaths ) if failed_filepaths else ""
+        msg = f"\nFound {len(failed_filepaths)} validation failures. File with validations:{filepath_to_validation_results}."# Path:" + str_paths
+        assert len(failed_filepaths) == 0, msg
+
 class SimulationTestSpecification(NamedTuple): 
     fullpath: str
     sim_type: SimulationType
+    modified_date: datetime
 
 def generate_simulations(base_path:str, simulation_folders: SimulationTestSpecification ) -> GeneratedSimulationsResult:
     loadcases_ranges_filepath:str = path_to_loadcases_configuration_file
 
     simulations = []
-    for p, sim_type in simulation_folders:
+    for p, sim_type, modified_date in simulation_folders:
         simulations.append( GenerateSimulation( 
             base_path=p, 
             loadcase_ranges_filepath=loadcases_ranges_filepath, 
             sim_type=sim_type,
             sim_loadcase_type=SimulationLoadcaseType.ONE_SET_FILE,
-            timeseries_names_vs_loadcase=TimeseriesNames_vs_LoadcaseNames.MATCH
+            timeseries_names_vs_loadcase=TimeseriesNames_vs_LoadcaseNames.MATCH, 
+            modified_date=modified_date
         ) )
 
     validations:dict[str, CleanStatus] = {}
@@ -71,7 +83,7 @@ def generate_simulations(base_path:str, simulation_folders: SimulationTestSpecif
             writer.writerow(row)
 
     return GeneratedSimulationsResult(
-        simulation_paths=[ path for path,sim_type in simulation_folders],
+        simulation_paths=[ sim.fullpath for sim in simulation_folders],
         simulations_csv_file=file_with_simulation_folders,
         validation_csv_file=file_clean_up_validation,
         validations=validations
@@ -93,8 +105,8 @@ def initialize_generate_simulations (n_simulations:int, base_path:str, loadcases
     start_time = time.perf_counter()
     #create two simulations with different structure
     simulation_folders: SimulationTestSpecification = [
-        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS),
-        (os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
+        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, datetime.now()),
+        (os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS, datetime.now())
     ]
 
     result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders )
@@ -126,7 +138,7 @@ def main():
     start_time = time.perf_counter()
 
     simulation_folders: SimulationTestSpecification = [  
-        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS),
+        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, datetime.now()),
         #(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
     ]
 

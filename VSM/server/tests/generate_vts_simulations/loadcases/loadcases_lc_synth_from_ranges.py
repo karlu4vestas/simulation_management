@@ -9,6 +9,7 @@
 # - Randomizes LC IDs with pattern <NN><family><speed3><variant>, where
 #   <family> comes from FAMILY_CODE in sim_ranges.json (fallback allowed).
 
+import os
 import argparse, json, random, math, datetime, sys
 
 SCENARIO_NN_RANGE = (10, 99)  # two-digit scenario code <NN>
@@ -164,7 +165,7 @@ def make_params(core, pkeys_freq, rnd):
         params.append(rand_stop(rnd))
     return params
 
-def write_synthetic_setfile(out_path, num, seed, sim_json):
+def write_synthetic_setfile(out_path, num, seed, sim_json, modified_date:datetime=None):
     rnd = random.Random(seed)
     ranges, enums, wdir, pkeys, tfp, fam_map, fam_default = load_ranges(sim_json)
     header = synth_header_lines(rnd)
@@ -190,6 +191,17 @@ def write_synthetic_setfile(out_path, num, seed, sim_json):
             else:
                 w.write(main + "\n")
             loadcase_ids.append(lc_id)
+
+    if modified_date:
+        #import time
+        #time.sleep(0.1)  # ensure time difference
+        os.utime(out_path, (modified_date.timestamp(), modified_date.timestamp()))
+        #time.sleep(0.1)  # ensure time difference
+        stats = os.stat(out_path)
+        if abs(stats.st_mtime - modified_date.timestamp()) > 1:
+            raise ValueError(f"Failed to set modified date for file {out_path}")
+
+
     return out_path, loadcase_ids
 
 def main():

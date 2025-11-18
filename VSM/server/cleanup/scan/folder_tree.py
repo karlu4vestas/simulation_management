@@ -1,6 +1,6 @@
 import os
 import random
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from collections.abc import Iterable
 import bigtree
 from bigtree import  list_to_tree
@@ -159,7 +159,7 @@ def main1():
         "\\root\\bb\\d\\e\\f2",
         "\\root\\bb\\d\\e\\f3",
     ]
-    folder_modified_date:dict[str,date] = {f: date.today() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
+    folder_modified_date:dict[str,datetime] = {f: datetime.now() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
 
     paths = ".\n".join(folder_modified_date.keys())
     print(f"specified paths:")
@@ -197,7 +197,7 @@ def main1():
     print( "\n".join([n.path_name for n in simulations_with_sub_simulations]) )
 
     # for the following to work the folder_modified_date must contain the path of all nodes
-    simulations_without_sub_simulations_dict:dict[str,date] = {n.sep+n.get_attr(vts_label): folder_modified_date[n.sep+n.get_attr(vts_label)] for n in simulations_without_sub_simulations}
+    simulations_without_sub_simulations_dict:dict[str,datetime] = {n.sep+n.get_attr(vts_label): folder_modified_date[n.sep+n.get_attr(vts_label)] for n in simulations_without_sub_simulations}
     print(f"\n{len(simulations_without_sub_simulations_dict)} simulation dict without sub-simulations: ")
     print( "\n".join([f"{path}: {max_modified_date}" for path, max_modified_date in simulations_without_sub_simulations_dict.items()]) )
 

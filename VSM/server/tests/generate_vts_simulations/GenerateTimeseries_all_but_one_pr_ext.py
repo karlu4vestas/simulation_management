@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from tests.generate_vts_simulations.GenerateTimeseries import CleanStatus,GenerateTimeseries, LoadcaseConfiguration, TimeseriesNames_vs_LoadcaseNames
 
 #For each extention "ext" this generator 
@@ -8,8 +9,8 @@ from tests.generate_vts_simulations.GenerateTimeseries import CleanStatus,Genera
 class Generate_clean_all_but_one_pr_ext(GenerateTimeseries):
 
     #notice that extension can be a tuples array
-    def __init__(self, simulation_generator, timeseries_count, local_folder_names, extensions ):
-        super().__init__(simulation_generator, timeseries_count, local_folder_names, extensions )
+    def __init__(self, simulation_generator, timeseries_count, local_folder_names, extensions, modified_date:datetime=None ):
+        super().__init__(simulation_generator, timeseries_count, local_folder_names, extensions, modified_date)
 
     def generate(self, base_path:str, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames) -> dict[str, CleanStatus]:
         # generate the test files and evaluate which files to keep and clean

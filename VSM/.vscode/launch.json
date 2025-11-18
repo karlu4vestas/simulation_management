@@ -270,12 +270,12 @@
       }
     },
     {
-      "name": "Debug test_2_verify_retentions_after_import_and_start_of_cleanup_round",
+      "name": "Debug test_scheduler_and_agents_with_full_cleanup_round",
       "type": "debugpy",
       "request": "launch",
       "module": "pytest",
       "args": [
-        "tests/integration/test_cleanup_workflows.py::TestCleanupWorkflows::test_2_verify_retentions_after_import_and_start_of_cleanup_round",
+        "tests/integration/test_scheduler_and_agents.py::TestSchedulerAndAgents::test_scheduler_and_agents_with_full_cleanup_round",
         "-v",
         "-s",
         "--tb=short"

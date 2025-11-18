@@ -2,7 +2,7 @@ from enum import Enum
 from bisect import bisect_left
 from dataclasses import dataclass
 from typing import Literal, Optional
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
 from datamodel import dtos
@@ -42,7 +42,7 @@ class Retention:
     # Core retention data structure for folder retention information.
     retention_id: int
     pathprotection_id: int | None = None
-    expiration_date: date | None = None
+    expiration_date: datetime | None = None
 
 
 @dataclass
@@ -141,13 +141,13 @@ class RetentionCalculator:
         # It is on the one hand practical to make a first configuration of retention without starting a cleanup round, if the user desires this
         # but on the other hand the RetentionCalculator requires a start_date to be able to calculate retentions
         # If the cleanup_state can be used to start a cleanup round then use its start date
-        # If the progress is INACTIVE and no start_date is set, we set the cleanup_round_start_date to today. 
+        # If the progress is INACTIVE and no start_date is set, we set the cleanup_round_start_date to datetime.now(). 
         # Notice that no retention will be marked with cleanup progress in CleanupProgress.ProgressEnum.INACTIVE
         start_date = None
         if cleanup_state.is_valid() and cleanup_state.dto.start_date is not None:
             start_date = cleanup_state.dto.start_date
         elif cleanup_state.dto.progress == dtos.CleanupProgress.Progress.INACTIVE.value:
-            start_date = date.today()
+            start_date = datetime.now()
         else:
             raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_state}")
         self.cleanup_round_start_date    = start_date
@@ -211,7 +211,7 @@ class RetentionCalculator:
     # if numeric retention then 
     #   use the modified_date to update expiration_date if it will result in longer retention (expiration_date)
     #   update numeric retention_id to the new expiration date. The retention_id is calculated; even if the expiration date did not change to be sure there is no inconsistency
-    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:date, new_modified_date:date=None) -> Retention:
+    def adjust_from_cleanup_configuration_and_modified_date(self, retention:Retention, modified_date:datetime, new_modified_date:datetime=None) -> Retention:
         if modified_date is None:# must be a new simulation
             if new_modified_date is not None: 
                 #if so the use the new modified date

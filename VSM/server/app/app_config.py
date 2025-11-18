@@ -14,7 +14,7 @@ class AppConfig:
     # Application configuration class that manages global settings.
     
     _instance = None
-    _test_mode:Mode  = Mode.CLIENT_TEST
+    _test_mode:Mode  = None  # Mode.CLIENT_TEST
     
     def __new__(cls):
         if cls._instance is None:

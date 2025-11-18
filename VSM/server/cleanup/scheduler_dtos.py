@@ -126,7 +126,7 @@ class CleanupCalendarBase(SQLModel):
     """
     rootfolder_id: int     = Field(foreign_key="rootfolderdto.id", index=True)
     status: str            = Field(default=CalendarStatus.ACTIVE.value, description="Current status of the calendar entry")
-    start_date: date       = Field(description="Start date of the cleanup phase for this calendar entry")
+    start_date: datetime   = Field(description="Start date of the cleanup phase for this calendar entry")
 
 class CleanupCalendarDTO(CleanupCalendarBase, table=True):
     id: int | None         = Field(default=None, primary_key=True)

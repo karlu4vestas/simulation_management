@@ -6,7 +6,7 @@ from datamodel.dtos import (
     SimulationDomainDTO
 )
 from datamodel.retentions import RetentionTypeDTO
-from datetime import date
+from datetime import date, datetime
 
 
 class TestRootFolderDTO:
@@ -207,8 +207,8 @@ class TestFolderNodeDTO:
             parent_id=1,
             name="TestNode",
             nodetype_id=folder_type.id,
-            modified_date=date(2025, 8, 12),
-            expiration_date=date(2025, 12, 31),
+            modified_date=datetime(2025, 8, 12),
+            expiration_date=datetime(2025, 12, 31),
             retention_id=5
         )
         test_session.add(original_node)
@@ -259,8 +259,8 @@ class TestFolderNodeDTO:
         
         # Update attributes with proper date objects
         initial_node.name = "UpdatedName"
-        initial_node.modified_date = date(2025, 9, 15)
-        initial_node.expiration_date = date(2026, 1, 15)
+        initial_node.modified_date = datetime(2025, 9, 15)
+        initial_node.expiration_date = datetime(2026, 1, 15)
         test_session.commit()
         
         # Store the folder_type_id before expunging
@@ -272,8 +272,8 @@ class TestFolderNodeDTO:
         
         # Verify updated values
         assert retrieved_node.name == "UpdatedName"
-        assert retrieved_node.modified_date == date(2025, 9, 15)
-        assert retrieved_node.expiration_date == date(2026, 1, 15)
+        assert retrieved_node.modified_date == datetime(2025, 9, 15)
+        assert retrieved_node.expiration_date == datetime(2026, 1, 15)
         assert retrieved_node.nodetype_id == expected_folder_type_id
 
     def test_folder_node_hierarchy_creation(self, test_session: Session, test_root_folder: RootFolderDTO):
@@ -580,8 +580,8 @@ class TestDTODatabaseIntegration:
             parent_id=123456,
             name="Test node with special chars äöü",
             nodetype_id=folder_type.id,
-            expiration_date=date(2025, 12, 31),
-            modified_date=date(2025, 8, 11)
+            expiration_date=datetime(2025, 12, 31),
+            modified_date=datetime(2025, 8, 11)
         )
 
         # Note: RetentionTypeDTO name is now a string field for display labels

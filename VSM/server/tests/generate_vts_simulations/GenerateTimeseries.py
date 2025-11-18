@@ -2,6 +2,7 @@ import os
 import string
 import random
 from enum import Enum
+from datetime import datetime
 from typing import NamedTuple
 from abc import abstractmethod
 
@@ -24,7 +25,7 @@ class TimeseriesNames_vs_LoadcaseNames(str,Enum):
                                                 #                          the same name as the loadcase for half of the loadcases
                                                 #                          with different names than the loadcase for the other half 
 
-def generate_random_files(number_of_files:int, folder_path:str, reserved_extension:list[str])->list[str]:
+def generate_random_files(number_of_files:int, folder_path:str, reserved_extension:list[str], modified_date:datetime=None)->list[str]:
     # generate 10 file with random names 3-10 and extension with 2-3 charaters except .set files
     # the purpose is just to verify that the application picks the correct files .set files and ignores the rest
     def draw_extension():
@@ -43,15 +44,26 @@ def generate_random_files(number_of_files:int, folder_path:str, reserved_extensi
             f.write("This is a random test file.")
             generated_filepaths.append(random_file)
 
+        if modified_date:
+            #import time
+            #time.sleep(0.1)  # ensure time difference
+            ts = modified_date.timestamp()
+            os.utime(random_file, (ts, ts))
+            #time.sleep(0.1)  # ensure time difference
+            stats = os.stat(random_file)
+            if abs(stats.st_mtime - ts) > 1:
+                raise ValueError(f"Failed to set modified date for file {random_file}")
+
     return generated_filepaths
 
 
 class GenerateTimeseries:
-    def __init__(self, simulation_generator:"Base_Simulation_Generator", timeseries_count:int, local_folder_names:list[str], extensions:list[str]):
+    def __init__(self, simulation_generator:"Base_Simulation_Generator", timeseries_count:int, local_folder_names:list[str], extensions:list[str], modified_date:datetime=None):
         self.simulation_generator = simulation_generator
         self.timeseries_count     = timeseries_count
         self.local_folder_names   = local_folder_names 
         self.extensions           = (*extensions,)
+        self.modified_date        = modified_date
 
     def generate_filepaths(self, local_folder: str, loadcase_names: str, ext: str, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames):
         # generate the files with extention "ext" and
@@ -81,9 +93,19 @@ class GenerateTimeseries:
                     for filepath in filepaths:  
                         full_filepath = os.path.join( base_path, filepath)
                         with open(full_filepath, "wb") as f:
-                            f.write( b"x" )  
+                            f.write( b"x" )
+
+                        if self.modified_date:
+                            #import time
+                            #time.sleep(0.1)  # ensure time difference
+                            os.utime(full_filepath, (self.modified_date.timestamp(), self.modified_date.timestamp()))   
+                            #time.sleep(0.1)  # ensure time difference
+                            stats = os.stat(full_filepath)
+                            if abs(stats.st_mtime - self.modified_date.timestamp()) > 1:
+                                raise ValueError(f"Failed to set modified date for file {full_filepath}")
+
                 #generate som random files that should be ignored by the cleanup
-                generate_random_files(3, full_local_path, self.extensions)
+                generate_random_files(3, full_local_path, self.extensions, self.modified_date)
 
         # gather all files in the target folders
         all_entries = dict[str,os.DirEntry]()
@@ -105,12 +127,13 @@ class LoadcaseConfiguration(NamedTuple):
     clean_value: CleanStatus
 class Base_Simulation_Generator :
     def __init__(self, base_path:str, loadcase_ranges_filepath:str, sim_type: 
-                 SimulationType, sim_loadcase_type: SimulationLoadcaseType, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames):
+                 SimulationType, sim_loadcase_type: SimulationLoadcaseType, timeseries_names_vs_loadcase: TimeseriesNames_vs_LoadcaseNames, modified_date:datetime=None):
         self.base_path                    = base_path
         self.loadcase_ranges_filepath     = loadcase_ranges_filepath
         self.sim_type                     = sim_type
         self.sim_loadcase_type            = sim_loadcase_type
         self.timeseries_names_vs_loadcase = timeseries_names_vs_loadcase
+        self.modified_date                = modified_date
     
     @abstractmethod
     def getLoadcaseConfiguration(self) -> LoadcaseConfiguration:
