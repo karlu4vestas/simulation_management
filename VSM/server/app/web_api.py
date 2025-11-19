@@ -4,8 +4,7 @@ from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
 from cleanup import agent_db_interface
-from datamodel.retentions import RetentionTypeDTO, FolderRetention
-from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO, PathProtectionDTO
+from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO, PathProtectionDTO, RetentionTypeDTO, FolderRetention
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db import db_api
@@ -18,6 +17,8 @@ async def lifespan(app: FastAPI):
     # Startup
     # Configure system clock first (based on environment variables)
     AppConfig.configure_clock()
+    # @todo ligespan will run for both client test and production so we have to find a way to differenciate
+    AppConfig.set_test_mode(AppConfig.Mode.CLIENT_TEST)  
     
     db = Database.get_db()
 

@@ -5,19 +5,18 @@ from sqlmodel import Session
 import pytest
 
 from cleanup import agents_internal
-
-from datamodel.retentions import RetentionCalculator, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention
 from datamodel import dtos
-from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO, FileInfo
+from db import db_api
+
+from datamodel.retentions import RetentionCalculator
+from datamodel.dtos import FolderNodeDTO, FolderTypeEnum, RootFolderDTO, FileInfo, FolderRetention, RetentionTypeDTO, ExternalRetentionTypes, Retention, RetentionTypeEnum
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 
-from db import db_api
 from db.db_api import exist_rootfolder
 from db.db_api import read_rootfolders_by_domain_and_initials, read_folders_marked_for_cleanup, read_folders, read_retentiontypes_by_domain_id, read_simulation_domain_by_name
 from db.db_api import read_folder_type_dict_pr_domain_id, read_simulation_domains, read_folder_types_pr_domain_id, read_frequency_by_domain_id, read_cycle_time_by_domain_id   
 from db.db_api import change_retentions, normalize_path, insert_or_update_simulations_in_db, insert_rootfolder
 
-from datamodel import dtos, retentions
 from tests.integration.testdata_for_import import InMemoryFolderNode, RootFolderWithMemoryFolders,CleanupConfiguration
 
 class RootFolderWithFolderNodeDTOList(NamedTuple):
@@ -723,7 +722,7 @@ class TestCleanupWorkflows:
                                                               nodetype=FolderTypeEnum.SIMULATION,
                                                               external_retention=ExternalRetentionTypes.NUMERIC)
 
-        pathprotected_folders: list[FolderNodeDTO] = db_api.read_simulations_by_retention_type(rootfolder.id, retentions.RetentionTypeEnum.PATH)
+        pathprotected_folders: list[FolderNodeDTO] = db_api.read_simulations_by_retention_type(rootfolder.id, dtos.RetentionTypeEnum.PATH)
         assert pathprotected_folders is not None, "unable to find a path protected folder for changing modified date"
         pathprotected_folder: FolderNodeDTO = pathprotected_folders[0]
         fileinfo_pathprotected_folder:FileInfo = FileInfo(filepath=pathprotected_folder.path, 

@@ -1,14 +1,11 @@
-from __future__ import annotations
 import os
-from typing import TYPE_CHECKING
+from typing import Literal,Optional
 from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-if TYPE_CHECKING:
-    from datamodel.retentions import ExternalRetentionTypes, RetentionTypeDTO, Retention
 
 # see values in vts_create_meta_data
 class SimulationDomainDTO(SQLModel, table=True):
@@ -20,8 +17,6 @@ class FolderTypeEnum(str, Enum):
     #'innernode' must exist for all domains and will be applied to all folders that are not simulations.
     INNERNODE   = "innernode"
     SIMULATION  = "simulation"
-
-
 
 # see values in vts_create_meta_data
 # FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
@@ -52,6 +47,95 @@ class LeadTimeBase(SQLModel):
 
 class LeadTimeDTO(LeadTimeBase, table=True):
     id: int | None            = Field(default=None, primary_key=True)
+
+
+# Type alias for valid retention names - shared across internal and external types
+RetentionName = Literal["missing", "issue", "clean", "path", "numeric"]
+
+class ExternalRetentionTypes(str, Enum):
+    MISSING: RetentionName = "missing"
+    ISSUE: RetentionName = "issue"
+    CLEAN: RetentionName = "clean"
+    NUMERIC: RetentionName = "numeric"
+
+class RetentionTypeEnum(str, Enum):
+    MISSING: RetentionName = "missing"
+    ISSUE: RetentionName = "issue"
+    CLEAN: RetentionName = "clean"
+    NUMERIC: RetentionName = "numeric"
+    PATH: RetentionName = "path"
+
+# Mapping from internal retention type names to external retention types
+INTERNAL_TO_EXTERNAL_RETENTION_TYPE_dict: dict[str, ExternalRetentionTypes] = {
+    RetentionTypeEnum.MISSING.value: ExternalRetentionTypes.MISSING,
+    RetentionTypeEnum.ISSUE.value: ExternalRetentionTypes.ISSUE,
+    RetentionTypeEnum.CLEAN.value: ExternalRetentionTypes.CLEAN,
+    RetentionTypeEnum.NUMERIC.value: ExternalRetentionTypes.NUMERIC,
+    RetentionTypeEnum.PATH.value: ExternalRetentionTypes.NUMERIC,
+}
+
+@dataclass
+class Retention:
+    # Core retention data structure for folder retention information.
+    retention_id: int
+    pathprotection_id: int | None = None
+    expiration_date: datetime | None = None
+
+@dataclass
+class FolderRetention(Retention):
+    # DTO for updating folder retention from client.
+    # Inherits all retention fields and adds folder_id for API routing.
+    # Since this IS-A Retention, it can be passed directly to functions expecting Retention objects.
+    folder_id: int = 0
+    
+    def update_retention_fields(self, retention: Retention) -> None:
+        # Update the retention fields from a Retention object.
+        self.retention_id = retention.retention_id
+        self.pathprotection_id = retention.pathprotection_id
+        self.expiration_date = retention.expiration_date
+
+    @staticmethod
+    def create(folder_id:int, retention: Retention) -> "FolderRetention":
+        # Update the retention fields from a Retention object.
+        return FolderRetention(
+            folder_id=folder_id,
+            retention_id=retention.retention_id,
+            pathprotection_id=retention.pathprotection_id,
+            expiration_date=retention.expiration_date
+        )
+
+class RetentionTypeBase(SQLModel):
+    simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
+    name: str                       = Field(default="numeric")  # Store retention name as string (display label like "+90d", "Marked", or enum values)
+    days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
+    is_endstage: bool               = Field(default=False) #end stage is clean, issue or missing
+    display_rank: int               = Field(default=0)
+    
+    def get_retention_type(self) -> RetentionTypeEnum:
+        # Get the enum representation of the retention type.
+        # Convert string name to enum if it matches enum values
+        try:
+            return RetentionTypeEnum(self.name.lower())
+        except ValueError:
+            # If not a valid enum value, return NUMERIC as default for numeric retentions
+            return RetentionTypeEnum.NUMERIC
+
+    def get_external_retention_type(self) -> ExternalRetentionTypes:
+        # Get the external API representation of the retention type.
+        # Maps based on the retention name from the database.
+        # Returns: The corresponding external retention type
+
+        if self.name is None:
+            return ExternalRetentionTypes.NUMERIC
+
+        name_lower = self.name.lower()
+        return INTERNAL_TO_EXTERNAL_RETENTION_TYPE_dict.get(name_lower, ExternalRetentionTypes.NUMERIC)        
+
+#retention types must be order by increasing days_to_cleanup and then by display_rank
+class RetentionTypeDTO(RetentionTypeBase, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
@@ -231,8 +315,7 @@ class FolderNodeBase(SQLModel):
         self.pathprotection_id = retention.pathprotection_id
         self.expiration_date = retention.expiration_date
     
-    def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, "RetentionTypeDTO"]) -> FileInfo:
-        from datamodel.retentions import RetentionTypeDTO
+    def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, RetentionTypeDTO]) -> FileInfo:
         # Convert FolderNodeBase to FileInfo with all fields populated except id.        
         # Args:
         #     nodetype_dict: Dictionary mapping nodetype_id to FolderTypeDTO

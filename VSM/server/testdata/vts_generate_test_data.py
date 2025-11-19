@@ -1,8 +1,7 @@
 import random
 from sqlmodel import Session, select
 from db.database import Database
-from datamodel.retentions import RetentionTypeDTO
-from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO, CleanupFrequencyDTO
+from datamodel.dtos import FolderTypeEnum, FolderTypeDTO, RootFolderDTO, FolderNodeDTO, SimulationDomainDTO, CleanupFrequencyDTO, RetentionTypeDTO
 from datamodel import dtos
 from db import db_api
 

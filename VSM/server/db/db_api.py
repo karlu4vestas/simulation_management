@@ -1,14 +1,11 @@
-from __future__ import annotations
 import os
-from typing import Literal, Optional, TYPE_CHECKING
+from typing import Literal, Optional
 from sqlalchemy import func
 from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
 from datamodel import dtos
 
-if TYPE_CHECKING:
-    from datamodel.retentions import RetentionTypeDTO, RetentionTypeEnum, FolderRetention 
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
 simulation_domain_name: Literal["vts"]
@@ -20,7 +17,7 @@ def read_simulation_domains() -> list[dtos.SimulationDomainDTO]:
         if not simulation_domains:
             raise HTTPException(status_code=404, detail="SimulationDomain not found")
         return simulation_domains
-#@app.get("/v1/simulationdomains/dict", response_model=dict[str,SimulationDomainDTO]) #disable webapi untill we need it
+
 def read_simulation_domains_dict():
     return {domain.name.lower(): domain for domain in read_simulation_domains()}
 
@@ -33,14 +30,13 @@ def read_simulation_domain_by_name(domain_name: str):
         return simulation_domain
 
 def read_retentiontypes_by_domain_id(simulationdomain_id: int):
-    from datamodel.retentions import RetentionTypeDTO
     with Session(Database.get_engine()) as session:
-        retention_types = session.exec(select(RetentionTypeDTO).where(RetentionTypeDTO.simulationdomain_id == simulationdomain_id)).all()
+        retention_types = session.exec(select(dtos.RetentionTypeDTO).where(dtos.RetentionTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not retention_types or len(retention_types) == 0:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         return retention_types
-#@app.get("/simulationdomain/{simulationdomain_id}/retentiontypes/dict", response_model=dict[str,RetentionTypeDTO]) do not expose before needed
-def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str, "RetentionTypeDTO"]:
+
+def read_retentiontypes_dict_by_domain_id(simulationdomain_id: int) -> dict[str, dtos.RetentionTypeDTO]:
     return {retention.name.lower(): retention for retention in read_retentiontypes_by_domain_id(simulationdomain_id)}
 
 def read_frequency_by_domain_id(simulationdomain_id: int):
@@ -49,19 +45,18 @@ def read_frequency_by_domain_id(simulationdomain_id: int):
         if not frequency or len(frequency) == 0:
             raise HTTPException(status_code=404, detail="Frequency not found")
         return frequency
-#@app.get("/simulationdomain/{simulationdomain_id}/cleanupfrequencies/dict", response_model=dict[str,CleanupFrequencyDTO]) # do not expose before needed
+
 def read_frequency_name_dict_by_domain_id(simulationdomain_id: int):
     return {cleanup.name.lower(): cleanup for cleanup in read_frequency_by_domain_id(simulationdomain_id)}
 
 
-def read_folder_types_pr_domain_id(simulationdomain_id: int):
-    
+def read_folder_types_pr_domain_id(simulationdomain_id: int):    
     with Session(Database.get_engine()) as session:
         folder_types = session.exec(select(dtos.FolderTypeDTO).where(dtos.FolderTypeDTO.simulationdomain_id == simulationdomain_id)).all()
         if not folder_types or len(folder_types) == 0:
             raise HTTPException(status_code=404, detail="foldertypes not found")
         return folder_types
-#@app.get("/foldertypes/dict", response_model=dict[str,FolderTypeDTO]) #isadble webapi untill we need it
+
 def read_folder_type_dict_pr_domain_id(simulationdomain_id: int) -> dict[str, dtos.FolderTypeDTO]:
     return {folder_type.name.lower(): folder_type for folder_type in read_folder_types_pr_domain_id(simulationdomain_id)}
 
@@ -71,22 +66,20 @@ def read_cycle_time_by_domain_id(simulationdomain_id: int):
         if not cycle_time or len(cycle_time) == 0:
             raise HTTPException(status_code=404, detail="LeadTime not found")
         return cycle_time
-#@app.get("/simulationdomain/{simulationdomain_id}/leadtimes/dict", response_model=dict[str,LeadTimeDTO]) # do not expose before needed
+
 def read_cycle_time_dict_by_domain_id(simulationdomain_id: int):
     return {cycle.name.lower(): cycle for cycle in read_cycle_time_by_domain_id(simulationdomain_id)}
-
 #-----------------end retrieval of metadata for a simulation domain -------------------
 
 
 #-----------------start maintenance of rootfolders and information under it -------------------
-
 def read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Query(default="")):
     if initials is None or simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
     rootfolders = read_rootfolders_by_domain_and_initials(simulationdomain_id, initials)
     return rootfolders
 
-def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None)->list[RootFolderDTO]:
+def read_rootfolders_by_domain_and_initials(simulationdomain_id: int, initials: str= None)->list[dtos.RootFolderDTO]:
     if simulationdomain_id is None or simulationdomain_id == 0:
         raise HTTPException(status_code=404, detail="root_folders not found. you must provide simulation domain and initials")
 
@@ -145,17 +138,16 @@ def read_rootfolder_by_id(rootfolder_id: int):
         return rootfolder
 
 def read_rootfolder_retentiontypes(rootfolder_id: int):
-    retention_types:list[RetentionTypeDTO] = list(read_rootfolder_retentiontypes_dict(rootfolder_id).values())
+    retention_types:list[dtos.RetentionTypeDTO] = list(read_rootfolder_retentiontypes_dict(rootfolder_id).values())
     return retention_types
 
-#@app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes/dict", response_model=dict[str, RetentionTypeDTO]) #do not expose untill needed
-def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, "RetentionTypeDTO"]:
+def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, dtos.RetentionTypeDTO]:
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="rootfolder not found")
 
-        retention_types:dict[str,RetentionTypeDTO] = read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
+        retention_types:dict[str,dtos.RetentionTypeDTO] = read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
         if not retention_types:
             raise HTTPException(status_code=404, detail="retentiontypes not found")
         
@@ -164,8 +156,8 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, "Retenti
         
         return retention_types
 
-def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, "RetentionTypeDTO"]:
-    retention_types_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
+def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, dtos.RetentionTypeDTO]:
+    retention_types_dict:dict[str, dtos.RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
     #filter to keep only retentions with at leadtime
     return {key:retention for key,retention in retention_types_dict.items() if retention.days_to_cleanup is not None}
 
@@ -479,7 +471,7 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
             raise HTTPException(status_code=404, detail="RootFolder not found")
         
         # Step 1: Find the path retention id
-        path_retention_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
+        path_retention_dict:dict[str, dtos.RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
         path_retention_id:int = path_retention_dict["path"].id if "path" in path_retention_dict else 0
         undefined_retention_id:int = path_retention_dict["?"].id if "?" in path_retention_dict else 0
         if path_retention_id == 0:
@@ -573,7 +565,7 @@ def delete_pathprotection(rootfolder_id: int, protection_id: int):
         session.commit()
         return {"message": f"Path protection {protection_id} deleted"}
 
-def read_simulations_by_retention_type(rootfolder_id: int, retention_type: RetentionTypeEnum, require_pathprotection: bool = False) -> list[dtos.FolderNodeDTO]:
+def read_simulations_by_retention_type(rootfolder_id: int, retention_type: dtos.RetentionTypeEnum, require_pathprotection: bool = False) -> list[dtos.FolderNodeDTO]:
     """
     Read all simulation folders with a specific retention type.
     
@@ -772,7 +764,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: dt
         raise HTTPException(status_code=500, detail=f"Ordering of existing folders does not match simulations for rootfolder {rootfolder.id}")
 
 
-    #Prepare calculation of retention: non-numeric including pathprotection and numeric retentions.  
+    #Prepare calculation of retention: non-numeric including pathprotection and numeric dtos.  
     retention_calculator: RetentionCalculator = RetentionCalculator(rootfolder.id, rootfolder.cleanup_config_id, session)
 
     # Prepare bulk update data for existing folders

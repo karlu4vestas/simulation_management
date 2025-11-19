@@ -1,6 +1,5 @@
 from sqlmodel import Session, select
-from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, FolderTypeDTO, CleanupFrequencyDTO, LeadTimeDTO
-from datamodel.retentions import RetentionTypeEnum, RetentionTypeDTO
+from datamodel.dtos import FolderTypeEnum, SimulationDomainDTO, FolderTypeDTO, CleanupFrequencyDTO, LeadTimeDTO, RetentionTypeEnum, RetentionTypeDTO
 
 def insert_vts_metadata_in_db(session:Session):
     # ensure that redundant metadata is not present 
