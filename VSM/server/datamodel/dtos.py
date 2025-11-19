@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Session
@@ -192,7 +193,6 @@ class RootFolderBase(SQLModel):
         session.add(self)
         session.commit()
         return config
-
 
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)

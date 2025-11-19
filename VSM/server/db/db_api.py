@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 from typing import Literal, Optional, TYPE_CHECKING
 from sqlalchemy import func
 from sqlmodel import Session, func, select
@@ -865,7 +866,7 @@ def insert_simulations_in_db(rootfolder: dtos.RootFolderDTO, simulations: list[d
     # This function only creates the folder structure, attributes will be updated separately.
     if not simulations:
         return {"inserted_hierarchy_count": 0, "failed_path_count": 0, "failed_paths": []}
-        
+
     #print(f"start insert_simulations rootfolder_id {rootfolder.id} inserting hierarchy for {len(simulations)} folders")
 
     nodetypes:dict[str,dtos.FolderTypeDTO] = read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
@@ -880,7 +881,7 @@ def insert_simulations_in_db(rootfolder: dtos.RootFolderDTO, simulations: list[d
         for sim in simulations:
             try:
                 # Insert hierarchy for this filepath (creates missing nodes)
-                leaf_node_id = insert_hierarchy_for_one_filepath(session, rootfolder.id, sim, nodetypes)
+                leaf_node_id = insert_hierarchy_for_one_filepath(session, rootfolder, sim, nodetypes)
                 inserted_count += 1
                 
             except Exception as e:
@@ -898,21 +899,27 @@ def insert_simulations_in_db(rootfolder: dtos.RootFolderDTO, simulations: list[d
     return {"inserted_hierarchy_count": inserted_count, "failed_path_count": len(failed_paths), "failed_paths": failed_paths}
 
 
-def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simulation: dtos.FileInfo, nodetypes:dict[str,dtos.FolderTypeDTO]) -> int:
+def insert_hierarchy_for_one_filepath(session: Session, rootfolder: dtos.RootFolderDTO, simulation: dtos.FileInfo, nodetypes:dict[str,dtos.FolderTypeDTO]) -> int:
     #    Insert missing hierarchy for a single filepath and return the leaf node ID.
+    rootfolder_id = rootfolder.id
     if rootfolder_id is None or rootfolder_id <= 0:
         raise ValueError(f"Invalid rootfolder_id: {rootfolder_id}")
-
-    # Normalize path and split into segments
-    normalized = normalize_path(simulation.filepath).rstrip("/")
     
-    # Check if path is absolute (starts with /)
-    if normalized.startswith("/") and len(normalized) > 1:
-        segments = [segment for segment in normalized.split("/") if segment.strip()]
-        if len(segments) > 0:
-            segments[0]= "/" + segments[0]   # restore leading slash to first segment
-    else:
-        segments = [segment for segment in normalized.split("/") if segment.strip()]
+ 
+    # Normalize path and split into segments
+    normalized:str = os.path.normpath(normalize_path(simulation.filepath).rstrip("/"))
+    rootfolder_head:str = os.path.normpath(rootfolder.path)
+    
+    if not normalized.startswith(rootfolder_head)  :
+        raise ValueError(f"Filepath '{simulation.filepath}' does not start with rootfolder head '{rootfolder_head}'")
+    
+    # the first segment must be the rootfolder head. The rest can be split using "/"
+    segments = [rootfolder_head]
+    remaining_path = normalized[len(rootfolder_head):]
+    if remaining_path and remaining_path.startswith("/"):
+        remaining_path = remaining_path[1:]  # Remove leading slash after rootfolder_head
+    if remaining_path:
+        segments.extend([segment for segment in remaining_path.split("/") if segment.strip()])
     
     if not segments:
         raise ValueError(f"Invalid or empty filepath: {simulation.filepath}")
@@ -922,10 +929,6 @@ def insert_hierarchy_for_one_filepath(session: Session, rootfolder_id: int, simu
     current_path_segments = []
 
     for index, segment in enumerate(segments):
-        # Validate segment name
-        if not segment or segment.strip() == "":
-            raise ValueError(f"Invalid empty segment in filepath: {simulation.filepath}")
-            
         current_path_segments.append(segment)
         
         # Build the path, adding leading / if original path was absolute
