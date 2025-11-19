@@ -42,7 +42,9 @@ class RandomNodeType:
         if self.inner_node_type is None : raise ValueError("InnerNode folder type not found") # for pylance' sake
         return self.inner_node_type
 
-def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:str, frequency:int, cycle_time:int, path, levels):    
+def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:str, frequency:int, cycle_time:int, path, levels):
+    print(f"Generating root folder at path: {path} with levels: {levels}")
+    
     root_folder = RootFolderDTO(
         simulationdomain_id=domain_id,
         owner=owner,
@@ -77,8 +79,8 @@ def insert_test_folder_hierarchy_in_db(session:Session):
     generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["2 weeks"].days,  cycle_time, "R3",4)
     generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["3 weeks"].days,  cycle_time, "R4",5)
     generate_root_folder(session, domain_id, "misve", "stefw, arlem", frequency_name_dict["4 weeks"].days,  cycle_time, "R5",6)
-    generate_root_folder(session, domain_id, "karlu", "arlem, caemh", frequency_name_dict["inactive"].days, cycle_time, "R6",7)
-    generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["6 weeks"].days,  cycle_time, "R7",8)
+    #generate_root_folder(session, domain_id, "karlu", "arlem, caemh", frequency_name_dict["inactive"].days, cycle_time, "R6",7)
+    #generate_root_folder(session, domain_id, "jajac", "stefw, misve", frequency_name_dict["6 weeks"].days,  cycle_time, "R7",8)
     #generate_root_folder(session, domain_id, "caemh", "arlem, jajac", False, "R8",9)
     #generate_root_folder(session, domain_id, "caemh", "arlem, jajac", False, "R9",10)
 

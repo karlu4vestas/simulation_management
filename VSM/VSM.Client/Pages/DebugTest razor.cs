@@ -10,7 +10,7 @@ namespace VSM.Client.Pages
             public string initials = "";
             public string domain_name = "vts";
             public SimulationDomainDTO? vts_simulationDomain = null;
-            public RootFolder? rootfolder = null;
+            public RootFolderDTO? rootfolder = null;
         }
 
         public static class EndpointTestRegistry
@@ -126,7 +126,7 @@ namespace VSM.Client.Pages
                 else
                 {
                     List<RootFolderDTO> rootFolders = shared_params.vts_simulationDomain == null ? new List<RootFolderDTO>() : await API.Instance.RootFoldersByDomainUser(shared_params.vts_simulationDomain.Id, shared_params.initials);
-                    shared_params.rootfolder = rootFolders.Count > 0 ? new RootFolder(rootFolders.First()) : null;
+                    shared_params.rootfolder = rootFolders.Count > 0 ? rootFolders.First() : null;
 
                     return rootFolders;
                 }
@@ -163,7 +163,7 @@ namespace VSM.Client.Pages
             {
                 if (!Enabled)
                     throw new Exception("Root folder not set. Run RootFolderTest first.");
-                return shared_params.rootfolder != null ? await API.Instance.GetRootfolderRetentionTypes(shared_params.rootfolder) : new RetentionTypesDTO();
+                return shared_params.rootfolder != null ? await API.Instance.GetRootfolderRetentionTypes(shared_params.rootfolder.Id) : new RetentionTypesDTO();
             }
             public override bool Enabled { get { return shared_params.rootfolder != null; } }
             protected override string FormatResult(RetentionTypesDTO result) => $"Number of retention types retrieved: {result.All_retentions.Count}";
@@ -175,7 +175,8 @@ namespace VSM.Client.Pages
             protected override async Task<CleanupConfigurationDTO?> GetDataAsync()
             {
                 await Task.Delay(10); // Simulate async work
-                return Enabled && shared_params.rootfolder != null ? shared_params.rootfolder.CleanupConfiguration : null;
+                //return Enabled && shared_params.rootfolder != null ? shared_params.rootfolder.CleanupConfiguration : null;
+                return shared_params.rootfolder == null ? new CleanupConfigurationDTO() : await API.Instance.GetCleanupConfigurationByRootFolderId(shared_params.rootfolder.Id);
             }
             public override bool Enabled { get { return shared_params.rootfolder != null; } }
 
@@ -187,7 +188,7 @@ namespace VSM.Client.Pages
             {
                 if (!Enabled)
                     throw new Exception("Root folder not set. Run RootFolderTest first.");
-                return shared_params.rootfolder == null ? new List<FolderNodeDTO>() : await API.Instance.GetFoldersByRootFolderId(shared_params.rootfolder);
+                return shared_params.rootfolder == null ? new List<FolderNodeDTO>() : await API.Instance.GetFoldersByRootFolderId(shared_params.rootfolder.Id);
             }
             public override bool Enabled { get { return shared_params.rootfolder != null; } }
             protected override string FormatResult(List<FolderNodeDTO> result) => $"Number of folders retrieved: {result.Count}";

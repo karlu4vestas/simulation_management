@@ -35,9 +35,9 @@ namespace VSM.Client.SharedAPI
             return domain;
         }
 
-        public async Task<RetentionTypesDTO> GetRootfolderRetentionTypes(RootFolder rootfolder)
+        public async Task<RetentionTypesDTO> GetRootfolderRetentionTypes(int rootfolder_Id)
         {
-            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>($"http://127.0.0.1:5173/v1/rootfolders/{rootfolder.Id}/retentiontypes", new JsonSerializerOptions
+            List<RetentionTypeDTO> all_retentions = await httpClient.GetFromJsonAsync<List<RetentionTypeDTO>>($"http://127.0.0.1:5173/v1/rootfolders/{rootfolder_Id}/retentiontypes", new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true,
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
@@ -77,11 +77,11 @@ namespace VSM.Client.SharedAPI
 
             return rootFolderDTOs;
         }
-        public async Task<List<FolderNodeDTO>> GetFoldersByRootFolderId(RootFolder rootFolder)
+        public async Task<List<FolderNodeDTO>> GetFoldersByRootFolderId(int rootfolder_Id)
         {
             try
             {
-                string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/{rootFolder.Id}/folders";
+                string requestUrl = $"http://127.0.0.1:5173/v1/rootfolders/{rootfolder_Id}/folders";
                 List<FolderNodeDTO> base_folders = await httpClient.GetFromJsonAsync<List<FolderNodeDTO>>(requestUrl, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
@@ -96,6 +96,25 @@ namespace VSM.Client.SharedAPI
                 return new List<FolderNodeDTO>();
             }
         }
+        // create API to get the cleanup configuration using the rootfolder id 
+        public async Task<CleanupConfigurationDTO?> GetCleanupConfigurationByRootFolderId(int rootFolderId)
+        {
+            try
+            {
+                CleanupConfigurationDTO? cleanupConfiguration = await httpClient.GetFromJsonAsync<CleanupConfigurationDTO>($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/cleanup_configuration", new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                });
+                return cleanupConfiguration;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching cleanup configuration: {ex.Message}");
+                return null;
+            }
+        }
+
         public async Task<bool> UpdateCleanupConfigurationForRootFolder(int rootFolderId, CleanupConfigurationDTO cleanup_configuration)
         {
             try

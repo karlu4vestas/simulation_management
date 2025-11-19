@@ -33,7 +33,14 @@ namespace VSM.Client.Datamodel
                 CleanupFrequencies = await API.Instance.GetCleanupFrequencies(Domain.Id);
                 CycleTimes = await API.Instance.GetCycleTimes(Domain.Id);
                 List<RootFolderDTO> rootFolderDTOs = await API.Instance.RootFoldersByDomainUser(Domain.Id, User);
-                UsersRootFolders = [.. rootFolderDTOs.Select(dto => new RootFolder(dto))];
+
+                UsersRootFolders = new List<RootFolder>();
+                foreach (var dto in rootFolderDTOs)
+                {
+                    CleanupConfigurationDTO? cleanupConfig = await API.Instance.GetCleanupConfigurationByRootFolderId(dto.Id);
+                    var rootFolder = new RootFolder(dto, cleanupConfig ?? new CleanupConfigurationDTO());
+                    UsersRootFolders.Add(rootFolder);
+                }
             }
         }
     }

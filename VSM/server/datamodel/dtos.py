@@ -198,7 +198,7 @@ class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
     rootfolder_id: int          = Field(default=None, foreign_key="rootfolderdto.id")
     leadtime: int               = Field(default=0)  # days a simulation must be available before cleanup can start. 
-    frequency: float            = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
+    frequency: int              = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
     start_date: datetime | None = Field(default=None)
     progress: str               = Field(default=CleanupProgress.Progress.INACTIVE.value)
 

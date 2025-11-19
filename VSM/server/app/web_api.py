@@ -111,10 +111,16 @@ def fs_read_rootfolders(simulationdomain_id: int, initials: Optional[str] = Quer
 
 
 
+# get a rootfolder's cleanup_configuration
+@app.get("/v1/rootfolders/{rootfolder_id}/cleanup_configuration", response_model=CleanupConfigurationDTO)
+def fs_read_rootfolder_cleanup_configuration(rootfolder_id: int):
+    return db_api.get_cleanup_configuration_by_rootfolder_id(rootfolder_id)
+
+
 # update a rootfolder's cleanup_configuration
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
 def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
-    return agent_db_interface.update_rootfolder_cleanup_configuration(rootfolder_id, cleanup_configuration)
+    return db_api.update_cleanup_configuration_by_rootfolder_id(rootfolder_id, cleanup_configuration)
 
 
 
@@ -170,32 +176,32 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from cleanup.scheduler import CleanupScheduler, CleanupTaskDTO
+from cleanup.scheduler import CleanupTaskDTO
+from cleanup.agent_task_manager import AgentTaskManager
 from cleanup.scheduler_dtos import AgentInfo
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
-    return AgentInfo.reserve_task(agent)
+    return AgentTaskManager.reserve_task(agent)
 
 @app.post("/v1/agent/task/{task_id}/task_completion")
 def fs_agent_task_completion(task_id: int, status: str, status_message: str|None = None) -> dict[str,str]:
-    return AgentInfo.task_completion(task_id, status, status_message)
+    return AgentTaskManager.task_completion(task_id, status, status_message)
 
-@app.post("/v1/agent/task/{task_id}/insert_or_update_simulations")
-def fs_agent_insert_or_update_simulations_in_db(task_id: int, rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
-    return AgentInfo.insert_or_update_simulations_in_db(task_id, rootfolder_id, simulations)
+# from cleanup import agent_db_interface
+# @app.post("/v1/agent/task/{task_id}/insert_or_update_simulations")
+# def fs_agent_insert_or_update_simulations_in_db(task_id: int, rootfolder_id: int, simulations: list[FileInfo]) -> dict[str, str]:
+#     return agent_db_interface.task_scan_insert_or_update_simulations_in_db(task_id, rootfolder_id, simulations)
 
-@app.get("/v1/agent/task/{task_id}/marked_for_cleanup", response_model=list[str])
-def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -> list[str]:
-    return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
+# @app.get("/v1/agent/task/{task_id}/marked_for_cleanup", response_model=list[str])
+# def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -> list[str]:
+#     return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
 
 #-----------------Scheduler API -------------------
-from cleanup.scheduler import CleanupScheduler
 from cleanup.agent_runner import InternalAgentFactory, AgentCallbackHandler
 
 def run_scheduler_tasks(callback_handler: AgentCallbackHandler = None, run_randomized: bool = False):
     #callback_handler: Optional handler for agent execution callbacks with on_agent_prerun and on_agent_postrun methods
     InternalAgentFactory.run_internal_agents(callback_handler=callback_handler, run_randomized=run_randomized)
-    #CleanupScheduler.update_calendars_and_tasks() # just as precaution. this is actualle done on complettion of each task
 
 @app.post("/v1/scheduler/update_calendars_and_tasks")
 def fs_schedule_calendars_and_tasks(background_tasks: BackgroundTasks):

@@ -55,9 +55,12 @@ namespace VSM.Client.Datamodel
     }
     public class CleanupConfigurationDTO
     {
+        public int Id { get; set; }
+        public int Rootfolder_Id { get; set; }
         public int LeadTime { get; set; }
-
         public int Frequency { get; set; }
+        public DateTime? Start_Date { get; set; } = null;
+        public string Progress { get; set; } = "";
 
         // if frequency is set then leadtime must also be set
         public bool IsValid { get { return Frequency == 0 || LeadTime > 0; } }

@@ -5,28 +5,14 @@ namespace VSM.Client.Datamodel
     public class RootFolder
     {
         RootFolderDTO dto;
-        public RootFolder(RootFolderDTO dto)
+        public RootFolder(RootFolderDTO dto, CleanupConfigurationDTO cleanupConfiguration)
         {
             this.dto = dto;
+            this.CleanupConfiguration = cleanupConfiguration;
         }
         public int Id => dto.Id;
         public int Folder_Id => dto.Folder_Id;
-        public CleanupConfigurationDTO CleanupConfiguration
-        {
-            get
-            {
-                return new CleanupConfigurationDTO
-                {
-                    Frequency = dto.Frequency,
-                    LeadTime = dto.LeadTime
-                };
-            }
-            set
-            {
-                dto.Frequency = value.Frequency;
-                dto.Leadtime = value.LeadTime;
-            }
-        }
+        public CleanupConfigurationDTO CleanupConfiguration { get; set; }
 
         public string Root_path => dto.Path;
         public string Owner => dto.Owner;
@@ -44,7 +30,7 @@ namespace VSM.Client.Datamodel
         public async Task LoadFolderRetentions()
         {
             this.RetentionConfiguration = await GetRetentionOptionsAsync();
-            List<FolderNodeDTO> dto_folders = await API.Instance.GetFoldersByRootFolderId(this);
+            List<FolderNodeDTO> dto_folders = await API.Instance.GetFoldersByRootFolderId(this.Id);
             this.Path_protections = await API.Instance.GetPathProtectionsByRootFolderId(this.Id);
             if (dto_folders.Count == 0 || RetentionConfiguration.All_retentions.Count == 0)
             {
@@ -55,7 +41,7 @@ namespace VSM.Client.Datamodel
         }
         private async Task<RetentionTypes> GetRetentionOptionsAsync()
         {
-            RetentionTypesDTO dto = await API.Instance.GetRootfolderRetentionTypes(this);
+            RetentionTypesDTO dto = await API.Instance.GetRootfolderRetentionTypes(this.Id);
             return new RetentionTypes(dto);
         }
         public async Task UpdateAggregation()
