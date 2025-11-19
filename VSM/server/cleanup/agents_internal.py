@@ -5,7 +5,7 @@ from db.database import Database
 from datamodel import dtos, retentions
 from cleanup import agent_db_interface
 from cleanup.scheduler_dtos import ActionType, AgentInfo, CleanupTaskDTO, TaskStatus 
-from cleanup.scheduler_db_actions import CleanupScheduler
+from cleanup.scheduler import CleanupScheduler
 from cleanup.agent_task_manager import AgentTaskManager
 from db import db_api
 

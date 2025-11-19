@@ -16,6 +16,9 @@ from app.app_config import AppConfig
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    # Configure system clock first (based on environment variables)
+    AppConfig.configure_clock()
+    
     db = Database.get_db()
 
     if db.is_empty() :
@@ -166,7 +169,7 @@ def fs_change_retentions(rootfolder_id: int, retentions: list[FolderRetention]):
 #-----------------end maintenance of rootfolders and information under it -------------------
 
 #-----------------Agents API -------------------
-from cleanup.scheduler_db_actions import CleanupScheduler, CleanupTaskDTO
+from cleanup.scheduler import CleanupScheduler, CleanupTaskDTO
 from cleanup.scheduler_dtos import AgentInfo
 @app.get("/v1/agent/reserve_task", response_model=CleanupTaskDTO| None)
 def fs_agent_reserve_task(agent: AgentInfo) -> CleanupTaskDTO| None:
@@ -185,13 +188,13 @@ def fs_agent_read_folders_marked_for_cleanup(task_id: int, rootfolder_id: int) -
     return AgentInfo.read_simulations_marked_for_cleanup(task_id, rootfolder_id)
 
 #-----------------Scheduler API -------------------
-from cleanup.scheduler_db_actions import CleanupScheduler
+from cleanup.scheduler import CleanupScheduler
 from cleanup.agent_runner import InternalAgentFactory, AgentCallbackHandler
 
 def run_scheduler_tasks(callback_handler: AgentCallbackHandler = None, run_randomized: bool = False):
     #callback_handler: Optional handler for agent execution callbacks with on_agent_prerun and on_agent_postrun methods
     InternalAgentFactory.run_internal_agents(callback_handler=callback_handler, run_randomized=run_randomized)
-    CleanupScheduler.update_calendars_and_tasks() # just as precaution. this is actualle done on complettion of each task
+    #CleanupScheduler.update_calendars_and_tasks() # just as precaution. this is actualle done on complettion of each task
 
 @app.post("/v1/scheduler/update_calendars_and_tasks")
 def fs_schedule_calendars_and_tasks(background_tasks: BackgroundTasks):

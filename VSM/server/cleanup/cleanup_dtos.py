@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from datamodel import dtos
 from db import db_api
 from db.database import Database
+from app.clock import SystemClock
 
 class CleanupState:
     dto:dtos.CleanupConfigurationDTO = None
@@ -52,7 +53,7 @@ class CleanupState:
         # and self.progress is INACTIVE or FINISHED
         
         # has valid configuration 
-        has_valid_configuration = self.is_valid() and self.dto.start_date is not None and self.dto.start_date <= datetime.now() 
+        has_valid_configuration = self.is_valid() and self.dto.start_date is not None and self.dto.start_date <= SystemClock.now() 
         if not has_valid_configuration:
             return False
 

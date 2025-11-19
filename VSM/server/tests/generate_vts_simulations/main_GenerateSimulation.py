@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import NamedTuple
 from dataclasses import dataclass
 from concurrent.futures import ThreadPoolExecutor
+from app.clock import SystemClock
 
 from tests.generate_vts_simulations import main_validate_cleanup
 from tests.generate_vts_simulations.GenerateTimeseries import CleanStatus, SimulationType, SimulationLoadcaseType, TimeseriesNames_vs_LoadcaseNames
@@ -104,9 +105,9 @@ def initialize_generate_simulations (n_simulations:int, base_path:str, loadcases
     # create a number of simulations
     start_time = time.perf_counter()
     #create two simulations with different structure
-    simulation_folders: SimulationTestSpecification = [
-        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, datetime.now()),
-        (os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS, datetime.now())
+    simulation_folders: list[SimulationTestSpecification] = [
+        SimulationTestSpecification(os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, SystemClock.now()),
+        SimulationTestSpecification(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS, SystemClock.now())
     ]
 
     result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders )
@@ -137,9 +138,9 @@ def main():
     # create a number of simulations
     start_time = time.perf_counter()
 
-    simulation_folders: SimulationTestSpecification = [  
-        (os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, datetime.now()),
-        #(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
+    simulation_folders: list[SimulationTestSpecification] = [  
+        SimulationTestSpecification(os.path.join(base_path, "loadrelease",  "LOADS"), SimulationType.VTS, datetime.now()),
+        #SimulationTestSpecification(os.path.join(base_path, "sim_without_htc", "LOADS"), SimulationType.VTS)
     ]
 
     result:GeneratedSimulationsResult = generate_simulations( base_path, simulation_folders )

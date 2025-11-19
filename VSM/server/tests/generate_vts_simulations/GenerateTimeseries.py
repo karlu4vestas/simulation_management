@@ -44,15 +44,15 @@ def generate_random_files(number_of_files:int, folder_path:str, reserved_extensi
             f.write("This is a random test file.")
             generated_filepaths.append(random_file)
 
-        if modified_date:
-            #import time
-            #time.sleep(0.1)  # ensure time difference
-            ts = modified_date.timestamp()
-            os.utime(random_file, (ts, ts))
-            #time.sleep(0.1)  # ensure time difference
-            stats = os.stat(random_file)
-            if abs(stats.st_mtime - ts) > 1:
-                raise ValueError(f"Failed to set modified date for file {random_file}")
+        # if modified_date:
+        #     #import time
+        #     #time.sleep(0.1)  # ensure time difference
+        #     ts = modified_date.timestamp()
+        #     os.utime(random_file, (ts, ts))
+        #     #time.sleep(0.1)  # ensure time difference
+        #     stats = os.stat(random_file)
+        #     if abs(stats.st_mtime - ts) > 1:
+        #         raise ValueError(f"Failed to set modified date for file {random_file}")
 
     return generated_filepaths
 
@@ -95,14 +95,14 @@ class GenerateTimeseries:
                         with open(full_filepath, "wb") as f:
                             f.write( b"x" )
 
-                        if self.modified_date:
-                            #import time
-                            #time.sleep(0.1)  # ensure time difference
-                            os.utime(full_filepath, (self.modified_date.timestamp(), self.modified_date.timestamp()))   
-                            #time.sleep(0.1)  # ensure time difference
-                            stats = os.stat(full_filepath)
-                            if abs(stats.st_mtime - self.modified_date.timestamp()) > 1:
-                                raise ValueError(f"Failed to set modified date for file {full_filepath}")
+                        # if self.modified_date:
+                        #     #import time
+                        #     #time.sleep(0.1)  # ensure time difference
+                        #     os.utime(full_filepath, (self.modified_date.timestamp(), self.modified_date.timestamp()))   
+                        #     #time.sleep(0.1)  # ensure time difference
+                        #     stats = os.stat(full_filepath)
+                        #     if abs(stats.st_mtime - self.modified_date.timestamp()) > 1:
+                        #         raise ValueError(f"Failed to set modified date for file {full_filepath}")
 
                 #generate som random files that should be ignored by the cleanup
                 generate_random_files(3, full_local_path, self.extensions, self.modified_date)

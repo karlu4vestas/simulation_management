@@ -4,7 +4,8 @@ from fastapi import HTTPException
 from db.database import Database
 from datamodel import dtos
 from cleanup import cleanup_dtos, scheduler_dtos
-from cleanup.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, CleanupCalendarDTO, CleanupTaskDTO 
+from cleanup.scheduler_dtos import TaskStatus, CalendarStatus, ActionType, CleanupCalendarDTO, CleanupTaskDTO
+from app.clock import SystemClock 
 
 class CleanupScheduler:
     # Dynamic scheduler that creates tasks just-in-time (JIT) directly in ACTIVATED state.
@@ -17,7 +18,7 @@ class CleanupScheduler:
     
     # Define the task sequence and their properties
     @staticmethod
-    def _get_task_definitions(retention_review_duration: float) -> list[dict]:
+    def _get_task_definitions(retention_review_duration: float) -> list[dict[str,object]]:
         # Returns the sequence of tasks to be created for a cleanup calendar.
         # Each task definition contains the parameters needed to create a CleanupTaskDTO.        
         # Args:
@@ -67,7 +68,7 @@ class CleanupScheduler:
             },
             {
                 "action_type": ActionType.SEND_FINAL_NOTIFICATION.value,
-                "task_offset": 0, #max(retention_review_duration,retention_review_duration - 7),
+                "task_offset": int(retention_review_duration * 0.75 + 0.5), #examples. with a duration of 7 days them the final notification is sent at day 5. duration 30 days -> day 23
                 "needs_storage_id": False,
                 "max_execution_hours": 1,
                 "precondition_states": [dtos.CleanupProgress.Progress.RETENTION_REVIEW.value],
@@ -77,7 +78,7 @@ class CleanupScheduler:
             },
             {
                 "action_type": ActionType.CLEAN_ROOTFOLDER.value,
-                "task_offset": 0, #retention_review_duration,
+                "task_offset": retention_review_duration,
                 "needs_storage_id": True,
                 "max_execution_hours": 48,
                 "precondition_states": [dtos.CleanupProgress.Progress.RETENTION_REVIEW.value],
@@ -87,7 +88,7 @@ class CleanupScheduler:
             },
             {
                 "action_type": ActionType.UNMARK_SIMULATIONS_AFTER_REVIEW.value,
-                "task_offset": 0, #max(retention_review_duration ),#, retention_review_duration + 1),
+                "task_offset": 0, 
                 "needs_storage_id": False,
                 "max_execution_hours": 1,
                 "precondition_states": [dtos.CleanupProgress.Progress.CLEANING.value],
@@ -97,7 +98,7 @@ class CleanupScheduler:
             },
             {
                 "action_type": ActionType.FINALISE_CLEANUP_CYCLE.value,
-                "task_offset": 0, #max(retention_review_duration ),#, retention_review_duration + 1),
+                "task_offset": 0, 
                 "needs_storage_id": False,
                 "max_execution_hours": 1,
                 "precondition_states": [dtos.CleanupProgress.Progress.UNMARKING_AFTER_REVIEW.value],
@@ -115,7 +116,7 @@ class CleanupScheduler:
         # Returns:
         #     String message indicating how many calendars were generated
 
-        now = datetime.now()
+        now = SystemClock.now()
         
         with Session(Database.get_engine()) as session:
             configs = session.exec( select(dtos.CleanupConfigurationDTO).where(
@@ -142,9 +143,11 @@ class CleanupScheduler:
                     continue
                 
                 if config.can_start_cleanup_now():
-                    if config.progress == dtos.CleanupProgress.Progress.DONE.value:
-                        config.dto.start_date = datetime.now()
-                        config.save_to_db(session)
+                    # if config.progress == dtos.CleanupProgress.Progress.DONE.value:
+                    #     config.dto.start_date = SystemClock.now()
+                    #     config.save_to_db(session)
+                    config.dto.start_date = SystemClock.now()
+                    config.save_to_db(session)
                     calendar:scheduler_dtos.CleanupCalendarDTO = CleanupScheduler.generate_cleanup_calendar(config)    
                     calendars.append(calendar)
 
@@ -254,7 +257,7 @@ class CleanupScheduler:
 
         # Check for reserved tasks that have exceeded their max execution time
         reserved_tasks = [task for task in tasks if task.status == TaskStatus.RESERVED.value and task.reserved_at]
-        now = datetime.now(timezone.utc)
+        now = SystemClock.now(timezone.utc)
         for task in reserved_tasks:
             execution_duration = now - task.reserved_at
             max_duration = timedelta(hours=task.max_execution_hours)
@@ -272,12 +275,10 @@ class CleanupScheduler:
                 calendars_failed += 1
 
         # Get the rootfolder configuration to determine total expected tasks
-        config = session.exec( select(dtos.CleanupConfigurationDTO).where(
-                dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id ) ).first()
+        config = session.exec( select(dtos.CleanupConfigurationDTO).where( dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id ) ).first()
         
         if config:
-            retention_review_duration = config.frequency if config.frequency > 0 else 7.0
-            task_definitions = CleanupScheduler._get_task_definitions(retention_review_duration)
+            task_definitions = CleanupScheduler._get_task_definitions( retention_review_duration=config.frequency )
             expected_task_count = len(task_definitions)
             
             # Check if all expected tasks are completed
@@ -304,16 +305,12 @@ class CleanupScheduler:
         """
         # Get rootfolder and config
         rootfolder = session.exec( select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == calendar.rootfolder_id) ).first()
-        
-        config = session.exec( select(dtos.CleanupConfigurationDTO).where(
-                dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id )).first()
-        
+        config     = session.exec( select(dtos.CleanupConfigurationDTO).where( dtos.CleanupConfigurationDTO.rootfolder_id == calendar.rootfolder_id )).first()
         if not rootfolder or not config:
             return 0
 
         # Get task definitions
-        retention_review_duration = config.frequency if config.frequency > 0 else 7.0
-        task_definitions = CleanupScheduler._get_task_definitions(retention_review_duration)
+        task_definitions = CleanupScheduler._get_task_definitions( retention_review_duration=config.frequency )
         
         # Determine which task to create next (based on how many tasks exist)
         next_task_index = len(existing_tasks)
@@ -333,8 +330,9 @@ class CleanupScheduler:
         
         # Check if scheduled date has been reached
         scheduled_date = calendar.start_date + timedelta(days=next_task_def["task_offset"])
-        now = datetime.now()
+        now = SystemClock.now()
         if now < scheduled_date:
+            print(f"postpone task: now {now} Calendar {calendar.id}: Not time yet for task: {next_task_def['action_type']} - task_offset {next_task_def['task_offset']} - scheduled_date {scheduled_date} - calendar_start_date {calendar.start_date}")
             return 0  # Not time yet
         
         # Create the task directly in ACTIVATED state
@@ -355,7 +353,7 @@ class CleanupScheduler:
         )
         
         session.add(new_task)
-        print(f"Created JIT task {next_task_def['action_type']} for calendar {calendar.id}")
+        print(f"now {now} Calendar {calendar.id}: Created JIT task: {next_task_def['action_type']} - task_offset {next_task_def['task_offset']} - scheduled_date {scheduled_date} - calendar_start_date {calendar.start_date}")
         return 1
     
     @staticmethod
@@ -391,7 +389,18 @@ class CleanupScheduler:
                 for task in tasks:
                     task.status = TaskStatus.FAILED.value
                     task.status_message = "Task cancelled due to calendar deactivation"
-                    task.completed_at = datetime.now(timezone.utc)
+                    task.completed_at = SystemClock.now(timezone.utc)
                     session.add(task)
             
             session.commit()
+
+    def get_active_calendar_by_rootfolder_id(rootfolder_id: int) -> CleanupCalendarDTO | None:
+        # Retrieve the active cleanup calendar for a given rootfolder.
+        with Session(Database.get_engine()) as session:
+            calendar = session.exec(
+                select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value)
+                )
+            ).first()
+            return calendar 

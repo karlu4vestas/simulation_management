@@ -161,7 +161,7 @@ def clean_main(
     try:
         # Wait for simulation queue to complete
         params.simulation_queue.join()
-        print("\nAll simulations processed. Waiting for file deletions...")
+        #print("\nAll simulations processed. Waiting for file deletions...")
         
         # Send poison pills to simulation workers
         for _ in range(num_sim_workers):

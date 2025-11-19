@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from collections.abc import Iterable
 import bigtree
 from bigtree import  list_to_tree
+from app.clock import SystemClock
 
 # Type alias for bigtree.Node
 FolderTreeNode = bigtree.Node
@@ -159,7 +160,7 @@ def main1():
         "\\root\\bb\\d\\e\\f2",
         "\\root\\bb\\d\\e\\f3",
     ]
-    folder_modified_date:dict[str,datetime] = {f: datetime.now() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
+    folder_modified_date:dict[str,datetime] = {f: SystemClock.now() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
 
     paths = ".\n".join(folder_modified_date.keys())
     print(f"specified paths:")
@@ -226,7 +227,7 @@ def main2():
     root = "any" #test_dir
     #folder_paths = [path for path in file_registry.get_all_dir_entries().keys()]
     folder_paths = [os.path.join(root, path) for path in file_registry.get_all_dir_entries().keys()]
-    folder_modified_date:dict[str,date] = {f: date.today() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
+    folder_modified_date:dict[str,datetime] = {f: SystemClock.now() - timedelta(days=random.randint(0, 7)) for f in folder_paths}
     tree:FolderTree = FolderTree(folder_paths)#, path_separator="/")#, prefix=prefix)
     #print(tree.get_ascii_tree(attr_list=["sim_node"]))  # Show the initial tree structure   
     

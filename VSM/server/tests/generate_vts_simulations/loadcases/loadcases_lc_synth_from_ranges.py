@@ -192,14 +192,14 @@ def write_synthetic_setfile(out_path, num, seed, sim_json, modified_date:datetim
                 w.write(main + "\n")
             loadcase_ids.append(lc_id)
 
-    if modified_date:
-        #import time
-        #time.sleep(0.1)  # ensure time difference
-        os.utime(out_path, (modified_date.timestamp(), modified_date.timestamp()))
-        #time.sleep(0.1)  # ensure time difference
-        stats = os.stat(out_path)
-        if abs(stats.st_mtime - modified_date.timestamp()) > 1:
-            raise ValueError(f"Failed to set modified date for file {out_path}")
+    # if modified_date:
+    #     #import time
+    #     #time.sleep(0.1)  # ensure time difference
+    #     os.utime(out_path, (modified_date.timestamp(), modified_date.timestamp()))
+    #     #time.sleep(0.1)  # ensure time difference
+    #     stats = os.stat(out_path)
+    #     if abs(stats.st_mtime - modified_date.timestamp()) > 1:
+    #         raise ValueError(f"Failed to set modified date for file {out_path}")
 
 
     return out_path, loadcase_ids

@@ -8,7 +8,7 @@ class CleanStatus(str,Enum):
     KEEP  = "keep"
     CLEAN = "clean"
 
-def validate_cleanup(validation_file: str, simulation_scope:list[str]) -> tuple[str, list[str]]:
+def validate_cleanup(validation_file: str, simulation_scope:list[str]=None) -> tuple[str, list[str]]:
     #Args: validation_file: path to the validation csv file
     #      simulations_scope: list of simulation names that the validation must focus on
     validation_file = os.path.normpath(validation_file)
@@ -19,10 +19,11 @@ def validate_cleanup(validation_file: str, simulation_scope:list[str]) -> tuple[
         filepath_to_validation_results = os.path.join(base_path, str_now + "test_results.csv")
 
 
-        print(f"reading validation file:{validation_file}\n")
+        #print(f"reading validation file:{validation_file}\n")
         schema_overrides = {"path":pl.String,"expected_status":pl.String}
         validation = pl.read_csv(validation_file, schema_overrides=schema_overrides, encoding = "utf-8", separator=';', quote_char='"' )
-        validation = validation.filter( pl.col("simulation").str.contains_any(simulation_scope, ascii_case_insensitive=True) )
+        if simulation_scope: # lets focus on the scope
+            validation = validation.filter( pl.col("simulation").str.contains_any(simulation_scope, ascii_case_insensitive=True) )
 
         #run through all files and register the existence status to the column "measured_status"
         path_existance = [CleanStatus.KEEP if os.path.exists(p) else CleanStatus.CLEAN for p in validation["path"].to_list()]

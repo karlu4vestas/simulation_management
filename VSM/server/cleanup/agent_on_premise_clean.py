@@ -82,23 +82,7 @@ class AgentCleanVTSRootFolder(AgentTemplate):
             self.error_message = "Temporary result folder is not set"
             return
             
-        simulations: list[FileInfo] = agent_db_interface.task_read_folders_marked_for_cleanup(self.task.id)
-        
-        # # test by readin all folder and filter the leaf folders marked for cleanup
-        # from db import db_api
-        # simulations:list[dtos.FolderNodeDTO] = db_api.read_folders(self.task.rootfolder_id)
-        # rootfolder = db_api.read_rootfolder_by_id(self.task.rootfolder_id)
-        # nodetype_dict_by_name = db_api.read_folder_type_dict_pr_domain_id(rootfolder.simulationdomain_id)
-        # retention_dict_by_name = db_api.read_retentiontypes_dict_by_domain_id(rootfolder.simulationdomain_id)
-        
-        # # Convert to ID-based dictionaries
-        # nodetype_dict  = {ft.id: ft for ft in nodetype_dict_by_name.values()}
-        # retention_dict = {rt.id: rt for rt in retention_dict_by_name.values()}
-
-        # nodetype:dtos.FolderTypeDTO = nodetype_dict_by_name[dtos.FolderTypeEnum.SIMULATION.value]
-        # simulations = [folder.get_fileinfo(nodetype_dict, retention_dict) for folder in simulations if folder.nodetype_id == nodetype.id]
-
-
+        simulations: list[FileInfo] = agent_db_interface.task_read_folders_marked_for_cleanup(self.task.id)        
         AgentTaskManager.task_progress(self.task.id, f"Starting cleanup of {len(simulations)} simulations in mode: {self.clean_mode.value}")
         
         clean_result: CleanupResult = None

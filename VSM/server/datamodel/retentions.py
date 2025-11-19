@@ -7,6 +7,7 @@ from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
 from datamodel import dtos
 from cleanup import cleanup_dtos
+from app.clock import SystemClock
 
 #ensure consistency of retentions
 
@@ -141,13 +142,13 @@ class RetentionCalculator:
         # It is on the one hand practical to make a first configuration of retention without starting a cleanup round, if the user desires this
         # but on the other hand the RetentionCalculator requires a start_date to be able to calculate retentions
         # If the cleanup_state can be used to start a cleanup round then use its start date
-        # If the progress is INACTIVE and no start_date is set, we set the cleanup_round_start_date to datetime.now(). 
+        # If the progress is INACTIVE and no start_date is set, we set the cleanup_round_start_date to SystemClock.now(). 
         # Notice that no retention will be marked with cleanup progress in CleanupProgress.ProgressEnum.INACTIVE
         start_date = None
         if cleanup_state.is_valid() and cleanup_state.dto.start_date is not None:
             start_date = cleanup_state.dto.start_date
         elif cleanup_state.dto.progress == dtos.CleanupProgress.Progress.INACTIVE.value:
-            start_date = datetime.now()
+            start_date = SystemClock.now()
         else:
             raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_state}")
         self.cleanup_round_start_date    = start_date
@@ -189,9 +190,7 @@ class RetentionCalculator:
     def get_endstage_retentions(self) -> list[RetentionTypeDTO]:
         return [retentiontype for retentiontype in self.retention_type_id_dict.values() if retentiontype.is_endstage]
 
-    # adjust the expiration_date using the cleanup_configuration and retentiontype 
-    # This is what you what when updating the simulations retentiontype using the webclient
-    #
+    # The usecase is that the "end user" has selected a retention relative to the cleanup configuration'
     # if non numeric retention then set expiration_date to None
     # if numeric retention then set expiration_date to cleanup_round_start_date + days_to_cleanup of the retention type
     def adjust_expiration_date_from_cleanup_configuration_and_retentiontype(self, retention: Retention) -> Retention:
@@ -230,7 +229,7 @@ class RetentionCalculator:
         if retention.retention_id is not None and not self.is_numeric(retention.retention_id) and retention.retention_id != self.undefined_retention_id: 
             # the retention is endstage or path retention so do not change the retention_id
             retention.expiration_date = None
-        else: # so it is a a numeric or unknown retention                
+        else: # so it is a numeric or unknown retention                
             if modified_date is not None:
                 retention.expiration_date = (modified_date + self.leadtimedelta) if retention.expiration_date is None else max(retention.expiration_date, modified_date + self.leadtimedelta)
 

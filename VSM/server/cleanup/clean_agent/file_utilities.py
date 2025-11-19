@@ -43,8 +43,8 @@ def get_size_stat_from_file_entries(file_entries: dict) -> FileStatistics:
         file_timestamp = [state.st_mtime for state in files_stat if state.st_mtime < max_time]  # have to create a list with valid timestamps first
         if len(file_timestamp) > 0:
             file_timestamp = np.fromiter(file_timestamp, dtype=np.float64)
-            max_timestamp = np.max(file_timestamp)
-            min_timestamp = np.min(file_timestamp)
+            max_timestamp  = np.max(file_timestamp)
+            min_timestamp  = np.min(file_timestamp)
             # Convert timestamps to datetime objects
             max_date = datetime.fromtimestamp(max_timestamp)
             min_date = datetime.fromtimestamp(min_timestamp)

@@ -1,12 +1,13 @@
 
 from datetime import date, datetime
+from cleanup import scheduler
 from sqlmodel import Session, select
 from fastapi import HTTPException
 from db.database import Database
 from datamodel import dtos, retentions
 from db import db_api
 from datamodel import dtos
-from cleanup import cleanup_dtos, scheduler_dtos, scheduler_db_actions
+from cleanup import cleanup_dtos, scheduler_dtos
 
 
 
@@ -58,5 +59,5 @@ def task_read_folders_marked_for_cleanup(task_id: int) -> list[dtos.FileInfo]:
         simulations:list[dtos.FolderNodeDTO] = db_api.read_folders_marked_for_cleanup(task.rootfolder_id)
         
         # Convert each FolderNodeDTO to FileInfo using get_fileinfo()
-        file_infos:list[dtos.FileInfo] = [folder.get_fileinfo(session, nodetype_dict, retention_dict) for folder in simulations]
+        file_infos:list[dtos.FileInfo] = [folder.get_fileinfo(nodetype_dict, retention_dict) for folder in simulations]
     return file_infos

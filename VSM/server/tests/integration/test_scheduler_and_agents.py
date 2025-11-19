@@ -6,6 +6,7 @@ import pytest
 from datetime import date, datetime
 from dataclasses import dataclass
 from datetime import timedelta
+from app.clock import SystemClock
 
 from cleanup.clean_agent.simulation_file_registry import SimulationFileRegistry
 from tests.generate_vts_simulations.main_validate_cleanup import validate_cleanup
@@ -53,7 +54,7 @@ class AgentExecutionRecord:
     error_message: str | None
     success_message: str | None
 
-class TestAgentCallbackHandler(AgentCallbackHandler):
+class AgentCallbackHandlerForTesting(AgentCallbackHandler):
     """Callback handler for testing that collects agent execution data"""
     
     def __init__(self):
@@ -167,6 +168,18 @@ class TestSchedulerAndAgents:
                         (CleanupCalendarDTO.status == CalendarStatus.COMPLETED.value) )).all()
             return active_calendars
 
+    @staticmethod
+    def get_active_calendars(rootfolder_id:int=None) -> list[CleanupCalendarDTO]:
+        with Session(Database.get_engine()) as session:
+            # Get all active calendars for this rootfolder
+            if rootfolder_id is None:
+                active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                    (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value) )).all()
+            else:
+                active_calendars = session.exec( select(CleanupCalendarDTO).where(
+                        (CleanupCalendarDTO.rootfolder_id == rootfolder_id) &
+                        (CleanupCalendarDTO.status == CalendarStatus.ACTIVE.value) )).all()
+            return active_calendars
 
     def run_scheduler_and_agents_with_full_cleanup_round(self, integration_session, cleanup_scenario_data, data_keys:list[str], number_of_runs:int, run_random:bool=False):
         # The purpose of this test is to test 
@@ -214,14 +227,14 @@ class TestSchedulerAndAgents:
         #new db created by pytest_fixture so we only need to populate the metadata
         insert_vts_metadata_in_db(integration_session)
 
-        mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
-            leadtime=7,
-            frequency=1./(24*60*60),  # set to one second for the test
-            start_date=datetime.now() - timedelta(days=8),  #8 = leadtime+1 ensure that simulations are marked for cleanup
-            progress=dtos.CleanupProgress.Progress.INACTIVE
-        )
+        # mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
+        #     leadtime=7,
+        #     frequency=1./(24*60*60),  # set to one second for the test
+        #     start_date=SystemClock.now() - timedelta(days=8),  #8 = leadtime+1 ensure that simulations are marked for cleanup
+        #     progress=dtos.CleanupProgress.Progress.INACTIVE
+        # )
         
-        runtime_callback: TestAgentCallbackHandler = TestAgentCallbackHandler()
+        runtime_callback: AgentCallbackHandlerForTesting = AgentCallbackHandlerForTesting()
         # setup folder for the test
         io_dir_for_storage_test: str = os.path.join(os.path.normpath(TEST_STORAGE_LOCATION),"test_integrationphase_5_scheduler_and_agents")
         if os.path.isdir(io_dir_for_storage_test):
@@ -245,17 +258,21 @@ class TestSchedulerAndAgents:
             sim_dir:str
             rootfolder_data:RootFolderWithMemoryFolders
             gen_sim_results: GeneratedSimulationsResult
-            root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO]
             sim_registry:dict[str,SimulationFileRegistry] = None
+            rootfolder:dtos.RootFolderDTO
+            cleanup_config:dtos.CleanupConfigurationDTO
             def __init__(self, data_key, sim_dir, rootfolder_data, gen_sim_results, root_cleanup_config):
                 self.data_key = data_key
                 self.sim_dir = sim_dir
                 self.rootfolder_data = rootfolder_data
                 self.gen_sim_results = gen_sim_results
                 self.root_cleanup_config = root_cleanup_config
-            def get_rootfolder_id(self) -> int:
-                return self.root_cleanup_config[0].id
-            
+                self.rootfolder = root_cleanup_config[0]
+                self.cleanup_config = root_cleanup_config[1]
+
+            def validate_cleanup_of_all(self) -> tuple[str, list[str]]:
+                scope_before_leafs:list[str] = [in_mem_folder.path for in_mem_folder in self.rootfolder_data.leafs]
+                return validate_cleanup(gen_sim_results.validation_csv_file, scope_before_leafs)    
 
             def getBeforeLeafFiles(self) -> tuple[str, list[str]]:
                 # scope the folders to those modified before the cleanup.start_date-cleanup.leadtime
@@ -272,7 +289,10 @@ class TestSchedulerAndAgents:
                 rootfolder_data:RootFolderWithMemoryFolders = cleanup_scenario_data[data_key]
                 sim_dir = os.path.join(io_dir_for_storage_test, "sim_dir", data_key)        
                 gen_sim_results: GeneratedSimulationsResult = TestSchedulerAndAgents.generate_simulations_folder_and_files(sim_dir, rootfolder_data, remove_rootdir=False)
-                root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO] = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, rootfolder=rootfolder_data.rootfolder, in_memory_config=mem_cleanup_config)
+                root_cleanup_config:tuple[dtos.RootFolderDTO, dtos.CleanupConfigurationDTO] = TestSchedulerAndAgents.import_rootfolder_and_cleanup_configuration(session=integration_session, 
+                                                                                                                                                                 rootfolder=rootfolder_data.rootfolder, 
+                                                                                                                                                                 in_memory_config=rootfolder_data.cleanup_configuration #mem_cleanup_config
+                                                                                                                                                                 )
                 data_sets.append( DataSet(data_key, sim_dir, rootfolder_data, gen_sim_results, root_cleanup_config) )    
                   
             # Create fresh test-specific agents for each iteration to avoid stale state
@@ -291,19 +311,46 @@ class TestSchedulerAndAgents:
             if run_random:
                 with InternalAgentFactory.with_agents(test_agents):
                     run_scheduler_tasks(runtime_callback, run_randomized=True)
+                    
+                    dataset = data_sets[0] #only update the SystemClock once. this will work because all datasets uses the same cleanupconfiguration and ofcause the same SystemClock 
+                    if len(TestSchedulerAndAgents.get_active_calendars()) >= len(data_keys) :
+                        #The calenders block at the first ofset > 0. When both calendars are active then advance the time so that they can finish
+                        SystemClock.set_offset_days(SystemClock.get_offset_days()+dataset.cleanup_config.frequency + 0.01) 
+                    
                     n_calendars_completed = len(TestSchedulerAndAgents.get_completed_calendars() )
                     if n_calendars_completed >= len(data_keys): #cannot pervent the creation of a new calendar while the we await that at least two gets completed 
                         break
 
             else:    
                 with InternalAgentFactory.with_agents(test_agents):
+                    for dataset in data_sets:
+                        print( f"cleanup configuration: {dataset.cleanup_config} " )
+                        print( f"all leafs, before_leafs, mid_leafs, after_leafs: {len(dataset.rootfolder_data.before_leafs)}, {len(dataset.rootfolder_data.mid_leafs)}, {len(dataset.rootfolder_data.after_leafs)}" )
+                        from cleanup.scheduler import CleanupScheduler
+                        task_defs:list[dict[str,object]] = CleanupScheduler._get_task_definitions(retention_review_duration=dataset.cleanup_config.frequency)
+                        #calendar : CleanupCalendarDTO = CleanupScheduler.get_active_calendar_by_rootfolder_id(dataset.rootfolder.id)
+                        #print( f"now: {SystemClock.now()} - calendar.start_date: {calendar.start_date}" )
+                        print( f"now: {SystemClock.now()} - cleanup_config.start_date: {dataset.cleanup_config.start_date}" )
+                        print( f"task_defs:" )
+                        for task_def in task_defs:
+                            print(f"    {task_def['action_type']} - {task_def['task_offset']} first start: {dataset.cleanup_config.start_date + timedelta(days=task_def['task_offset'])}" )
+
                     run_scheduler_tasks(runtime_callback)
+                    # the first round will stop at the first tash with an offset > 0 like the final notification and the AgentCleanVTSRootFolder
+                    # By advancing the system clock to just after the current cleanup round the next run_scheduler_tasks() can finish the round
+                    SystemClock.set_offset_days(SystemClock.get_offset_days()+dataset.cleanup_config.frequency + 0.01) 
+                    run_scheduler_tasks(runtime_callback)
+                    for dataset in data_sets:
+                        # as long as we are not able to set the modified date on the files, the clean up will clean all files because the integration session sets the  
+                        # SystemClock offset one day after the leadtime used in the cleanup_scenario_data' cleanupconfiguration. see conftest.py 
+                        # def integration_session():
+                        #     # Create a SystemClock offset by more than cleanup configuration leadtime 
+                        #     SystemClock.set_offset_days(leadtime + 1)
+
+                        #if ever we can set the modifed date on teh file system then we can verify that leafs_before get cleaned and the rest does not
+                        filepath_to_validation_results, failed_filepaths = dataset.validate_cleanup_of_all()
+                        assert len(failed_filepaths) == 0, f"The cleanup of for data_key:{dataset.data_key} missed {len(failed_filepaths)}. See validation results here:{filepath_to_validation_results}."
                     
-                    # @todo it is not working to set the modified dat on the files so no simulations are marked for cleanup
-                    # therefore we cannot verify the cleanup results
-                    #for data_set in data_sets:
-                    #    file_with_validation_results, failed_paths = data_set.getBeforeLeafFiles()
-                    #    assert len(failed_paths) == 0, f"data-set {data_set.data_key}: Found {len(failed_paths)} failed paths in before_leafs that were not cleaned" #\n" + "\n".join( failed_paths )
 
 
         runtime_callback.save_records_to_csv(

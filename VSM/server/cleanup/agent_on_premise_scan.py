@@ -1,6 +1,7 @@
 import os
 import csv
 from datetime import date, datetime
+from app.clock import SystemClock
 from cleanup.agent_task_manager import agent_db_interface,  AgentTaskManager
 from cleanup.agents_internal import AgentTemplate
 from cleanup.scan.scan import do_scan, ScanResult 
@@ -63,7 +64,7 @@ class AgentScanVTSRootFolder(AgentTemplate):
             return
 
         root_folder_name: str  = os.path.basename(self.task.path)
-        date_time_str: str     = datetime.now().strftime("%Y%m%d-%H%M%S")
+        date_time_str: str     = SystemClock.now().strftime("%Y%m%d-%H%M%S")
         metadata_file: str     = os.path.join(self.temporary_result_folder, date_time_str+"_"+root_folder_name+"_metadata.csv")
 
         scan_result:ScanResult = self.scan_metadata(self.task.path, metadata_file, self.nb_scan_thread)
@@ -130,13 +131,13 @@ def extract_simulations(scan_result_file: str, vts_name_set:frozenset, htc_word:
     paths:list[str] = [db_api.normalize_path(p) for p in folder_modified_date_dict.keys()]
     tree:FolderTree = FolderTree(paths)#, prefix=prefix, path_separator="\\")
     tree.mark_vts_simulations(vts_label, vts_name_set, htc_word, vts_hierarchical_label, has_vts_children_label)
-    print(tree.get_ascii_tree(attr_list=[vts_label, vts_hierarchical_label, has_vts_children_label]))  # Show the tree and their attributes
+    #print(tree.get_ascii_tree(attr_list=[vts_label, vts_hierarchical_label, has_vts_children_label]))  # Show the tree and their attributes
 
     # get the modifed time for each simulation
     simulations_without_sub_simulations:tuple[FolderTreeNode,...] = tree.findall(lambda node: len(node.get_attr(vts_label,"")) > 0 and not node.get_attr(vts_hierarchical_label,False))
     simulations_without_sub_simulations = [n.sep+n.get_attr(vts_label) for n in simulations_without_sub_simulations]
-    print(f"Total number of simulations_without_sub_simulations: {len(simulations_without_sub_simulations)}")
-    print( "\n".join(simulations_without_sub_simulations) )
+    #print(f"Total number of simulations_without_sub_simulations: {len(simulations_without_sub_simulations)}")
+    #print( "\n".join(simulations_without_sub_simulations) )
 
     simulations_without_sub_simulations_modified_date:list[datetime]  = [ folder_modified_date_dict[p] for p in simulations_without_sub_simulations] 
 

@@ -1,7 +1,13 @@
 import pytest
+from app.clock import SystemClock
 from sqlmodel import Session
 from db.database import Database
 
+
+leadtime:int=14
+frequency:int=7
+from datetime import datetime
+start_date=datetime(2025, 11, 19)
 
 @pytest.fixture(scope="function")
 def clean_database():
@@ -42,6 +48,9 @@ def test_session():
 
 @pytest.fixture(scope="function")
 def integration_session():
+    # Create a SystemClock offset by more than cleanup configuration leadtime 
+    SystemClock.set_offset_days(leadtime + 1)
+
     # Create a persistent test database session for integration tests
     # Keep session open for the entire integration test
     # delete the database when the integration test is done 
@@ -211,7 +220,7 @@ def sample_retention_data(test_session):
 @pytest.fixture(scope="function")
 def cleanup_scenario_data():
     from tests.integration import testdata_for_import 
-    return testdata_for_import.generate_cleanup_scenario_data()
+    return testdata_for_import.generate_cleanup_scenario_data(leadtime=leadtime, frequency=frequency, start_date=start_date)
 
 
 # Pytest markers for test organization

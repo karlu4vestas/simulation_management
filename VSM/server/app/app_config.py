@@ -67,3 +67,54 @@ class AppConfig:
             return "sqlite:///integration_test.sqlite"  # Separate test database file
         else:  # PRODUCTION
             return "sqlite:///db.sqlite"  # Production database file
+    
+    @staticmethod
+    def configure_clock() -> None:
+        """
+        Configure SystemClock based on environment variables or test mode.
+        Should be called early in application startup.
+        
+        Environment variables:
+            APP_TIME_FIXED: ISO format datetime (e.g., "2025-12-31T12:00:00")
+            APP_TIME_OFFSET_SECONDS: Integer seconds offset from real time
+            APP_TIME_OFFSET_DAYS: Integer days offset from real time
+        """
+        import os
+        from datetime import datetime
+        from app.clock import SystemClock
+        
+        # Check environment variables first
+        fixed_time = os.getenv("APP_TIME_FIXED")
+        offset_seconds = os.getenv("APP_TIME_OFFSET_SECONDS")
+        offset_days = os.getenv("APP_TIME_OFFSET_DAYS")
+        
+        if fixed_time:
+            try:
+                dt = datetime.fromisoformat(fixed_time)
+                SystemClock.set_fixed(dt)
+                print(f"SystemClock: Fixed time set to {dt}")
+                return
+            except ValueError as e:
+                print(f"Warning: Invalid APP_TIME_FIXED format '{fixed_time}': {e}")
+        
+        if offset_days:
+            try:
+                days = int(offset_days)
+                SystemClock.set_offset_days(days)
+                print(f"SystemClock: Offset set to {days} days")
+                return
+            except ValueError as e:
+                print(f"Warning: Invalid APP_TIME_OFFSET_DAYS value '{offset_days}': {e}")
+        
+        if offset_seconds:
+            try:
+                seconds = int(offset_seconds)
+                SystemClock.set_offset_seconds(seconds)
+                print(f"SystemClock: Offset set to {seconds} seconds")
+                return
+            except ValueError as e:
+                print(f"Warning: Invalid APP_TIME_OFFSET_SECONDS value '{offset_seconds}': {e}")
+        
+        # Default: real time
+        SystemClock.set_real()
+        print("SystemClock: Using real system time")

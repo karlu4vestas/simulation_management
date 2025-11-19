@@ -193,7 +193,7 @@ class RootFolderWithMemoryFolders:
     folders: list[InMemoryFolderNode]
     leafs: list[InMemoryFolderNode]
     before_leafs: list[InMemoryFolderNode]=None
-    before_after_leafs: list[InMemoryFolderNode]=None
+    mid_leafs: list[InMemoryFolderNode]=None
     after_leafs: list[InMemoryFolderNode]=None
     cleanup_configuration:CleanupConfiguration
     def __init__(self, rootfolder: RootFolderDTO, folders: list[InMemoryFolderNode], cleanup_configuration: CleanupConfiguration):
@@ -202,7 +202,7 @@ class RootFolderWithMemoryFolders:
         self.leafs = [folder for folder in folders if folder.is_leaf]
         self.cleanup_configuration = cleanup_configuration
         self.before_leafs = []
-        self.before_after_leafs =  []
+        self.mid_leafs =  []
         self.after_leafs =  []
 
     def get_paths_with_most_children(self, minimum_number_of_children:int=2, min_levels:int=2, n_paths: int=0) -> list[str]:
@@ -299,48 +299,51 @@ class RootFolderWithMemoryFolders:
         }
 
     def randomize_modified_dates_of_leaf_folders(self):
-        """Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
-        - before_leafs:       retention period starts and ends before the cleanup round start
-                            => modified date = from "start_date - retention_period - random_interval - 1"
-                                modified date+retention_period to "start_date - random_interval - 1"
+        # the following modified date has not effect before we are able to set the modified date in the file system
+        # Randomize the modified dates of all leaf folders according to the following rules. Notice that end date is not stored, only the modified date is set:
+        # - before_leafs:        retention period starts and ends before the cleanup round start
+        #                     => modified date = from "start_date - retention_period - random_interval - 1"
+        #                        modified date+retention_period to "start_date - random_interval - 1"
 
-        - before_after_leafs: retention period starts before and ends after the cleanup
-                            => modified date = from "start_date - retention_period/2 - random_interval" 
-                                modified date+retention_period to "start_date - random_interval - 1"
+        # - before_after_leafs:  retention period starts before and ends after the cleanup
+        #                     => modified date = from "start_date - retention_period/2 - random_interval" 
+        #                        modified date+retention_period to "start_date - random_interval - 1"
 
-        - after_leafs:        retention period starts after the cleanup round
-                            => modified date = from "start_date + 1 + random_interval" onwards
-                            modified date + retention_period to  "start_date + retention_period + 1 + random_interval"
-        """
+        # - after_leafs:         retention period starts after the cleanup round
+        #                     => modified date = from "start_date + 1 + random_interval" onwards
+        #                        modified date + retention_period to  "start_date + retention_period + 1 + random_interval"
+
         leafs = [folder for folder in self.folders if folder.is_leaf]
         
         # Divide leafs into three equal groups
-        total_leafs = len(leafs)
-        group_size = total_leafs // 3
+        group_size = len(leafs) // 3
         self.before_leafs = leafs[:group_size]
-        self.before_after_leafs = leafs[group_size:2*group_size]
-        self.after_leafs = leafs[2*group_size:]
+        self.mid_leafs    = leafs[group_size:2*group_size]
+        self.after_leafs  = leafs[2*group_size:]
         
         rand: random.Random = random.Random()  # Use non-deterministic seed for true randomization
-        ran_interval_days = 10
-        retention_period_days = self.cleanup_configuration.leadtime
+        ran_interval_days = self.cleanup_configuration.leadtime//2
+        leadtime_days = self.cleanup_configuration.leadtime
         start_date = self.cleanup_configuration.start_date
 
         # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
         # Date range: [cleanup_start - retention - random_days - 1] to [cleanup_start - random_days - 1]
         for leaf in self.before_leafs:
-            leaf.modified_date = start_date - timedelta(days=retention_period_days + rand.randint(1, ran_interval_days)  + 1)
+            #the case closest to not being marked i the modified_date start date-leadtime_days-1. The rest old. All will be marked if cleanup start at start_date 
+            leaf.modified_date = start_date + timedelta(days=-leadtime_days - rand.randint(1, 10) - 1) 
             leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE
         
         # Group 2: before_after_leafs - retention spans across cleanup (partially in retention)
         # Date range: [cleanup_start - retention/2 - random_days] to [cleanup_start - random_days - 1]
-        for leaf in self.before_after_leafs:
-            leaf.modified_date = start_date - timedelta(days=retention_period_days // 2 + rand.randint(1, ran_interval_days) )
+        for leaf in self.mid_leafs:
+            #the oldest is start_date-leadtime_days // 2 + 1. The rest is more recent. Non will be marked if cleanup start at start_date
+            leaf.modified_date = start_date + timedelta(days= -leadtime_days // 2 + rand.randint(1, ran_interval_days) ) 
             leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.BEFORE_AFTER
 
         # Group 3: after_leafs - modified dates after cleanup starts (will NOT be cleaned up)
         # Date range: [cleanup_start + 1 + random_days] onwards (up to +60 days)
         for leaf in self.after_leafs:
+            # The oldest is start_date + 1 + 1 (minimum random_days). The rest is more recent. None will be marked if cleanup start at start_date
             leaf.modified_date = start_date + timedelta(days=1 + rand.randint(1, ran_interval_days) )
             leaf.testcase_dict["folder_retention_case"] = InMemoryFolderNode.TestCaseEnum.AFTER
         
@@ -483,15 +486,14 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     return root_folders
 
 
-def generate_cleanup_scenario_data():
-    from datamodel import dtos
+def generate_cleanup_scenario_data(leadtime=30, frequency=7, start_date=datetime(2000, 1, 1)):
     # Sample data with 3 datasets for 2 root folders:
     #  - part one with the first root folder and a list of all its subfolders in random order
     #  - part two and three with a random split of each of the second rootfolders list of subfolders
     # The root folder's cleanup configuration is not initialised means that assumes default values
 
     number_of_rootfolders = 2
-    cleanup_configuration = CleanupConfiguration(leadtime=30, frequency=7, start_date=datetime(2000, 1, 1))
+    cleanup_configuration = CleanupConfiguration(leadtime=leadtime, frequency=frequency, start_date=start_date)
 
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0

@@ -13,6 +13,7 @@ import shutil
 import sys
 from datetime import datetime, timedelta
 from queue import Queue
+from app.clock import SystemClock
 
 from tests.generate_vts_simulations.GenerateTimeseries import SimulationType
 
@@ -102,8 +103,8 @@ class TestCleanupWithOnDiskSimulations:
         # Test that cleanup in ANALYSE mode preserves all files 
         
         # Step 1: Generate real VTS simulations
-        print("\n=== Generating simulations for ANALYSE mode test ===")
-        simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "analyse_mode_LOADS"), SimulationType.VTS, datetime.now())]
+        print("\n=== Generating simulations for DELETE mode test ===")
+        simulation_folders: list[SimulationTestSpecification] = [SimulationTestSpecification(os.path.join(test_base_path, "loadrelease", "delete_mode_LOADS"), SimulationType.VTS, SystemClock.now())]
         gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
         
         # Step 2: Scan simulations and count files before cleanup
@@ -178,7 +179,7 @@ class TestCleanupWithOnDiskSimulations:
         
         # Step 1: Generate real VTS simulations
         print("\n=== Step 1: Generating simulations ===")
-        simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "HTC_LOADS"), SimulationType.HTC, datetime.now())]
+        simulation_folders: list[SimulationTestSpecification] = [SimulationTestSpecification(os.path.join(test_base_path, "loadrelease", "HTC_LOADS"), SimulationType.HTC, datetime.now())]
         gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
 
         # Verify generation completed
@@ -249,7 +250,7 @@ class TestCleanupWithOnDiskSimulations:
         
         # Step 1: Generate real VTS simulations
         print("\n=== Step 1: Generating simulations ===")
-        simulation_folders: SimulationTestSpecification = [(os.path.join(test_base_path, "loadrelease", "delete_mode_LOADS"), SimulationType.VTS, datetime.now())]
+        simulation_folders: list[SimulationTestSpecification] = [SimulationTestSpecification(os.path.join(test_base_path, "loadrelease", "delete_mode_LOADS"), SimulationType.VTS, datetime.now())]
         gen_result: GeneratedSimulationsResult = generate_simulations(test_base_path, simulation_folders)
 
         # Verify generation completed

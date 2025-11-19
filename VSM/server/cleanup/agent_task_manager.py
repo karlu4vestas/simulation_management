@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
-from sqlmodel import Session, func, select
+from sqlmodel import Session, select
 from fastapi import HTTPException
+from app.clock import SystemClock
 from db.database import Database
 from db import db_api
 from datamodel import dtos
 from cleanup import agent_db_interface
 from cleanup.scheduler_dtos import TaskStatus, ActionType, AgentInfo, CleanupTaskDTO 
-from cleanup.scheduler_db_actions import CleanupScheduler
+from cleanup.scheduler import CleanupScheduler
 
 class AgentTaskManager:
     
@@ -65,7 +66,7 @@ class AgentTaskManager:
 
                 reserved_task.status = TaskStatus.RESERVED.value
                 reserved_task.reserved_by_agent_id = agent.agent_id
-                reserved_task.reserved_at = datetime.now(timezone.utc)
+                reserved_task.reserved_at = SystemClock.now(timezone.utc)
                 session.add(reserved_task)
                 session.commit()
                 session.refresh(reserved_task)  # Ensure all attributes are loaded before detaching
@@ -121,7 +122,7 @@ class AgentTaskManager:
 
             task.status = status
             task.status_message = status_message
-            task.completed_at = datetime.now(timezone.utc)
+            task.completed_at = SystemClock.now(timezone.utc)
             
             session.add(task)
             session.commit()

@@ -202,7 +202,7 @@ def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.Cleanup
         if existing_cleanup_config:
             return existing_cleanup_config
         
-        from cleanup.scheduler_db_actions import CleanupScheduler
+        from cleanup.scheduler import CleanupScheduler
         cleanup_config.rootfolder_id = rootfolder_id
         cleanup_config.rootfolder_id = rootfolder_id
         cleanup_config.progress = dtos.CleanupProgress.Progress.INACTIVE
