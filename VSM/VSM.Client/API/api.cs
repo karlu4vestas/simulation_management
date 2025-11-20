@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using VSM.Client.Datamodel; // This ensures all types in this namespace are accessible
 
@@ -115,23 +116,35 @@ namespace VSM.Client.SharedAPI
             }
         }
 
-        public async Task<bool> UpdateCleanupConfigurationForRootFolder(int rootFolderId, CleanupConfigurationDTO cleanup_configuration)
+        public async Task<CleanupConfigurationDTO?> UpdateCleanupConfigurationForRootFolder(int rootFolderId, CleanupConfigurationDTO cleanup_configuration)
         {
             try
             {
-                var updateData = new { frequency = cleanup_configuration.Frequency, leadtime = cleanup_configuration.LeadTime };
-                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/cleanup_configuration", updateData, new JsonSerializerOptions
+                var response = await httpClient.PostAsJsonAsync($"http://127.0.0.1:5173/v1/rootfolders/{rootFolderId}/cleanup_configuration", cleanup_configuration, new JsonSerializerOptions
                 {
                     PropertyNameCaseInsensitive = true,
                     PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
                 });
-
-                return response.IsSuccessStatusCode;
+                if (response.IsSuccessStatusCode)
+                {
+                    var updatedConfig = await response.Content.ReadFromJsonAsync<CleanupConfigurationDTO>(new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+                    });
+                    return updatedConfig;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Error updating cleanup configuration. Status: {response.StatusCode}, Error: {errorContent}");
+                    return null;
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error updating root folder cleanup frequency: {ex.Message}");
-                return false;
+                return null;
             }
         }
         public async Task<List<PathProtectionDTO>> GetPathProtectionsByRootFolderId(int rootFolderId)

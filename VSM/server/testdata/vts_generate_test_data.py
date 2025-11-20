@@ -53,17 +53,14 @@ def generate_root_folder(session: Session, domain_id:int, owner:str, approvers:s
     )
     root_folder =db_api.insert_rootfolder(root_folder)
    
-    # Create cleanup config (NEW)
-    cleanup_config = dtos.CleanupConfigurationDTO(
-        rootfolder_id=root_folder.id,
-        leadtime=cycle_time,
-        frequency=frequency
-    )
+    cleanup_config = root_folder.get_cleanup_configuration(session)
+    cleanup_config.lead_time = cycle_time
+    cleanup_config.frequency = frequency
     session.add(cleanup_config)
-    session.flush()  # Ensure cleanup config is persisted
-    
+    #session.refresh(cleanup_config) 
     root_folder.folder_id = generate_folder_tree(session, root_folder.id, path, levels)
     session.add(root_folder)
+    #session.refresh(cleanup_config) 
     session.commit()
     return root_folder, cleanup_config
 

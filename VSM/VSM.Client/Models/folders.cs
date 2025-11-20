@@ -199,7 +199,7 @@ namespace VSM.Client.Datamodel
                     await Task.Yield();
                 }
             }
-            Console.WriteLine($"ChangeRetentionsOfSubtree changed leafs, unchanged leafs : {retentionUpdates.Count} {number_of_unchanged_leafs}");
+            //Console.WriteLine($"ChangeRetentionsOfSubtree changed leafs, unchanged leafs : {retentionUpdates.Count} {number_of_unchanged_leafs}");
             // print_leafs(folder);
             return retentionUpdates;
         }

@@ -4,7 +4,7 @@ from sqlmodel import Session
 from db.database import Database
 
 
-leadtime:int=14
+lead_time:int=14
 frequency:int=7
 from datetime import datetime
 start_date=datetime(2025, 11, 19)
@@ -48,8 +48,8 @@ def test_session():
 
 @pytest.fixture(scope="function")
 def integration_session():
-    # Create a SystemClock offset by more than cleanup configuration leadtime 
-    SystemClock.set_offset_days(leadtime + 1)
+    # Create a SystemClock offset by more than cleanup configuration lead_time 
+    SystemClock.set_offset_days(lead_time + 1)
 
     # Create a persistent test database session for integration tests
     # Keep session open for the entire integration test
@@ -126,7 +126,7 @@ def sample_root_folder_data():
         "path": "/test/folder",
         "owner": "JD",
         "approvers": "AB,CD",
-        "leadtime": 30,
+        "lead_time": 30,
         "frequency": 7
     }
 
@@ -156,7 +156,7 @@ def sample_folder_node_data(test_session):
         path="/test/folder",
         owner="TestUser",
         approvers="TestApprover",
-        leadtime=30,
+        lead_time=30,
         frequency=7
     )
     test_session.add(root_folder)
@@ -190,7 +190,7 @@ def test_root_folder(test_session):
         path="/test/folder",
         owner="TestUser",
         approvers="TestApprover",
-        leadtime=30,
+        lead_time=30,
         frequency=7
     )
     test_session.add(root_folder)
@@ -220,7 +220,7 @@ def sample_retention_data(test_session):
 @pytest.fixture(scope="function")
 def cleanup_scenario_data():
     from tests.integration import testdata_for_import 
-    return testdata_for_import.generate_cleanup_scenario_data(leadtime=leadtime, frequency=frequency, start_date=start_date)
+    return testdata_for_import.generate_cleanup_scenario_data(lead_time=lead_time, frequency=frequency, start_date=start_date)
 
 
 # Pytest markers for test organization

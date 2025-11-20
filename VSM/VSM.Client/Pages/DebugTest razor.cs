@@ -174,13 +174,11 @@ namespace VSM.Client.Pages
         {
             protected override async Task<CleanupConfigurationDTO?> GetDataAsync()
             {
-                await Task.Delay(10); // Simulate async work
-                //return Enabled && shared_params.rootfolder != null ? shared_params.rootfolder.CleanupConfiguration : null;
                 return shared_params.rootfolder == null ? new CleanupConfigurationDTO() : await API.Instance.GetCleanupConfigurationByRootFolderId(shared_params.rootfolder.Id);
             }
             public override bool Enabled { get { return shared_params.rootfolder != null; } }
 
-            protected override string FormatResult(CleanupConfigurationDTO? result) => result != null ? $"Cleanup configurations. LeadTime {result.LeadTime} days, Frequency {result.Frequency} days" : "No cleanup configuration retrieved";
+            protected override string FormatResult(CleanupConfigurationDTO? result) => result != null ? $"Cleanup configurations. LeadTime {result.Lead_time} days, Frequency {result.Frequency} days" : "No cleanup configuration retrieved";
         }
         public class GetFoldersByRootFolderIdTest : EndpointTest<List<FolderNodeDTO>>
         {

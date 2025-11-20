@@ -119,7 +119,7 @@ class TestCleanupWorkflows:
                 cleanup_config_dto:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(integration_session)
 
                 in_memory_config:CleanupConfiguration   = cleanup_scenario_data.get("cleanup_configuration", None)
-                cleanup_config_dto.leadtime            = in_memory_config.leadtime
+                cleanup_config_dto.lead_time            = in_memory_config.lead_time
                 cleanup_config_dto.frequency     = in_memory_config.frequency
                 cleanup_config_dto.start_date   = in_memory_config.start_date
                 cleanup_config_dto.progress     = in_memory_config.progress

@@ -12,7 +12,8 @@
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
-            <FluentTextField @bind-Value="@Library.Instance.User" Placeholder="your initials"></FluentTextField>
+
+            <FluentTextField @bind-Value="@user_name" Placeholder="your initials"></FluentTextField>
             <FluentButton OnClick="@OnLoginClicked" Appearance="Appearance.Accent">Login</FluentButton>
         </div>
 
@@ -43,19 +44,19 @@
 
                     <TemplateColumn Title="Retention period" Width="180px">
                         <ChildContent Context="folder">
-                            @($"{cycleTimeConverter.GetName(folder.CleanupConfiguration.LeadTime)}")
+                            @($"{cycleTimeConverter.DaysToName(folder.CleanupConfiguration.Lead_time)}")
                         </ChildContent>
                     </TemplateColumn>
 
                     <TemplateColumn Title="Cleanup frequency" Width="190px">
                         <ChildContent Context="folder">
-                            @($"{frequencyConverter.GetName(folder.CleanupConfiguration.Frequency)}")
+                            @($"{frequencyConverter.DaysToName(folder.CleanupConfiguration.Frequency)}")
                         </ChildContent>
                     </TemplateColumn>
 
                     <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
-                            @if (folder.CleanupConfiguration.CanStartCleanup)
+                            @if (folder.CleanupConfiguration.IsValid)
                             {
                                 <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to
                                     retentions</FluentButton>
@@ -74,10 +75,12 @@
             @if (Library.Instance.SelectedRootFolder != null)
             {
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Secure folder:</span>
-                    @Library.Instance.SelectedRootFolder.Root_path </div>
+                    @Library.Instance.SelectedRootFolder.Root_path
+                </div>
                 string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Owners & approvers:</span>
-                    @ownerstring</div>
+                    @ownerstring
+                </div>
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Retention period:</span>
                     <FluentCombobox Autofocus="true" Items="@cycleTimeConverter?.Names()" @bind-Value="@cycle_time_name"
                         @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
@@ -94,115 +97,3 @@
         </FluentStack>
     }
 </FluentStack>
-@code {
-    public class NamesDays
-    {
-        public string Name { get; set; } = "";
-        public int Days { get; set; }
-    }
-    public class NamesDaysLookup
-    {
-        private readonly string _defaultName = "";
-        private readonly int _defaultDays = 0;
-        private List<NamesDays> _itemList = new List<NamesDays>();
-        private readonly Dictionary<string, int> _nameToDays = new();
-        private readonly Dictionary<int, string> _daysToName = new();
-        public NamesDaysLookup() { }
-        public NamesDaysLookup(IEnumerable<NamesDays> items)
-        {
-            _itemList = items.ToList();
-            // store first entry as fallback if any
-            if (_itemList.Count > 0)
-            {
-                _defaultName = _itemList[0].Name;
-                _defaultDays = _itemList[0].Days;
-            }
-            _nameToDays = _itemList.ToDictionary(x => x.Name, x => x.Days);
-            _daysToName = _itemList.ToDictionary(x => x.Days, x => x.Name);
-        }
-        public List<string> Names() => _nameToDays.Keys.ToList();
-        public int GetDays(string name) => _nameToDays.TryGetValue(name, out var days) ? days : _defaultDays;
-        public string GetName(int days) => _daysToName.TryGetValue(days, out var name) ? name : _defaultName;
-    }
-
-
-    bool has_loaded_rootFolders = false;
-    CleanupConfigurationDTO cleanup_config = new CleanupConfigurationDTO();
-    string frequency_name = "";
-    string cycle_time_name = "";
-    NamesDaysLookup frequencyConverter = new NamesDaysLookup();
-    NamesDaysLookup cycleTimeConverter = new NamesDaysLookup();
-
-    async Task OnLoginClicked()
-    {
-        if (Library.Instance.User.Length > 0)
-        {
-            try
-            {
-                has_loaded_rootFolders = false;
-                // Ensure UI shows loading state. well later if we implement it
-                await InvokeAsync(StateHasChanged);
-
-                // first load retention options because we need them to generate testdata and folder structure
-                await Library.Instance.Load();
-                List<NamesDays> frequencyItems = Library.Instance.CleanupFrequencies.Select(x => new NamesDays
-                {
-                    Name = x.Name,
-                    Days =
-                x.Days
-                }).ToList();
-                frequencyConverter = new NamesDaysLookup(frequencyItems);
-                List<NamesDays> cycleTimeItems = Library.Instance.CycleTimes.Select(x => new NamesDays
-                {
-                    Name = x.Name,
-                    Days = x.Days
-                }).ToList();
-                cycleTimeConverter = new NamesDaysLookup(cycleTimeItems);
-
-                has_loaded_rootFolders = true;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error loading root folders: {ex.Message}");
-                has_loaded_rootFolders = true;
-            }
-            finally
-            {
-                await InvokeAsync(StateHasChanged);
-            }
-        }
-    }
-    //selecte the folder for the details panel
-    private void OnSelectRootFolder(FluentDataGridRow<RootFolder> row)
-    {
-        Library.Instance.SelectedRootFolder = row.Item;
-        if (Library.Instance.SelectedRootFolder != null)
-        {
-            cleanup_config = Library.Instance.SelectedRootFolder.CleanupConfiguration;
-            frequency_name = frequencyConverter.GetName(cleanup_config.Frequency);
-            cycle_time_name = cycleTimeConverter.GetName(cleanup_config.LeadTime);
-        }
-        StateHasChanged();
-    }
-    private async Task UpdateCleanUpConfiguration()
-    {
-        if (Library.Instance.SelectedRootFolder != null && frequency_name.Length > 0 && cycle_time_name.Length > 0)
-        {
-            cleanup_config.Frequency = frequencyConverter.GetDays(frequency_name);
-            cleanup_config.LeadTime = cycleTimeConverter.GetDays(cycle_time_name);
-            if (cleanup_config.CanStartCleanup)
-            {
-                UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Library.Instance.SelectedRootFolder,
-                cleanup_config);
-                await cmd.Apply();
-                StateHasChanged();
-                Console.WriteLine($"new frequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
-            }
-        }
-    }
-    private void Go2retention(RootFolder root_folder)
-    {
-        Library.Instance.SelectedRootFolder = root_folder;
-        Navigation.NavigateTo("retention");
-    }
-}

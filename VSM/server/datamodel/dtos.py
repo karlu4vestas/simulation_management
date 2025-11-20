@@ -1,9 +1,8 @@
 import os
 from typing import Literal,Optional
-from fastapi import HTTPException
 from sqlmodel import Field, SQLModel, Session
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
 
 
@@ -139,8 +138,8 @@ class RetentionTypeDTO(RetentionTypeBase, table=True):
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
-#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. If cleanup_round_start_date is not set then we assume now
-#   c) leadtime can be set with cleanup is inactive frequency is None
+#   b) activating a cleanup round requires that frequency is set and that the lead_time is > 0. If cleanup_round_start_date is not set then we assume now
+#   c) lead_time can be set with cleanup is inactive frequency is None
 #   d) progress to describe where the rootfolder is in the cleanup round: 
 #      - inactive
 #      - started: the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
@@ -184,20 +183,20 @@ class CleanupProgress:
 
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
-#   b) activating a cleanup round requires that frequency is set and that the leadtime is > 0. 
+#   b) activating a cleanup round requires that frequency is set and that the lead_time is > 0. 
 #        If cleanup_round_start_date is not set then we assume now
-#   c) leadtime: is minimum number of days from last modification of a simulation til it can be cleaned
+#   c) lead_time: is minimum number of days from last modification of a simulation til it can be cleaned
 #        It can be set with cleanup is inactive frequency is None
 #   d) progress to describe where the rootfolder is in the cleanup round: 
 #      - inactive: going from an activate state to inactive will set the start_date to None. 
-#                  If inactivate state and frequency, leadtime and start_date will start the cleanup when the start_date is reached.
+#                  If inactivate state and frequency, lead_time and start_date will start the cleanup when the start_date is reached.
 #      - started:  the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
 #      - cleaning: this is the last phase in which the actual cleaning happens
 #      - finished: the cleanup round is finished and we wait for the next round
 class CleanupConfigurationBase(SQLModel):
     """Base class for cleanup configuration."""
     rootfolder_id: int          = Field(default=None, foreign_key="rootfolderdto.id")
-    leadtime: int               = Field(default=0)  # days a simulation must be available before cleanup can start. 
+    lead_time: int              = Field(default=0)  # days a simulation must be available before cleanup can start. 
     frequency: int              = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
     start_date: datetime | None = Field(default=None)
     progress: str               = Field(default=CleanupProgress.Progress.INACTIVE.value)
@@ -207,10 +206,10 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     id: int | None = Field(default=None, primary_key=True)
 
     def is_valid(self) -> bool:
-        # has cleanup_frequency and leadtime been set. 
+        # has cleanup_frequency and lead_time been set. 
         # If start_date is None then progress must be INACTIVE
         is_valid: bool = (self.frequency is not None and self.frequency > 0) and \
-                         (self.leadtime is not None and self.leadtime > 0) and \
+                         (self.lead_time is not None and self.lead_time > 0) and \
                          ( self.progress == CleanupProgress.Progress.INACTIVE.value  or self.start_date is not None )
         return is_valid
     
@@ -251,32 +250,33 @@ class RootFolderBase(SQLModel):
         self.cleanup_config_id = new_cleanup.id
         session.add(self)
         session.commit()
+        session.refresh(self)
         return new_cleanup
 
-    def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
-        #@TODO we should use insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
-        if self.cleanup_config_id is not None:
-            config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
-            if config is None:
-                # Create new cleanup configuration if none exists or if it was deleted
-                config = CleanupConfigurationDTO(rootfolder_id=self.id)
-                session.add(config)
-                session.commit()
-                session.refresh(config)
-                self.cleanup_config_id = config.id
+    # def save_cleanup_configuration(self, session: Session, cleanup_configuration: CleanupConfigurationDTO) -> CleanupConfigurationDTO:
+    #     #@TODO we should use insert_cleanup_configuration(input.rootfolder.id, cleanup_config_dto)
+    #     if self.cleanup_config_id is not None:
+    #         config = session.get(CleanupConfigurationDTO, self.cleanup_config_id)
+    #         if config is None:
+    #             # Create new cleanup configuration if none exists or if it was deleted
+    #             config = CleanupConfigurationDTO(rootfolder_id=self.id)
+    #             session.add(config)
+    #             session.commit()
+    #             session.refresh(config)
+    #             self.cleanup_config_id = config.id
 
-        if config is None:
-            raise HTTPException(status_code=404, detail="unable to save cleanup configuration")
+    #     if config is None:
+    #         raise HTTPException(status_code=404, detail="unable to save cleanup configuration")
 
-        if config is not None:
-            config.leadtime   = cleanup_configuration.leadtime
-            config.frequency  = cleanup_configuration.frequency
-            config.start_date = cleanup_configuration.start_date
-            config.progress   = cleanup_configuration.progress if cleanup_configuration.progress is None else cleanup_configuration.progress
+    #     if config is not None:
+    #         config.lead_time   = cleanup_configuration.lead_time
+    #         config.frequency  = cleanup_configuration.frequency
+    #         config.start_date = cleanup_configuration.start_date
+    #         config.progress   = cleanup_configuration.progress if cleanup_configuration.progress is None else cleanup_configuration.progress
 
-        session.add(self)
-        session.commit()
-        return config
+    #     session.add(self)
+    #     session.commit()
+    #     return config
 
 class RootFolderDTO(RootFolderBase, table=True):
     id: int | None = Field(default=None, primary_key=True)

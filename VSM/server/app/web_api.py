@@ -3,12 +3,10 @@ from typing import Optional
 from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session
-from cleanup import agent_db_interface
 from datamodel.dtos import RootFolderDTO, FolderNodeDTO, FolderTypeDTO, SimulationDomainDTO, CleanupFrequencyDTO, LeadTimeDTO, CleanupConfigurationDTO, PathProtectionDTO, RetentionTypeDTO, FolderRetention
 from datamodel.vts_create_meta_data import insert_vts_metadata_in_db
 from db.database import Database
 from db import db_api
-from datamodel.dtos import FileInfo 
 from app.app_config import AppConfig
 
 
@@ -119,9 +117,10 @@ def fs_read_rootfolder_cleanup_configuration(rootfolder_id: int):
 
 # update a rootfolder's cleanup_configuration
 @app.post("/v1/rootfolders/{rootfolder_id}/cleanup_configuration")
-def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO):
-    return db_api.update_cleanup_configuration_by_rootfolder_id(rootfolder_id, cleanup_configuration)
-
+def fs_update_rootfolder_cleanup_configuration(rootfolder_id: int, cleanup_configuration: CleanupConfigurationDTO)-> CleanupConfigurationDTO:
+    #return db_api.update_cleanup_configuration_by_rootfolder_id(rootfolder_id, cleanup_configuration)
+    updated_config:CleanupConfigurationDTO = db_api.insert_or_update_cleanup_configuration(rootfolder_id, cleanup_configuration) 
+    return updated_config
 
 
 @app.get("/v1/rootfolders/{rootfolder_id}/retentiontypes", response_model=list[RetentionTypeDTO])
@@ -164,7 +163,7 @@ def fs_delete_path_protection(rootfolder_id: int, protection_id: int):
     return db_api.delete_pathprotection(rootfolder_id, protection_id)
 
     
-# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.frequency and rootfolder.leadtime msut be set
+# The following can be called when the securefolder' cleanup configuration is fully defined meaning that rootfolder.frequency and rootfolder.lead_time msut be set
 # it will adjust the expiration dates to the user selected retention categories in the webclient
 #   the expiration date for non-numeric retentions is set to None
 #   the expiration date for numeric retention is set to cleanup_round_start_date + days_to_cleanup for the user selected retention type

@@ -55,18 +55,14 @@ namespace VSM.Client.Datamodel
     }
     public class CleanupConfigurationDTO
     {
-        public int Id { get; set; }
-        public int Rootfolder_Id { get; set; }
-        public int LeadTime { get; set; }
-        public int Frequency { get; set; }
-        public DateTime? Start_Date { get; set; } = null;
+        public int Id { get; set; } = 0;
+        public int Rootfolder_id { get; set; } = 0;
+        public int Lead_time { get; set; } = 0;
+        public int Frequency { get; set; } = 0;
+        public DateTime? Start_date { get; set; } = null;
         public string Progress { get; set; } = "";
-
-        // if frequency is set then leadtime must also be set
-        public bool IsValid { get { return Frequency == 0 || LeadTime > 0; } }
-
         /// Return true if cleanup can be started with this configuration
-        public bool CanStartCleanup { get { return Frequency > 0 && LeadTime > 0; } }
+        public bool IsValid { get { return Frequency > 0 && Lead_time > 0 && Start_date != null; } }
     }
 
     public class FolderNodeDTO
@@ -85,16 +81,16 @@ namespace VSM.Client.Datamodel
     // NodeAttributesDTO is only used for nodes with metadata. Most nodes is just an organization of subfolders and will not contain other metadata
     public class RootFolderDTO
     {
-        public int Id { get; set; } //ID of this DTO
-        public int Simulationdomain_Id { get; set; } //Id of the simulation domain this rootfolder belongs to
-        public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
-        public int Folder_Id { get; set; } //Id to folder' FolderNodeDTO. unit24 would be sufficient
+        public int Id { get; set; } = 0; //ID of this DTO
+        public int Simulationdomain_Id { get; set; } = 0; //Id of the simulation domain this rootfolder belongs to
+        public int Folder_Id { get; set; } = 0; //Id to folder' FolderNodeDTO. unit24 would be sufficient
+        public string Storage_Id { get; set; } = "local"; // storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system.
         public string Owner { get; set; } = ""; // the initials of the owner
         public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public int LeadTime { get; set; } = 0; // days from initialization of the simulations til it can be cleaned
-        public int Frequency { get; set; } = 0; // number of days between cleanup rounds
-        public DateTime? Start_Date { get; set; } = null; // at what date have the user set the cleanup to start
+        public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
+        public int? Cleanup_Config_Id { get; set; } = null; // foreign key to CleanupConfigurationDTO
     }
+
     // so far we know: 
     // InnerNode, 
     // VTSSimulation, which is currently a LeafNode but that might change

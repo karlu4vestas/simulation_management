@@ -1,10 +1,12 @@
 import os
+from datetime import datetime
 from typing import Literal, Optional
 from sqlalchemy import func
 from sqlmodel import Session, func, select
 from fastapi import Query, HTTPException
 from db.database import Database
 from datamodel import dtos
+
 
  
 #-----------------start retrieval of metadata for a simulation domain -------------------
@@ -124,7 +126,7 @@ def insert_rootfolder(rootfolder:dtos.RootFolderDTO):
 
         session.add(rootfolder)
         session.commit()
-        #session.refresh(rootfolder)
+        session.refresh(rootfolder)
 
         if (rootfolder.id is None) or (rootfolder.id == 0):
             raise HTTPException(status_code=404, detail=f"Failed to provide {rootfolder.path} with an id")
@@ -158,7 +160,7 @@ def read_rootfolder_retentiontypes_dict(rootfolder_id: int)-> dict[str, dtos.Ret
 
 def read_rootfolder_numeric_retentiontypes_dict(rootfolder_id: int) -> dict[str, dtos.RetentionTypeDTO]:
     retention_types_dict:dict[str, dtos.RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
-    #filter to keep only retentions with at leadtime
+    #filter to keep only retentions with at lead_time
     return {key:retention for key,retention in retention_types_dict.items() if retention.days_to_cleanup is not None}
 
 def read_folders( rootfolder_id: int ):
@@ -180,64 +182,62 @@ def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> dtos.Cleanu
     return cleanup_configuration
 
 #insert the cleanup configuration for a rootfolder and update the rootfolder to point to the cleanup configuration
-def insert_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.CleanupConfigurationDTO):
+def insert_or_update_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.CleanupConfigurationDTO):
     if (rootfolder_id is None) or (rootfolder_id == 0):
         raise HTTPException(status_code=404, detail="You must provide a valid rootfolder_id to create a cleanup configuration")
-    
+    existing_cleanup_cfg:dtos.CleanupConfigurationDTO = None
     with Session(Database.get_engine()) as session:
         #verify if the rootfolder already exists
-        existing_rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where((dtos.RootFolderDTO.id == rootfolder_id))).first()
-        if not existing_rootfolder:
+        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where((dtos.RootFolderDTO.id == rootfolder_id))).first()
+        if not rootfolder:
             raise HTTPException(status_code=404, detail=f"Failed to find rootfolder with id {rootfolder_id} to create a cleanup configuration")
 
+        existing_cleanup_cfg = rootfolder.get_cleanup_configuration(session)
         #verify if a cleanup configuration already exists for this rootfolder
-        existing_cleanup_config:dtos.CleanupConfigurationDTO = session.exec(select(dtos.CleanupConfigurationDTO).where((dtos.CleanupConfigurationDTO.rootfolder_id == rootfolder_id))).first()
-        if existing_cleanup_config:
-            return existing_cleanup_config
+        # existing_cleanup_config:dtos.CleanupConfigurationDTO = session.exec(select(dtos.CleanupConfigurationDTO).where((dtos.CleanupConfigurationDTO.rootfolder_id == rootfolder_id))).first()
+        # if existing_cleanup_config and (cleanup_config.id != existing_cleanup_config.id or cleanup_config.rootfolder_id != existing_cleanup_config.rootfolder_id) :
+        #     raise HTTPException(status_code=404, detail=f"There can only be one cleanupconfiguration for the rootfolder. Its id and rootfolder_id must match. existing cleanup id {rootfolder_id} new id {cleanup_config.id}")
+        existing_cleanup_cfg.lead_time  = cleanup_config.lead_time
+        existing_cleanup_cfg.frequency  = cleanup_config.frequency
+        existing_cleanup_cfg.start_date = datetime.fromisoformat(cleanup_config.start_date)
+        existing_cleanup_cfg.progress   = dtos.CleanupProgress.Progress.INACTIVE # any change to the cleanupå config resets progress to INACTIVE
         
+        # Import at runtime to avoid circular dependency
         from cleanup.scheduler import CleanupScheduler
-        cleanup_config.rootfolder_id = rootfolder_id
-        cleanup_config.rootfolder_id = rootfolder_id
-        cleanup_config.progress = dtos.CleanupProgress.Progress.INACTIVE
-        CleanupScheduler.deactivate_calendar(cleanup_config.rootfolder_id)
-        session.add(cleanup_config)
+        CleanupScheduler.deactivate_calendar(existing_cleanup_cfg.rootfolder_id)
+        
+        session.add(existing_cleanup_cfg)
         session.commit()
-        session.refresh(cleanup_config)
-        existing_rootfolder.cleanup_config_id = cleanup_config.id
-        session.add(existing_rootfolder)
-        session.commit()
+        #session.refresh(existing_cleanup_cfg)
+        #existing_rootfolder.cleanup_config_id = existing_cleanup_config.id
+        #session.add(existing_rootfolder)
+        #session.commit()
 
-        if (cleanup_config.id is None) or (cleanup_config.id == 0):
-            raise HTTPException(status_code=404, detail=f"Failed to provide cleanup configuration for rootfolder_id {rootfolder_id} with an id")
-        return cleanup_config   
+        #if (cleanup_config.id is None) or (cleanup_config.id == 0):
+        #    raise HTTPException(status_code=404, detail=f"Failed to provide cleanup configuration for rootfolder_id {rootfolder_id} with an id")
+        return existing_cleanup_cfg
     
-def update_cleanup_configuration_by_rootfolder_id(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
-    is_valid = cleanup_configuration.is_valid()
-    if not is_valid:
-        raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
+# def update_cleanup_configuration_by_rootfolder_id(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
+#     #is_valid = cleanup_configuration.is_valid()
+#     #if not is_valid:
+#     #    raise HTTPException(status_code=404, detail=f"for rootfolder {rootfolder_id}: update of cleanup_configuration failed")
 
-    #now the configuration is consistent
-    with Session(Database.get_engine()) as session:
-        rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
-        if not rootfolder:
-            raise HTTPException(status_code=404, detail="rootfolder not found")
+#     #now the configuration is consistent
+#     with Session(Database.get_engine()) as session:
+#         rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
+#         if not rootfolder:
+#             raise HTTPException(status_code=404, detail="rootfolder not found")
       
-        # NEW: Use ensure_cleanup_config to get or create CleanupConfigurationDTO
-        cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        # Update the DTO with values from the incoming dataclass
-        # any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
-        cleanup_config.leadtime          = cleanup_configuration.leadtime
-        cleanup_config.frequency   = cleanup_configuration.frequency
-        cleanup_config.start_date = cleanup_configuration.start_date
-        cleanup_config.progress   = dtos.CleanupProgress.Progress.INACTIVE 
-        #config_dto.progress   = cleanup_configuration.progress if cleanup_configuration.progress is None else cleanup_configuration.progress 
-        rootfolder.save_cleanup_configuration(session, cleanup_config)
+#         cleanup_config: dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+#         # Update the DTO with values from the incoming dataclass
+#         # Any change will reset the progress to INACTIVE and deactivate all active calender and tasks 
+#         cleanup_config.lead_time   = cleanup_configuration.lead_time
+#         cleanup_config.frequency  = cleanup_configuration.frequency
+#         cleanup_config.start_date = cleanup_configuration.start_date
+#         cleanup_config.progress   = dtos.CleanupProgress.Progress.INACTIVE 
+#         rootfolder.save_cleanup_configuration(session, cleanup_config)
 
-        #if cleanup_configuration.can_start_cleanup():
-        #    print(f"Starting cleanup for rootfolder {rootfolder_id} with configuration {cleanup_configuration}")
-        #    #from app.web_server_retention_api import start_new_cleanup_cycle  #avoid circular import
-        #    #start_new_cleanup_cycle(rootfolder_id)
-        return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {cleanup_config.id} "}
+#         return {"message": f"for rootfolder {rootfolder_id}: update of cleanup configuration {cleanup_config.id} "}
 
 
 # # --------------- start not in use now - will be used for optimization -------------------
@@ -612,9 +612,9 @@ def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]
 
         #cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
         # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
-        # However, when a cleanup round is started they have time at "rootfolder.leadtime" to adjust retention
+        # However, when a cleanup round is started they have time at "rootfolder.lead_time" to adjust retention
         #if not cleanup_config.is_valid():
-        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing frequency, cleanup_round_start_date or leadtime ")
+        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing frequency, cleanup_round_start_date or lead_time ")
 
         # Get retention types for calculations
         #retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 

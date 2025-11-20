@@ -122,13 +122,16 @@ public class UpdateCleanupConfigurationCmd : Command
         // Store original state for rollback
         original_cleanup_configuration = rootFolder.CleanupConfiguration;
 
-        bool result = await API.Instance.UpdateCleanupConfigurationForRootFolder(this.rootFolder.Id, this.cleanup_configuration);
-        if (result)
-            rootFolder.CleanupConfiguration = cleanup_configuration;
-        else
-            throw new Exception("Failed to update cleanup configuration via API.");
+        var updatedConfig = await API.Instance.UpdateCleanupConfigurationForRootFolder(this.rootFolder.Id, this.cleanup_configuration);
+        if (updatedConfig != null)
+        {
+            rootFolder.CleanupConfiguration = updatedConfig;
+            return true;
+        }
+        //else
+        //    throw new Exception("Failed to update cleanup configuration via API.");
 
-        return result;
+        return false;
     }
     public override async Task<bool> Rollback()
     {

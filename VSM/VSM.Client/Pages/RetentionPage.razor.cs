@@ -20,14 +20,12 @@ namespace VSM.Client.Pages
             isLoading = true;
             // Just set up initial state, don't block with async operations
             StateHasChanged();
-            if (rootFolder != Datamodel.Library.Instance.SelectedRootFolder)
-            {
-                rootFolder = Datamodel.Library.Instance.SelectedRootFolder;
-            }
+            rootFolder = Datamodel.Library.Instance.SelectedRootFolder;
+            Datamodel.Library.Instance.SelectedRootFolder = null;
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (firstRender && isLoading)
+            if (firstRender && isLoading && rootFolder != null)
             {
                 StateHasChanged();
                 // Load both data and retention options
@@ -68,7 +66,7 @@ namespace VSM.Client.Pages
                 new_retention_key = new RetentionKey { Id = cell.retention_key.Id };
             else
                 new_retention_key.Id = cell.retention_key.Id;
-            Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
+            //Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
         }
         // the following update the retention for one cell and all its children
         // Concerning path protection. One pathprotection can be added and only one path protection can be removed
@@ -286,7 +284,7 @@ namespace VSM.Client.Pages
             //create a hashlist for fast lookup which folder are already expanded. Basically a look of all id ViewNode.Data.Id list for 
             HashSet<int> visiblefolder_Ids = VisibleRows.Select(r => r.Data.Id).ToHashSet();
             // print the visible folder ids to the console for debugging
-            Console.WriteLine($"Visible folder IDs ({visiblefolder_Ids.Count}): {string.Join(", ", visiblefolder_Ids)}");
+            //Console.WriteLine($"Visible folder IDs ({visiblefolder_Ids.Count}): {string.Join(", ", visiblefolder_Ids)}");
 
             //add all nodes (node and its parents) that are not expanded (that not in the expandedFolders) to a list closed nodes. 
             //stop at the first node found in expandedFolders
@@ -296,7 +294,7 @@ namespace VSM.Client.Pages
             {
                 closedNodes.Push(current);
                 current = current.Parent;
-                if (current != null) Console.WriteLine($"current: ID:{current.Id}, Name: {current.Name}, IsVisible:{visiblefolder_Ids.Contains(current.Id)}");
+                //if (current != null) Console.WriteLine($"current: ID:{current.Id}, Name: {current.Name}, IsVisible:{visiblefolder_Ids.Contains(current.Id)}");
             }
 
             // Find the viewnode for current which is the highest ViewNode with one of node's parent FolderNodes

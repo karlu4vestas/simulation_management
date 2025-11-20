@@ -40,7 +40,7 @@ class RetentionCalculator:
         retention_type_dict: dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
 
         if not retention_type_dict or not cleanup_state.is_valid():
-            raise ValueError("cleanup_round_start_date, at least one numeric retention type and leadtime must be set for RetentionCalculator to work")
+            raise ValueError("cleanup_round_start_date, at least one numeric retention type and lead_time must be set for RetentionCalculator to work")
 
         # It is on the one hand practical to make a first configuration of retention without starting a cleanup round, if the user desires this
         # but on the other hand the RetentionCalculator requires a start_date to be able to calculate retentions
@@ -56,7 +56,7 @@ class RetentionCalculator:
             raise ValueError(f"The RetentionCalculator cannot work with the cleanup configuration:{cleanup_state}")
         self.cleanup_round_start_date    = start_date
 
-        self.leadtimedelta              = timedelta(days=cleanup_state.dto.leadtime)
+        self.leadtimedelta              = timedelta(days=cleanup_state.dto.lead_time)
 
         self.retention_type_str_dict:dict[str, RetentionTypeDTO] = read_rootfolder_retentiontypes_dict(rootfolder_id)
         self.retention_type_id_dict      = {retention.id: retention for retention in self.retention_type_str_dict.values()}

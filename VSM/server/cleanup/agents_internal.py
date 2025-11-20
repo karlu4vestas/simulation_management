@@ -232,7 +232,7 @@ class AgentNotification(AgentTemplate):
                 initial_message: str = f"The review has started. Use it to review and adjust the retention of your simulation in particular those marked for cleanup \n" + \
                                     f"You have configure the cleanup rutine as follow " + \
                                     f"Duration of the review periode is {config.frequency} days; ending on {enddate_for_cleanup_cycle}." + \
-                                    f"Simulations will be marked for cleanup {config.leadtime} days from last modification date unless otherwise specified by retention settings."
+                                    f"Simulations will be marked for cleanup {config.lead_time} days from last modification date unless otherwise specified by retention settings."
                 final_message: str   = f"The retention review is about to end in {config.frequency-self.task.task_offset-1} days."
 
                 message: str = initial_message if self.task.action_type == ActionType.SEND_INITIAL_NOTIFICATION.value else final_message

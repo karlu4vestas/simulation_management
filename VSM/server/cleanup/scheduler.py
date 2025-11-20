@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import timedelta, timezone
 from sqlmodel import Session, func, select
 from fastapi import HTTPException
 from db.database import Database
@@ -120,7 +120,7 @@ class CleanupScheduler:
         
         with Session(Database.get_engine()) as session:
             configs = session.exec( select(dtos.CleanupConfigurationDTO).where(
-                    (dtos.CleanupConfigurationDTO.leadtime > 0) &
+                    (dtos.CleanupConfigurationDTO.lead_time > 0) &
                     (dtos.CleanupConfigurationDTO.frequency > 0) &
                     (dtos.CleanupConfigurationDTO.start_date != None) &
                     (dtos.CleanupConfigurationDTO.start_date <= now) &

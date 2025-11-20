@@ -4,7 +4,10 @@ namespace VSM.Client.Datamodel
     //-------------------- here come client side objects that contains a DTO like object ----------------
     public class RootFolder
     {
-        RootFolderDTO dto;
+        RootFolderDTO dto = new RootFolderDTO();
+        public RootFolder()
+        {
+        }
         public RootFolder(RootFolderDTO dto, CleanupConfigurationDTO cleanupConfiguration)
         {
             this.dto = dto;
@@ -12,7 +15,7 @@ namespace VSM.Client.Datamodel
         }
         public int Id => dto.Id;
         public int Folder_Id => dto.Folder_Id;
-        public CleanupConfigurationDTO CleanupConfiguration { get; set; }
+        public CleanupConfigurationDTO CleanupConfiguration { get; set; } = new CleanupConfigurationDTO();
 
         public string Root_path => dto.Path;
         public string Owner => dto.Owner;

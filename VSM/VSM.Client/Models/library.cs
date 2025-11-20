@@ -6,10 +6,19 @@ namespace VSM.Client.Datamodel
         // Private static variable that holds the single instance
         private static readonly Lazy<Library> _instance = new Lazy<Library>(() => new Library());
         // Prevent instantiation from outside
-        private Library() { }
+        private Library()
+        {
+            Console.WriteLine("Library instance created");
+        }
+
+        // Destructor to print when the instance is finalized
+        ~Library()
+        {
+            Console.WriteLine("Library instance finalized (destructor called)");
+        }
         // Public static property to access the instance
         public static Library Instance => _instance.Value;
-        public RootFolder? SelectedRootFolder { get; set; }
+        public RootFolder? SelectedRootFolder { get; set; } = null;
         public string User { get; set; } = "";
         // just hard code for now until we have more than one domain and know more about how to mix and match domains
         private SimulationDomainDTO? Domain { get; set; }

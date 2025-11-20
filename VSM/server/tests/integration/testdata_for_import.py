@@ -15,7 +15,7 @@ from datamodel.retentions import ExternalRetentionTypes
 @dataclass
 class CleanupConfiguration: 
     # In-memory cleanup configuration for test data setup.
-    leadtime: int            # days from initialization of the simulations til it can be cleaned
+    lead_time: int            # days from initialization of the simulations til it can be cleaned
     frequency: int           # number of days between cleanup rounds
     start_date: datetime     # at what date did the current cleanup round start
     progress: dtos.CleanupProgress.Progress = dtos.CleanupProgress.Progress.INACTIVE  # current state of the cleanup round
@@ -24,7 +24,7 @@ class CleanupConfiguration:
         # Convert to CleanupConfigurationDTO for database insertion.
         return dtos.CleanupConfigurationDTO(
             rootfolder_id=rootfolder_id,
-            leadtime=self.leadtime,
+            lead_time=self.lead_time,
             frequency=self.frequency,
             start_date=self.start_date,
             progress=self.progress.value
@@ -322,8 +322,8 @@ class RootFolderWithMemoryFolders:
         self.after_leafs  = leafs[2*group_size:]
         
         rand: random.Random = random.Random()  # Use non-deterministic seed for true randomization
-        ran_interval_days = self.cleanup_configuration.leadtime//2
-        leadtime_days = self.cleanup_configuration.leadtime
+        ran_interval_days = self.cleanup_configuration.lead_time//2
+        leadtime_days = self.cleanup_configuration.lead_time
         start_date = self.cleanup_configuration.start_date
 
         # Group 1: before_leafs - modified dates before retention period (will be cleaned up)
@@ -486,14 +486,14 @@ def generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders:i
     return root_folders
 
 
-def generate_cleanup_scenario_data(leadtime=30, frequency=7, start_date=datetime(2000, 1, 1)):
+def generate_cleanup_scenario_data(lead_time=30, frequency=7, start_date=datetime(2000, 1, 1)):
     # Sample data with 3 datasets for 2 root folders:
     #  - part one with the first root folder and a list of all its subfolders in random order
     #  - part two and three with a random split of each of the second rootfolders list of subfolders
     # The root folder's cleanup configuration is not initialised means that assumes default values
 
     number_of_rootfolders = 2
-    cleanup_configuration = CleanupConfiguration(leadtime=leadtime, frequency=frequency, start_date=start_date)
+    cleanup_configuration = CleanupConfiguration(lead_time=lead_time, frequency=frequency, start_date=start_date)
 
     rootfolders: deque[RootFolderWithMemoryFolderTree] = deque( generate_in_memory_rootfolder_and_folder_hierarchies(number_of_rootfolders) )
     assert len(rootfolders) > 0

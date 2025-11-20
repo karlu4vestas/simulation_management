@@ -137,7 +137,7 @@ class TestSchedulerAndAgents:
         # The cleanup_scenario_data fixture uses the old CleanupConfiguration dataclass for in-memory setup
         # Now we create the corresponding CleanupConfigurationDTO database record
         cleanup_config:dtos.CleanupConfigurationDTO = in_memory_config.to_dto(rootfolder_id=rootfolder.id)
-        cleanup_config:dtos.CleanupConfigurationDTO = db_api.insert_cleanup_configuration(rootfolder.id, cleanup_config)
+        cleanup_config:dtos.CleanupConfigurationDTO = db_api.insert_or_update_cleanup_configuration(rootfolder.id, cleanup_config)
         return rootfolder, cleanup_config
     
     @staticmethod
@@ -201,8 +201,8 @@ class TestSchedulerAndAgents:
 
         # Notice 
         #  1) that the condition to ensure that some simulations get marked for cleanup is that.
-        #     The date of the CleanupConfigurationDTO' start_date + leadtime is before the simulations modified date
-        #     The easiest way to use modified date = now and start_date = now-leadtime-1
+        #     The date of the CleanupConfigurationDTO' start_date + lead_time is before the simulations modified date
+        #     The easiest way to use modified date = now and start_date = now-lead_time-1
         #  2) A cleanup_round required the passage of time equal to the frequency to finalize the round. 
         #     That is we must either simulate or let time pass. frequency was changed to float in order to allow a second to pass (that is 1/(24*60*60) of a day) in this way 
         #     we can let time pass in the test by running the scheduler and wait a second before next run of the scheduler
@@ -228,9 +228,9 @@ class TestSchedulerAndAgents:
         insert_vts_metadata_in_db(integration_session)
 
         # mem_cleanup_config: CleanupConfiguration = CleanupConfiguration( 
-        #     leadtime=7,
+        #     lead_time=7,
         #     frequency=1./(24*60*60),  # set to one second for the test
-        #     start_date=SystemClock.now() - timedelta(days=8),  #8 = leadtime+1 ensure that simulations are marked for cleanup
+        #     start_date=SystemClock.now() - timedelta(days=8),  #8 = lead_time+1 ensure that simulations are marked for cleanup
         #     progress=dtos.CleanupProgress.Progress.INACTIVE
         # )
         
@@ -275,7 +275,7 @@ class TestSchedulerAndAgents:
                 return validate_cleanup(gen_sim_results.validation_csv_file, scope_before_leafs)    
 
             def getBeforeLeafFiles(self) -> tuple[str, list[str]]:
-                # scope the folders to those modified before the cleanup.start_date-cleanup.leadtime
+                # scope the folders to those modified before the cleanup.start_date-cleanup.lead_time
                 scope_before_leafs:list[str] = [in_mem_folder.path for in_mem_folder in self.rootfolder_data.before_leafs]
                 return validate_cleanup(gen_sim_results.validation_csv_file, scope_before_leafs)    
             
@@ -342,10 +342,10 @@ class TestSchedulerAndAgents:
                     run_scheduler_tasks(runtime_callback)
                     for dataset in data_sets:
                         # as long as we are not able to set the modified date on the files, the clean up will clean all files because the integration session sets the  
-                        # SystemClock offset one day after the leadtime used in the cleanup_scenario_data' cleanupconfiguration. see conftest.py 
+                        # SystemClock offset one day after the lead_time used in the cleanup_scenario_data' cleanupconfiguration. see conftest.py 
                         # def integration_session():
-                        #     # Create a SystemClock offset by more than cleanup configuration leadtime 
-                        #     SystemClock.set_offset_days(leadtime + 1)
+                        #     # Create a SystemClock offset by more than cleanup configuration lead_time 
+                        #     SystemClock.set_offset_days(lead_time + 1)
 
                         #if ever we can set the modifed date on teh file system then we can verify that leafs_before get cleaned and the rest does not
                         filepath_to_validation_results, failed_filepaths = dataset.validate_cleanup_of_all()
