@@ -32,6 +32,21 @@
         "projectPath": "${workspaceFolder}/VSM.Client/VSM.Client.csproj"
     },
     {
+      "name": "Debug Agents Unit Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/server/run_agents_unittests.py",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": false,
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    },
+    {
       "name": "Debug DB Unit Tests",
       "type": "debugpy",
       "request": "launch",
@@ -169,6 +184,28 @@
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}/server/tests/generate_vts_simulations",
       "justMyCode": false,
+      "env": {
+        "PYTHONUNBUFFERED": "1",
+        "PYTHONPATH": "${workspaceFolder}/server",
+        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
+        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
+      }
+    },
+    {
+      "name": "Debug test_scan_agent_without_db",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests/unittests/agents/test_on_premise_scan_agent.py:::TestOnPremiseScanAgent::test_scan_agent_without_db",
+        "-v",
+        "-s",
+        "--tb=short"
+      ],
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}/server",
+      "justMyCode": true,
       "env": {
         "PYTHONUNBUFFERED": "1",
         "PYTHONPATH": "${workspaceFolder}/server",
