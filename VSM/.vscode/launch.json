@@ -26,103 +26,10 @@
       ]
     },
     {
-      "name": "Launch Blazor Server",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://0\\.0\\.0\\.0:\\d+)"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5100"
-      },
-      "logging": {
-        "trace": true
-      }
-    },
-    {
-      "name": "🌐 VSM Server - Development (Port 5000) [Debug]",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM/bin/Debug/net9.0/VSM.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM",
-      "stopAtEntry": false,
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_URLS": "http://0.0.0.0:5800"
-      },
-      "justMyCode": false,
-      "enableStepFiltering": false,
-      "requireExactSource": true,
-      "symbolOptions": {
-        "searchMicrosoftSymbolServer": true,
-        "searchNuGetSymbolServer": true
-      },
-      "internalConsoleOptions": "openOnSessionStart",
-      "suppressJITOptimizations": true,
-      "logging": {
-        "moduleLoad": false
-      }
-    },
-    {
-      "name": "Test FastAPI endpoints",
-      "type": "debugpy",
-      "request": "launch",
-      "module": "pytest",
-      "args": [
-        "tests/api/test_endpoints.py",
-        "-v",
-        "--tb=short"
-      ],
-      "python": "${workspaceFolder}/.venv/bin/python",
-      "cwd": "${workspaceFolder}/server",
-      "console": "integratedTerminal",
-      "justMyCode": false,
-      "env": {
-        "PYTHONPATH": "${workspaceFolder}/server",
-        "VIRTUAL_ENV": "${workspaceFolder}/.venv",
-        "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
-      }
-    },
-    {
-      "name": "🔌 Attach to Running VSM Server",
-      "type": "coreclr",
-      "request": "attach",
-      "processId": "${command:pickProcess}",
-      "justMyCode": true
-    },
-    {
-      "name": "🌐 Debug Blazor Client - Development (Port 5000)",
-      "type": "chrome",
-      "request": "launch",
-      "url": "http://localhost:5000",
-      "webRoot": "${workspaceFolder}/VSM.Client"
-    },
-    {
-      "name": "Launch Client",
-      "type": "coreclr",
-      "request": "launch",
-      "preLaunchTask": "build",
-      "program": "${workspaceFolder}/VSM.Client/bin/Debug/net9.0/VSM.Client.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}/VSM.Client",
-      "stopAtEntry": false,
-      "serverReadyAction": {
-        "action": "openExternally",
-        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
-        "uriFormat": "%s"
-      },
-      "env": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
+        "name": "C#: VSM.Client [Default Configuration]",
+        "type": "dotnet",
+        "request": "launch",
+        "projectPath": "${workspaceFolder}/VSM.Client/VSM.Client.csproj"
     },
     {
       "name": "Debug DB Unit Tests",
@@ -329,34 +236,6 @@
         "VIRTUAL_ENV": "${workspaceFolder}/.venv",
         "PATH": "${workspaceFolder}/.venv/bin:${env:PATH}"
       }
-    }
-  ],
-  "compounds": [
-    {
-      "name": "🚀 Full Stack Debug - Development Environment",
-      "configurations": [
-        "🌐 VSM Server - Development (Port 5000) [Debug]",
-        "🌐 Debug Blazor Client - Development (Port 5000)"
-      ],
-      "stopAll": true
-    },
-    {
-      "name": "Blazor Client-Server Full Stack Debug",
-      "configurations": [
-        "🌐 VSM Server - Development (Port 5000) [Debug]",
-        "Launch Client",
-        "🌐 Debug Blazor Client - Development (Port 5000)"
-      ],
-      "stopAll": true
-    },
-    {
-      "name": "🐍🌐 FastAPI + VSM - Development Environment",
-      "configurations": [
-        "🐍 Start FastAPI Server (Port 5173)",
-        "🌐 VSM Server - Development (Port 5000) [Debug]",
-        "🌐 Debug Blazor Client - Development (Port 5000)"
-      ],
-      "stopAll": true
     }
   ]
 }

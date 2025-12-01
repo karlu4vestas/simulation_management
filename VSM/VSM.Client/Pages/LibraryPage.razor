@@ -1,14 +1,18 @@
 ﻿@page "/library"
 @rendermode InteractiveAuto
 @using Microsoft.FluentUI.AspNetCore.Components
+@using Microsoft.FluentUI.AspNetCore.Components.Components
 @using System.Linq.Expressions
+@using VSM.Client.SharedAPI
 @using VSM.Client.Datamodel
+@inject NavigationDataService NavService
 @inject NavigationManager Navigation
+@inject API Api
 
 <PageTitle>Library</PageTitle>
 
 <FluentStack Orientation="Orientation.Vertical">
-    @if (Library.Instance.UsersRootFolders.Count == 0)
+    @if (library.RootFolders.Count == 0)
     {
         <div style="display:flex">
             <p>Login to access your simulations:</p>
@@ -27,10 +31,10 @@
     else
     {
         <FluentStack Orientation="Orientation.Vertical">
-            <p>User: @Library.Instance.User</p>
+            <p>User: @library.User</p>
             <hr />
             <div class="grid">
-                <FluentDataGrid Items="@Library.Instance.UsersRootFolders.AsQueryable()" TGridItem="RootFolder"
+                <FluentDataGrid Items="@library.RootFolders.AsQueryable()" TGridItem="RootFolder"
                     OnRowClick="OnSelectRootFolder" ShowHover="true" DisplayMode="DataGridDisplayMode.Table"
                     GenerateHeader="@GenerateHeaderOption.Sticky" MultiLine="true">
 
@@ -44,7 +48,7 @@
 
                     <TemplateColumn Title="Retention period" Width="180px">
                         <ChildContent Context="folder">
-                            @($"{cycleTimeConverter.DaysToName(folder.CleanupConfiguration.Lead_time)}")
+                            @($"{cycleTimeConverter.DaysToName(folder.CleanupConfiguration.LeadTime)}")
                         </ChildContent>
                     </TemplateColumn>
 
@@ -56,10 +60,9 @@
 
                     <TemplateColumn Title="Retentions" Width="300px">
                         <ChildContent Context="folder">
-                            @if (folder.CleanupConfiguration.IsValid)
+                            @if (folder.CleanupConfiguration.IsValid())
                             {
-                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to
-                                    retentions</FluentButton>
+                                <FluentButton Appearance="Appearance.Accent" @onclick="@(() => Go2retention(folder))">Go to retentions</FluentButton>
                             }
                             else
                             {
@@ -72,26 +75,40 @@
         </FluentStack>
         <FluentStack Orientation="Orientation.Vertical">
             <hr />
-            @if (Library.Instance.SelectedRootFolder != null)
+            @if (selected_rootFolder != null)
             {
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Secure folder:</span>
-                    @Library.Instance.SelectedRootFolder.Root_path
+                    @selected_rootFolder.Root_path
                 </div>
-                string ownerstring = string.Join(", ", Library.Instance.SelectedRootFolder.AllInitials);
+                string ownerstring = string.Join(", ", selected_rootFolder.AllInitials);
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Owners & approvers:</span>
                     @ownerstring
                 </div>
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Retention period:</span>
-                    <FluentCombobox Autofocus="true" Items="@cycleTimeConverter?.Names()" @bind-Value="@cycle_time_name"
-                        @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
+                    <FluentSelect 
+                        Items="@library.CycleTimes" 
+                        TOption="LeadTimeDTO"
+                        OptionText="@(r => r.Name)" 
+                        OptionValue="@(r => r.Id.ToString())"
+                        @bind-SelectedOption="@leadTimeCallback"
+                        Height="300px" 
+                        Position="SelectPosition.Above" 
+                        Autofocus="true" 
                         ImmediateDelay="100" />
-                    <span style="width: 320px; display: inline-block;"> - days needed to analyse a simulation</span>
+                    <span style="width: 320px; display: inline-block;">  Days needed to analyse a simulation</span>
                 </div>
                 <div style="display:flex"><span style="width: 170px; display: inline-block;">Cleanup frequency</span>
-                    <FluentCombobox Autofocus="true" Items="@frequencyConverter?.Names()" @bind-Value="@frequency_name"
-                        @bind-Value:after="UpdateCleanUpConfiguration" Height="300px" Position="SelectPosition.Above" Immediate
+                    <FluentSelect 
+                        Items="@library.CleanupFrequencies" 
+                        TOption="CleanupFrequencyDTO"
+                        OptionText="@(r => r.Name)" 
+                        OptionValue="@(r => r.Id.ToString())"
+                        @bind-SelectedOption="@frequencyCallback"
+                        Height="300px" 
+                        Position="SelectPosition.Above" 
+                        Autofocus="true" 
                         ImmediateDelay="100" />
-                    <span style="width: 260px; display: inline-block;"> Days between cleanups</span>
+                    <span style="width: 260px; display: inline-block;">  Days between cleanups</span>
                 </div>
             }
         </FluentStack>

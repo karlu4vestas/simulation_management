@@ -1,65 +1,58 @@
 ﻿using System.Threading.Tasks.Dataflow;
 using Microsoft.FluentUI.AspNetCore.Components;
 using VSM.Client.Datamodel;
+using System.ComponentModel.DataAnnotations;
+//using VSM.Client.SharedAPI
 
 namespace VSM.Client.Pages
 {
     public partial class LibraryPage
     {
-        public class NamedPeriod
-        {
-            public string Name { get; set; } = "";
-            public int Days { get; set; }
-        }
-        public class NamedPeriodConverter
-        {
-            private readonly string _defaultName = "";
-            private readonly int _defaultDays = 0;
-            private List<NamedPeriod> _itemList = new List<NamedPeriod>();
-            private readonly Dictionary<string, int> _nameToDays = new();
-            private readonly Dictionary<int, string> _daysToName = new();
-            public NamedPeriodConverter() { }
-            public NamedPeriodConverter(IEnumerable<NamedPeriod> items)
-            {
-                _itemList = items.ToList();
-                // store first entry as fallback if any
-                if (_itemList.Count > 0)
-                {
-                    _defaultName = _itemList[0].Name;
-                    _defaultDays = _itemList[0].Days;
-                }
-                _nameToDays = _itemList.ToDictionary(x => x.Name, x => x.Days);
-                _daysToName = _itemList.ToDictionary(x => x.Days, x => x.Name);
-            }
-            public List<string> Names() => _nameToDays.Keys.ToList();
-            public int NameToDays(string name) => _nameToDays.TryGetValue(name, out var days) ? days : _defaultDays;
-            public string DaysToName(int days) => _daysToName.TryGetValue(days, out var name) ? name : _defaultName;
-        }
-
+        //FluentCombobox<string> cycleTimeComboBox = null!;
         static int pagevisits = 0;
         string user_name = "";
         bool has_loaded_rootFolders = false;
-        string frequency_name = "";
-        string cycle_time_name = "";
         NamedPeriodConverter frequencyConverter = new NamedPeriodConverter();
         NamedPeriodConverter cycleTimeConverter = new NamedPeriodConverter();
+        public CleanupFrequencyDTO? selectedFrequencyOption = null;
+        public CleanupFrequencyDTO? frequencyCallback
+        {
+            get => selectedFrequencyOption;
+            set{
+                selectedFrequencyOption = value;
+                //call async but uses a local discard task wrapper to catch exceptions.
+                _ = OnFrequencyChangedAsync(value).ContinueWith(t => {
+                    if (t.Exception != null)
+                        Console.Error.WriteLine(t.Exception);
+                });           
+            }
+        }
+        public LeadTimeDTO? selectedLeadTimeOption = null;
+        public LeadTimeDTO? leadTimeCallback
+        {
+            get => selectedLeadTimeOption;
+            set{
+                selectedLeadTimeOption = value;
+                //call async but uses a local discard task wrapper to catch exceptions.
+                _ = OnLeadTimeChangedAsync(value).ContinueWith(t => {
+                    if (t.Exception != null)
+                        Console.Error.WriteLine(t.Exception);
+                });           
+            }
+        }
+        
+        Library library = null!;
+        RootFolder? selected_rootFolder = null;
         protected override void OnInitialized()
         {
+            library = new Library(Api);
             pagevisits++;
-            Console.WriteLine("OnInitialized - Page visits: " + pagevisits);
-            Console.WriteLine("user_name: " + user_name);
-            Console.WriteLine("LibraryPage initialized");
-            Console.WriteLine("has_loaded_rootFolders: " + has_loaded_rootFolders);
-            Console.WriteLine("frequency_name: " + frequency_name);
-            Console.WriteLine("cycle_time_name: " + cycle_time_name);
-            Console.WriteLine("frequencies available: " + string.Join(", ", frequencyConverter.Names()));
-            Console.WriteLine("cycle times available: " + string.Join(", ", cycleTimeConverter.Names()));
         }
         async Task OnLoginClicked()
         {
             if (user_name.Length > 0)
             {
-                Library.Instance.User = user_name;
+                library.User = user_name;
                 try
                 {
                     has_loaded_rootFolders = false;
@@ -67,19 +60,9 @@ namespace VSM.Client.Pages
                     await InvokeAsync(StateHasChanged);
 
                     // first load retention options because we need them to generate testdata and folder structure
-                    await Library.Instance.Load();
-                    List<NamedPeriod> frequencyItems = Library.Instance.CleanupFrequencies.Select(x => new NamedPeriod
-                    {
-                        Name = x.Name,
-                        Days = x.Days
-                    }).ToList();
-                    frequencyConverter = new NamedPeriodConverter(frequencyItems);
-                    List<NamedPeriod> cycleTimeItems = Library.Instance.CycleTimes.Select(x => new NamedPeriod
-                    {
-                        Name = x.Name,
-                        Days = x.Days
-                    }).ToList();
-                    cycleTimeConverter = new NamedPeriodConverter(cycleTimeItems);
+                    await library.Load();
+                    frequencyConverter = new NamedPeriodConverter(library.CleanupFrequencies.Select(x => new NamedPeriod(x.Name, x.Days)));
+                    cycleTimeConverter = new NamedPeriodConverter(library.CycleTimes.Select(x => new NamedPeriod(x.Name, x.Days)));
 
                     has_loaded_rootFolders = true;
                 }
@@ -99,42 +82,95 @@ namespace VSM.Client.Pages
         {
             if (row.Item != null)
             {
-                Library.Instance.SelectedRootFolder = row.Item;
-                RootFolder rootFolder = row.Item;
-                frequency_name = frequencyConverter.DaysToName(rootFolder.CleanupConfiguration.Frequency);
-                cycle_time_name = cycleTimeConverter.DaysToName(rootFolder.CleanupConfiguration.Lead_time);
+                selected_rootFolder = row.Item;
+                CleanupFrequencyDTO? freq = library.CleanupFrequencies.FirstOrDefault(f => f.Days == selected_rootFolder.CleanupConfiguration.Frequency);
+                int leadtime_corrected = selected_rootFolder.CleanupConfiguration.LeadTime; 
+                if (leadtime_corrected == 0) 
+                    leadtime_corrected = -1;
+                LeadTimeDTO? leadtime = library.CycleTimes.FirstOrDefault(c => c.Days == leadtime_corrected);
+                selectedFrequencyOption = freq;
+                selectedLeadTimeOption = leadtime;
+            } else
+            {
+                selected_rootFolder = null;
+                selectedFrequencyOption = null;
+                selectedLeadTimeOption = null;
             }
             StateHasChanged();
         }
+        private async Task OnFrequencyChangedAsync(CleanupFrequencyDTO? frequency)
+        {
+            if (frequency != null)
+                await UpdateCleanUpConfiguration();
+        }
+        private async Task OnLeadTimeChangedAsync(LeadTimeDTO? leadtime)
+        {
+            if (leadtime != null)
+                await UpdateCleanUpConfiguration();
+        }
         private async Task UpdateCleanUpConfiguration()
         {
-            RootFolder? rootFolder = Library.Instance.SelectedRootFolder;
-            if (rootFolder == null)
+            if (selected_rootFolder == null)
                 return;
 
-            rootFolder.CleanupConfiguration.Frequency = frequencyConverter.NameToDays(frequency_name);
-            rootFolder.CleanupConfiguration.Lead_time = cycleTimeConverter.NameToDays(cycle_time_name);
-            if (rootFolder.CleanupConfiguration.Frequency > 0 && rootFolder.CleanupConfiguration.Lead_time > 0 && rootFolder.CleanupConfiguration.Start_date == null)
+            selected_rootFolder.CleanupConfiguration.Frequency = frequencyCallback?.Days ?? -1;
+            selected_rootFolder.CleanupConfiguration.LeadTime  = leadTimeCallback?.Days ?? -1;
+            if (selected_rootFolder.CleanupConfiguration.Frequency > 0 && selected_rootFolder.CleanupConfiguration.LeadTime > 0 )
             {
-                rootFolder.CleanupConfiguration.Start_date = DateTime.Now;
+                selected_rootFolder.CleanupConfiguration.StartDate = DateTime.UtcNow;
+            } else{
+                selected_rootFolder.CleanupConfiguration.StartDate = null;
             }
 
-            if (rootFolder.CleanupConfiguration.IsValid)
+            UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(Api, selected_rootFolder, selected_rootFolder.CleanupConfiguration);
+            bool success = await cmd.Apply();
+            
+            if (!success)
             {
-                UpdateCleanupConfigurationCmd cmd = new UpdateCleanupConfigurationCmd(rootFolder, rootFolder.CleanupConfiguration);
-                bool success = await cmd.Apply();
-                if (!success)
-                {
-                    Console.WriteLine("Failed to update cleanup configuration.");
-                }
-                StateHasChanged();
-                Console.WriteLine($"new frequency:{Library.Instance.SelectedRootFolder?.CleanupConfiguration}");
+                Console.WriteLine("Failed to update cleanup configuration.");
             }
+            StateHasChanged();
         }
         private void Go2retention(RootFolder root_folder)
         {
-            Library.Instance.SelectedRootFolder = root_folder;
+            selected_rootFolder = root_folder;
+            NavService.CurrentRootFolder = selected_rootFolder;
             Navigation.NavigateTo("retention");
         }
+    }
+
+    public class NamedPeriod
+    {
+        public NamedPeriod( string name, int days )
+        {
+            Name = name;
+            Days = days;
+        }
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+    public class NamedPeriodConverter
+    {
+        private readonly string _defaultName = "";
+        private readonly int _defaultDays = 0;
+        private List<NamedPeriod> _itemList = new List<NamedPeriod>();
+        private readonly Dictionary<string, int> _nameToDays = new();
+        private readonly Dictionary<int, string> _daysToName = new();
+        public NamedPeriodConverter() { }
+        public NamedPeriodConverter(IEnumerable<NamedPeriod> items)
+        {
+            _itemList = items.ToList();
+            // store first entry as fallback if any
+            if (_itemList.Count > 0)
+            {
+                _defaultName = _itemList[0].Name;
+                _defaultDays = _itemList[0].Days;
+            }
+            _nameToDays = _itemList.ToDictionary(x => x.Name, x => x.Days);
+            _daysToName = _itemList.ToDictionary(x => x.Days, x => x.Name);
+        }
+        public List<string> Names() => _nameToDays.Keys.ToList();
+        public int NameToDays(string name) => _nameToDays.TryGetValue(name, out var days) ? days : _defaultDays;
+        public string DaysToName(int days) => _daysToName.TryGetValue(days, out var name) ? name : _defaultName;
     }
 }

@@ -54,3 +54,5 @@ Thumbs.db
 .VSCodeCounter/
 
 io_dir_for_storage_test/
+
+.fake
