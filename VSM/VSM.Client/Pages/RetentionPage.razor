@@ -62,9 +62,8 @@
                     
                         @foreach (RetentionTypeDTO key in rootFolder.RetentionTypes.AllRetentions)
                         {                
-                            //Width="100px"
                             int unicodeChars = new StringInfo(key.Name).LengthInTextElements;
-                            string header_with = $"{unicodeChars * 15}px";
+                            string header_with = $"{unicodeChars * 14+20}px";
                             <TemplateColumn TGridItem="ViewNode" 
                                 Title="@key.Name" 
                                 Width=@header_with
