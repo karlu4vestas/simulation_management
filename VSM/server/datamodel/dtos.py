@@ -5,9 +5,21 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 
+from pydantic import BaseModel, ConfigDict
+from pydantic.alias_generators import to_camel
+
+
+class CamelSQLMOdel(SQLModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
+
+
 
 # see values in vts_create_meta_data
-class SimulationDomainDTO(SQLModel, table=True):
+class SimulationDomainDTO(CamelSQLMOdel, table=True):
     id: int | None  = Field(default=None, primary_key=True)
     name: str       = Field(default="")
 
@@ -19,7 +31,7 @@ class FolderTypeEnum(str, Enum):
 
 # see values in vts_create_meta_data
 # FolderTypeEnum.INNERNODE must exist of all domains and will be applied to all folders that are not simulations
-class FolderTypeBase(SQLModel):
+class FolderTypeBase(CamelSQLMOdel):
     simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
     name: str                       = Field(default="")
 
@@ -28,7 +40,7 @@ class FolderTypeDTO(FolderTypeBase, table=True):
 
 
 # time from initialization of the simulation til cleanup of the simulation
-class CleanupFrequencyBase(SQLModel):
+class CleanupFrequencyBase(CamelSQLMOdel):
     simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
     name: str                 = Field(default="")
     days: int                 = Field(default=0)
@@ -39,7 +51,7 @@ class CleanupFrequencyDTO(CleanupFrequencyBase, table=True):
 
 # how long time does the engineer require to analyse a simulation before it expires and can be cleaned
 # see values in vts_create_meta_data
-class LeadTimeBase(SQLModel):
+class LeadTimeBase(CamelSQLMOdel):
     simulationdomain_id: int  = Field(foreign_key="simulationdomaindto.id") 
     name: str                 = Field(default="")
     days: int                 = Field(default=0)
@@ -73,24 +85,28 @@ INTERNAL_TO_EXTERNAL_RETENTION_TYPE_dict: dict[str, ExternalRetentionTypes] = {
     RetentionTypeEnum.PATH.value: ExternalRetentionTypes.NUMERIC,
 }
 
-@dataclass
-class Retention:
+class Retention(BaseModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
     # Core retention data structure for folder retention information.
     retention_id: int
-    pathprotection_id: int | None = None
+    path_protection_id: int  = 0
     expiration_date: datetime | None = None
 
-@dataclass
 class FolderRetention(Retention):
     # DTO for updating folder retention from client.
     # Inherits all retention fields and adds folder_id for API routing.
     # Since this IS-A Retention, it can be passed directly to functions expecting Retention objects.
     folder_id: int = 0
-    
+    def getRetention(self) -> Retention:
+        return self
+
     def update_retention_fields(self, retention: Retention) -> None:
-        # Update the retention fields from a Retention object.
-        self.retention_id = retention.retention_id
-        self.pathprotection_id = retention.pathprotection_id
+        self.retention_id = retention.retention_id if retention.retention_id is not None else 0
+        self.path_protection_id = retention.path_protection_id if retention.path_protection_id is not None else 0
         self.expiration_date = retention.expiration_date
 
     @staticmethod
@@ -99,11 +115,21 @@ class FolderRetention(Retention):
         return FolderRetention(
             folder_id=folder_id,
             retention_id=retention.retention_id,
-            pathprotection_id=retention.pathprotection_id,
+            path_protection_id=retention.path_protection_id,
             expiration_date=retention.expiration_date
         )
+    @staticmethod
+    def from_folder_node_dto(folder:"FolderNodeDTO") -> "FolderRetention":
+        # Create a FolderRetention from a FolderNodeDTO.
+        ret =  FolderRetention(
+            folder_id=folder.id,
+            retention_id=folder.retention_id if folder.retention_id is not None else 0,
+            path_protection_id=folder.path_protection_id if folder.path_protection_id is not None else 0,
+            expiration_date=folder.expiration_date
+        )
+        return ret
 
-class RetentionTypeBase(SQLModel):
+class RetentionTypeBase(CamelSQLMOdel):
     simulationdomain_id: int        = Field(foreign_key="simulationdomaindto.id") 
     name: str                       = Field(default="numeric")  # Store retention name as string (display label like "+90d", "Marked", or enum values)
     days_to_cleanup: Optional[int]  = None  # days until the simulation can be cleaned. Can be null for path_retention "clean" and "issue"
@@ -181,6 +207,7 @@ class CleanupProgress:
         Progress.DONE:                          Progress.SCANNING
     }
 
+
 # The configuration can be used as follow:
 #   a) deactivating cleanup is done by setting frequency to None
 #   b) activating a cleanup round requires that frequency is set and that the lead_time is > 0. 
@@ -193,12 +220,12 @@ class CleanupProgress:
 #      - started:  the markup phase starts then cleanup round starts so that the user can adjust what simulations will be cleaned
 #      - cleaning: this is the last phase in which the actual cleaning happens
 #      - finished: the cleanup round is finished and we wait for the next round
-class CleanupConfigurationBase(SQLModel):
+class CleanupConfigurationBase(CamelSQLMOdel):
     """Base class for cleanup configuration."""
     rootfolder_id: int          = Field(default=None, foreign_key="rootfolderdto.id")
-    lead_time: int              = Field(default=0)  # days a simulation must be available before cleanup can start. 
-    frequency: int              = Field(default=0)  # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
-    start_date: datetime | None = Field(default=None)
+    lead_time: int              = Field(default=-1)     # days a simulation must be available before cleanup can start. 
+    frequency: int              = Field(default=-1)      # days to next cleanup round. we use float because automatic testing may require setting it to 1 second like 1/(24*60*60) of a day
+    start_date: datetime | None = Field(default=None)   # when does the cleanup round start
     progress: str               = Field(default=CleanupProgress.Progress.INACTIVE.value)
 
 class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
@@ -215,7 +242,7 @@ class CleanupConfigurationDTO(CleanupConfigurationBase, table=True):
     
 # path protection for a specific path in a rootfolder
 # the question is whether we need a foreigne key to the folder id 
-class PathProtectionBase(SQLModel):
+class PathProtectionBase(CamelSQLMOdel):
     rootfolder_id: int   = Field(foreign_key="rootfolderdto.id")
     folder_id: int       = Field(foreign_key="foldernodedto.id")
     path: str            = Field(default="")
@@ -226,7 +253,7 @@ class PathProtectionDTO(PathProtectionBase, table=True):
 
 
 #storage_id:  @TODO the default = "local" must be fixed when moving to remote storage platforms
-class RootFolderBase(SQLModel):
+class RootFolderBase(CamelSQLMOdel):
     simulationdomain_id: int              = Field(foreign_key="simulationdomaindto.id") 
     folder_id: int | None                 = Field(default=None, foreign_key="foldernodedto.id") 
     storage_id: str                       = Field(default="local")     # storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system.
@@ -293,26 +320,26 @@ class FileInfo:
 
 
 
-class FolderNodeBase(SQLModel):
+class FolderNodeBase(CamelSQLMOdel):
     rootfolder_id: int                    = Field(foreign_key="rootfolderdto.id")
     parent_id: int                        = Field(default=0)  # 0 means no parent
     name: str                             = Field(default="")
     path: str                             = Field(default="")  # full path
     path_ids: str                         = Field(default="")  # full path represented as 0/1/2/3 where each number is the folder id and 0 means root
     nodetype_id: int                      = Field(foreign_key="foldertypedto.id")
+    retention_id: int                     = Field(default=0, foreign_key="retentiontypedto.id")
+    path_protection_id: int               = Field(default=0, foreign_key="pathprotectiondto.id")
     modified_date: datetime | None        = None # must actually be mandatory but lets wait until the test data is fixed 
-    retention_id: int | None              = Field(default=None, foreign_key="retentiontypedto.id")
-    pathprotection_id: int | None         = Field(default=None, foreign_key="pathprotectiondto.id")
     expiration_date: datetime | None      = None
 
     # we should gravitate towards using the Retention dataclass to enforce consistency between retention_id and pathprotection_id nad possibly expiration_date
     def get_retention(self) -> "Retention":
         from datamodel.retentions import Retention
-        return Retention(self.retention_id, self.pathprotection_id, self.expiration_date)
+        return Retention(self.retention_id, self.path_protection_id, self.expiration_date)
     
     def set_retention(self, retention: "Retention"):
         self.retention_id = retention.retention_id
-        self.pathprotection_id = retention.pathprotection_id
+        self.path_protection_id = retention.path_protection_id
         self.expiration_date = retention.expiration_date
     
     def get_fileinfo(self, nodetype_dict: dict[int, FolderTypeDTO], retention_dict: dict[int, RetentionTypeDTO]) -> FileInfo:

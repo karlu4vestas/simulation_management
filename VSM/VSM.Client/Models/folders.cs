@@ -93,22 +93,22 @@ namespace VSM.Client.Datamodel
         }
         //mapped to server fields
         public int Id => dto.Id;
-        public int Parent_Id => dto.Parent_Id;
-        public int Rootfolder_Id => dto.Rootfolder_Id;
+        public int ParentId => dto.ParentId;
+        public int RootfolderId => dto.RootfolderId;
         public string Name => dto.Name;
-        public int Type_Id => dto.Type_Id;
+        //public int NodeTypeId => dto.NodeTypeId;
         public Retention Retention
         {
-            get => new Retention { TypeId = dto.Retention_Id, PathId = dto.Path_Protection_Id };
+            get => new Retention { TypeId = dto.RetentionId, PathId = dto.PathProtectionId };
             set
             {
-                dto.Retention_Id = value.TypeId;
-                dto.Path_Protection_Id = value.PathId;
+                dto.RetentionId = value.TypeId;
+                dto.PathProtectionId = value.PathId;
             }
         }
         //client side helper fields
-        public int Retention_Id { get => dto.Retention_Id; set => dto.Retention_Id = value; }
-        public int Path_Protection_Id { get => dto.Path_Protection_Id; set => dto.Path_Protection_Id = value; }
+        public int RetentionId { get => dto.RetentionId; set => dto.RetentionId = value; }
+        public int PathProtectionId { get => dto.PathProtectionId; set => dto.PathProtectionId = value; }
         //client side help fields. 
         // It is reconstructed on the fly,, which is ok because it is only used for display of the path protection list and when the user selects a folder
         public string FullPath
@@ -154,13 +154,13 @@ namespace VSM.Client.Datamodel
             }
             throw new Exception($"Folder with ID {folder_id} not found.");
         }
-        public async Task<List<RetentionUpdateDTO>> ChangeRetentionsOfSubtree(ChangeRetentionDelegate change_delegate)
+        public async Task<List<FolderRetention>> ChangeRetentionsOfSubtree(ChangeRetentionDelegate change_delegate)
         {
             //select the subtree to folder incl folder that have retention equal to  (from_retention_ID, from_path_protection_id)
             // and change the retentions to (to_retention_ID, to_path_protection_id)
             //Console.WriteLine($"ChangeRetentionsOfSubtree: {this.FullPath} to_retention_ID: {change_delegate.to_retention.TypeId}, to_path_protection_id: {change_delegate.to_retention.PathId} ");
             int number_of_unchanged_leafs = 0;
-            List<RetentionUpdateDTO> retentionUpdates = new List<RetentionUpdateDTO>();
+            List<FolderRetention> retentionUpdates = new List<FolderRetention>();
 
             var stack = new Stack<FolderNode>();
             stack.Push(this);
@@ -174,11 +174,11 @@ namespace VSM.Client.Datamodel
                     if (change_delegate.update_retention(currentNode))
                     {
                         currentNode.Retention = change_delegate.to.Clone();
-                        retentionUpdates.Add(new RetentionUpdateDTO
+                        retentionUpdates.Add(new FolderRetention
                         {
-                            Folder_id = currentNode.Id,
-                            Retention_id = currentNode.Retention.TypeId,
-                            Pathprotection_id = currentNode.Retention.PathId
+                            FolderId = currentNode.Id,
+                            RetentionId = currentNode.Retention.TypeId,
+                            PathProtectionId = currentNode.Retention.PathId
                         });
                     }
                     else

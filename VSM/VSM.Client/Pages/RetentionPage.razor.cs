@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using VSM.Client.Datamodel;
+using VSM.Client.SharedAPI;
+using System.Threading.Tasks;
 
 namespace VSM.Client.Pages
 {
@@ -11,23 +13,40 @@ namespace VSM.Client.Pages
         RetentionCell? selected_cell = null;
         RetentionCell? target_retention_cell = null;
         bool isProcessing = false;
-        RetentionKey new_retention_key = new();
-        //data from the DataModel
-        public RootFolder? rootFolder { get; set; }
+        public RootFolder rootFolder = null!;
+        public RetentionTypeDTO? selectedRetentionOption = null;
+        public RetentionTypeDTO? retentionCallback
+        {
+            get => selectedRetentionOption;
+            set
+            {
+                selectedRetentionOption = value;
+                //call async but uses a local discard task wrapper to catch exceptions.
+                _ = OnRetentionChangedAsync(value).ContinueWith(t => {
+                    if (t.Exception != null)
+                        Console.Error.WriteLine(t.Exception);
+                });           
+            }
+        }
 
         protected override void OnInitialized()
         {
             isLoading = true;
+            //retentionCallback = new RetentionCallback(this);
+            if( NavService.CurrentRootFolder==null )
+            {
+                Navigation.NavigateTo("library");
+                return;
+            } else{
+                rootFolder = NavService.CurrentRootFolder ;
+            }
             // Just set up initial state, don't block with async operations
             StateHasChanged();
-            rootFolder = Datamodel.Library.Instance.SelectedRootFolder;
-            Datamodel.Library.Instance.SelectedRootFolder = null;
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender && isLoading && rootFolder != null)
             {
-                StateHasChanged();
                 // Load both data and retention options
                 await LoadDataAsync();
             }
@@ -57,62 +76,64 @@ namespace VSM.Client.Pages
         {
             visibleTable.ToggleExpand(node);
         }
-        private void OnCellClick(RetentionCell cell)
+        private async Task OnRetentionChangedAsync(RetentionTypeDTO? selectedRetentionOption)
         {
-            //selected_cell = (node,key);
-            selected_cell = cell;
-            target_retention_cell = null;
-            if (new_retention_key == null)
-                new_retention_key = new RetentionKey { Id = cell.retention_key.Id };
-            else
-                new_retention_key.Id = cell.retention_key.Id;
-            //Console.WriteLine($"Cell focused: {cell.Node.Name}, {cell.retention_key.Name}");
-        }
-        // the following update the retention for one cell and all its children
-        // Concerning path protection. One pathprotection can be added and only one path protection can be removed
-        // The dealing with hierachies of path protection must be done on the userinterface so that it is explicit for the user what will happen
-        private async Task OnRetentionChangedAsync()
-        {
+            // the following update the retention for one cell and all its children
+            // Concerning path protection. One pathprotection can be added and only one path protection can be removed
+            // The dealing with hierachies of path protection must be done on the userinterface so that it is explicit for the user what will happen
+            
+            // Fallbaclin case false==cmd.ExecuteAsync is to provoke a reload of the data from the server by sending the user 
+            // to the library page. Not elegant but it works for now.
             try
             {
-                if (selected_cell != null && new_retention_key != null && rootFolder != null)
+                if (selected_cell != null && selectedRetentionOption != null && rootFolder != null)
                 {
                     isProcessing = true;
                     await InvokeAsync(StateHasChanged);
 
                     //start by verifying if we need to change the list of pathprotections
-                    if (new_retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
+                    if (selectedRetentionOption.Id == rootFolder.RetentionTypes.PathRetentionType.Id)
                     {
                         //add a path protection if it doesn't already exist
-                        if (rootFolder.Path_protections.Any(p => p.Folder_Id == selected_cell.Node.Id))
+                        if (rootFolder.PathProtections.Any(p => p.FolderId == selected_cell.Node.Id))
                         {
                             Console.WriteLine($"Path protection already exists for folder {selected_cell.Node.Name} ({selected_cell.Node.FullPath})");
                             return;
                         }
 
-                        AddPathProtectionCmd cmd = new AddPathProtectionCmd(rootFolder, selected_cell.Node);
-                        if (false == await cmd.ExecuteAsync())
+                        AddPathProtectionCmd cmd = new AddPathProtectionCmd(Api, rootFolder, selected_cell.Node);
+                        if (false == await cmd.ExecuteAsync()){
+                            Navigation.NavigateTo("library");
                             return;
+                        }
                     }
-                    else if (selected_cell.retention_key.Id == rootFolder.RetentionConfiguration.Path_retentiontype.Id)
+                    else if (selected_cell.retention.Id == rootFolder.RetentionTypes.PathRetentionType.Id)
                     {
                         //remove existing path protection.
-                        RemovePathProtectionCmd cmd = new RemovePathProtectionCmd(rootFolder, selected_cell.Node, new_retention_key.Id);
-                        if (false == await cmd.ExecuteAsync())
+                        RemovePathProtectionCmd cmd = new RemovePathProtectionCmd(Api,rootFolder, selected_cell.Node, selectedRetentionOption.Id);
+                        if (false == await cmd.ExecuteAsync()){
+                            Navigation.NavigateTo("library");
                             return;
+                        }
                     }
-                    else if (new_retention_key != null) // case for change of retention that does not involved pathRetention
+                    else //if (selectedOption != null) // case for change of retention that does not involved pathRetention
                     {
-                        ChangeRetentionsCmd cmd = new ChangeRetentionsCmd(rootFolder, selected_cell.Node, selected_cell.retention_key.Id, new_retention_key.Id);
-                        if (false == await cmd.ExecuteAsync())
+                        ChangeRetentionsCmd cmd = new ChangeRetentionsCmd(Api,rootFolder, selected_cell.Node, selected_cell.retention.Id, selectedRetentionOption.Id);
+                        if (false == await cmd.ExecuteAsync()){
+                            Navigation.NavigateTo("library");
                             return;
+                        }
                     }
 
                     // All done for the selected_cell. Now use target_retention_cell to show where the change has gone to
-                    if (new_retention_key != null)
+                    if (selectedRetentionOption != null)
                     {
-                        selected_cell.retention_key.Id = new_retention_key.Id; // Update the selected cell's retention key
-                        selected_cell.retention_key.Name = rootFolder.RetentionConfiguration.Find_by_Id(new_retention_key.Id)?.Name ?? "unknown";
+                        //Console.WriteLine($"Selected retention option before change: {selectedRetentionOption.Name} ({selectedRetentionOption.Id})");
+                        selected_cell.retention =new RetentionTypeDTO
+                        {
+                            Id = selectedRetentionOption.Id,
+                            Name = selectedRetentionOption.Name
+                        };
                         target_retention_cell = selected_cell;
                         selected_cell = null;
                     }
@@ -126,44 +147,46 @@ namespace VSM.Client.Pages
             {
                 //ensure that the user can see the changes
                 isProcessing = false;
+                StateHasChanged();
                 await InvokeAsync(StateHasChanged);
             }
         }
-
+        private void OnCellClick(RetentionCell cell)
+        {
+            selected_cell = cell;
+            target_retention_cell = null;
+            if( rootFolder!=null)                                     
+            {   
+                selectedRetentionOption = rootFolder.RetentionTypes.FindById( cell.retention.Id );
+            }
+        }
         private async Task SelectPathRetention(PathProtectionDTO pathprotection)
         {
-            FolderNode? folder = rootFolder == null ? null : await rootFolder.FolderTree.FindByFolderId(pathprotection.Folder_Id);
+            FolderNode? folder = rootFolder == null ? null : await rootFolder.FolderTree.FindByFolderId(pathprotection.FolderId);
             if (rootFolder != null && folder != null && visibleTable.VisibleRootNode != null)
             {
-                //unfolder the VisibleRows to show folder and select the node where the pathprotection is defined
+                //unfolde the VisibleRows to show folder and select the node where the pathprotection is defined
                 visibleTable.ExpandToNode(folder);
-                selected_cell = new RetentionCell(folder, rootFolder.RetentionConfiguration.Path_retentiontype);
+                selected_cell = new RetentionCell(folder, rootFolder.RetentionTypes.PathRetentionType);
                 target_retention_cell = null;
-                new_retention_key.Id = rootFolder.RetentionConfiguration.Path_retentiontype.Id;
+                selectedRetentionOption = rootFolder.RetentionTypes.PathRetentionType;
+                await InvokeAsync(StateHasChanged);
             }
             else
             {
                 Console.WriteLine($"failed to select retention for pathprotection {pathprotection.Id}, {pathprotection.Path}");
             }
         }
-    }
-
-    class RetentionKey
-    {
-        public byte Id = 0;
-        public string Id_AsString
+        private async Task AddPathRetention(RetentionCell cell)
         {
-            get
-            {
-                return Id.ToString();
-            }
-            set
-            {
-                Id = byte.TryParse(value, out byte byte_value) ? byte_value : Id;
+            //Console.WriteLine($"AddPathRetention for a child to a pathprotectionfolder: {cell.Node.Name}, {cell.retention.Name}");
+            if( cell.retention.Id==rootFolder.RetentionTypes.PathRetentionType.Id){
+                AddPathProtectionCmd cmd = new AddPathProtectionCmd(Api, rootFolder, cell.Node);
+                if (false == await cmd.ExecuteAsync())
+                    return;
             }
         }
     }
-
     //client node with fields to manage display and navigation
     public class ViewNode
     {
@@ -178,7 +201,6 @@ namespace VSM.Client.Pages
         public bool IsExpanded { get; set; } = false;
         public string Name => data.Name;
         public List<ViewNode> Children = [];
-
     }
     public class VisibleTable
     {
@@ -313,16 +335,22 @@ namespace VSM.Client.Pages
     }
     public class RetentionCell : IEquatable<RetentionCell>
     {
+        //The retention cell is a place in the grid (foldernode rows vs retention columns)
         public FolderNode Node { get; set; }
-        public RetentionTypeDTO retention_key { get; set; }
+        public RetentionTypeDTO retention { get; set; }
         public RetentionCell(FolderNode node, RetentionTypeDTO retention_key)
         {
             this.Node = node;
-            this.retention_key = new RetentionTypeDTO
+            this.retention = new RetentionTypeDTO
             {
                 Id = retention_key.Id,
                 Name = retention_key.Name,
             };
+        }
+        public bool CanChangeRetention()
+        {
+            //returns true if the retention can be changed
+            return this.retention.Name != "Clean" && this.retention.Name != "Missing";
         }
         public override bool Equals(Object? other)
         {
@@ -337,11 +365,11 @@ namespace VSM.Client.Pages
             if (other is null) return false;
             if (ReferenceEquals(this, other)) return true;
 
-            return Node?.Id == other.Node?.Id && retention_key.Id == other.retention_key.Id;
+            return Node?.Id == other.Node?.Id && retention.Id == other.retention.Id;
         }
         public override int GetHashCode()
         {
-            return HashCode.Combine(Node.GetHashCode(), retention_key.Id);
+            return HashCode.Combine(Node.GetHashCode(), retention.Id);
         }
         public static bool operator ==(RetentionCell? left, RetentionCell? right)
         {

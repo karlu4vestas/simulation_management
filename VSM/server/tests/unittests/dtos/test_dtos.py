@@ -186,7 +186,7 @@ class TestFolderNodeDTO:
         assert retrieved_node.path_ids == ""          # Default value
         assert retrieved_node.modified_date is None   # Default value
         assert retrieved_node.expiration_date is None # Default value
-        assert retrieved_node.retention_id is None    # Default value
+        assert retrieved_node.retention_id == 0       # Default value
 
     def test_folder_node_with_attributes_create_and_retrieve(self, test_session: Session, test_root_folder):
         """Test creating and retrieving a FolderNodeDTO with attributes"""

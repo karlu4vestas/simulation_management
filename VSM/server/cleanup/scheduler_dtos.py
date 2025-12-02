@@ -4,6 +4,15 @@ from sqlmodel import SQLModel, Field, Column
 from sqlalchemy import JSON
 from pydantic import BaseModel
 
+from pydantic import ConfigDict
+from pydantic.alias_generators import to_camel
+
+class CamelSQLMOdel(SQLModel):
+    model_config = ConfigDict(
+        alias_generator=to_camel,
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
 # ------------------cleanup calendar and tasks ------------------
 # The scheduler runs periodically to activate the tasks in the rootfolders calendar when their scheduled time comes.
@@ -66,7 +75,7 @@ class AgentInfo(BaseModel):
                                              # None is adequate for the notification agent and internal agents that are used to change cleanup progress state
 
 
-class CleanupTaskBase(SQLModel):
+class CleanupTaskBase(CamelSQLMOdel):
     """
     Base class for cleanup tasks in the calendar.
     
@@ -105,7 +114,7 @@ class CleanupTaskDTO(CleanupTaskBase, table=True):
     id: int | None                      = Field(default=None, primary_key=True)
     
 
-class CleanupCalendarBase(SQLModel):
+class CleanupCalendarBase(CamelSQLMOdel):
     """
     Base class for cleanup calendar tasks.
 

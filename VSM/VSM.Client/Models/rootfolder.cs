@@ -5,16 +5,19 @@ namespace VSM.Client.Datamodel
     public class RootFolder
     {
         RootFolderDTO dto = new RootFolderDTO();
-        public RootFolder()
+        protected API Api { get; }
+        public RootFolder(API api)
         {
+            Api = api;
         }
-        public RootFolder(RootFolderDTO dto, CleanupConfigurationDTO cleanupConfiguration)
+        public RootFolder(API api, RootFolderDTO dto, CleanupConfigurationDTO cleanupConfiguration)
         {
+            Api = api;
             this.dto = dto;
             this.CleanupConfiguration = cleanupConfiguration;
         }
         public int Id => dto.Id;
-        public int Folder_Id => dto.Folder_Id;
+        public int FolderId => dto.FolderId;
         public CleanupConfigurationDTO CleanupConfiguration { get; set; } = new CleanupConfigurationDTO();
 
         public string Root_path => dto.Path;
@@ -23,29 +26,25 @@ namespace VSM.Client.Datamodel
         public List<string> AllInitials => new List<string> { Owner }.Concat(Approvers.Split(',')).ToList();
         // the content of the following property must be loaded on demand by calling LoadFolderRetentions()
         public FolderNode FolderTree { get; set; } = new FolderNode(new FolderNodeDTO());
-        public RetentionTypes RetentionConfiguration { get; set; } = new RetentionTypes(new RetentionTypesDTO());
-        public List<PathProtectionDTO> Path_protections { get; set; } = new();
+        public RetentionTypes RetentionTypes { get; set; } = new RetentionTypes([]);
+        public List<PathProtectionDTO> PathProtections { get; set; } = new();
 
-        public PathProtectionDTO? Find_PathProtection_by_FolderId(int folder_id)
+        public PathProtectionDTO? FindPathProtectionByFolderId(int folder_id)
         {
-            return this.Path_protections.FirstOrDefault(r => r.Folder_Id == folder_id);
+            return this.PathProtections.FirstOrDefault(r => r.FolderId == folder_id);
         }
         public async Task LoadFolderRetentions()
         {
-            this.RetentionConfiguration = await GetRetentionOptionsAsync();
-            List<FolderNodeDTO> dto_folders = await API.Instance.GetFoldersByRootFolderId(this.Id);
-            this.Path_protections = await API.Instance.GetPathProtectionsByRootFolderId(this.Id);
-            if (dto_folders.Count == 0 || RetentionConfiguration.All_retentions.Count == 0)
+            List<RetentionTypeDTO> retentiontypes_dto = await Api.GetRootfolderRetentionTypesAsync(this.Id);
+            List<FolderNodeDTO> dto_folders = await Api.GetFoldersByRootFolderIdAsync(this.Id);
+            if (dto_folders.Count == 0 || retentiontypes_dto.Count == 0)
             {
-                throw new Exception($"unable to load foldertree or retention configuration. Folder count,retention type count {dto_folders.Count}, {RetentionConfiguration.All_retentions.Count}");
+                throw new Exception($"unable to load foldertree or retention configuration. Folder count,retention type count {dto_folders.Count}, {RetentionTypes.AllRetentions.Count}");
             }
+            this.RetentionTypes = new RetentionTypes(retentiontypes_dto);
+            this.PathProtections = await Api.GetPathProtectionsByRootFolderIdAsync(this.Id)??[];
 
             FolderTree = await ConstructFolderTreeFromNodes(this, dto_folders);
-        }
-        private async Task<RetentionTypes> GetRetentionOptionsAsync()
-        {
-            RetentionTypesDTO dto = await API.Instance.GetRootfolderRetentionTypes(this.Id);
-            return new RetentionTypes(dto);
         }
         public async Task UpdateAggregation()
         {
@@ -65,17 +64,17 @@ namespace VSM.Client.Datamodel
             // Build the tree structure
             foreach (var dto in dto_nodes)
             {
-                if (dto.Parent_Id == 0)
+                if (dto.ParentId == 0)
                 {
                     // This is the root node
                     continue;
                 }
-                else if (nodeLookup.TryGetValue(dto.Parent_Id, out var parentNode))
+                else if (nodeLookup.TryGetValue(dto.ParentId, out var parentNode))
                 {
                     parentNode.Children.Add(nodeLookup[dto.Id]);
                 }
             }
-            FolderNode root = nodeLookup[rootFolder.Folder_Id];
+            FolderNode root = nodeLookup[rootFolder.FolderId];
             await root.SetParentFolderLink();
             //print_folder_leaf_levels(root, 0);
             return root;
@@ -86,10 +85,15 @@ namespace VSM.Client.Datamodel
             FolderNode? current = folderNode.Parent;
             while (current != null && closest_path_protection == null)
             {
-                closest_path_protection = Path_protections.FirstOrDefault(r => r.Folder_Id == current.Id);
+                closest_path_protection = PathProtections.FirstOrDefault(r => r.FolderId == current.Id);
                 current = current.Parent;
             }
             return closest_path_protection;
+        }
+        public PathProtectionDTO? FindPathProtection(FolderNode folderNode)
+        {
+            PathProtectionDTO? path_protection  = PathProtections.FirstOrDefault(r => r.FolderId == folderNode.Id);
+            return path_protection;
         }
         void print_folder_leaf_levels(FolderNode folderNode, int level)
         {

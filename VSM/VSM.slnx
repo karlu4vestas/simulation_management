@@ -4,6 +4,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="VSM/VSM.csproj" />
   <Project Path="VSM.Client/VSM.Client.csproj" />
 </Solution>

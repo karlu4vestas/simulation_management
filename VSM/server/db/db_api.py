@@ -169,6 +169,19 @@ def read_folders( rootfolder_id: int ):
         return folders
 
 
+
+from datetime import datetime, timezone
+import zoneinfo
+
+def to_utc(dt, default_timezone="UTC"):
+    if dt is None:
+        return None
+    elif dt.tzinfo is None:
+        # Assign a timezone to naive datetime
+        tz = zoneinfo.ZoneInfo(default_timezone)
+        dt = dt.replace(tzinfo=tz)
+    return dt.astimezone(timezone.utc)
+
 def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> dtos.CleanupConfigurationDTO:
     with Session(Database.get_engine()) as session:
         rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
@@ -178,44 +191,40 @@ def get_cleanup_configuration_by_rootfolder_id(rootfolder_id: int)-> dtos.Cleanu
         cleanup_configuration = rootfolder.get_cleanup_configuration(session)
         if not cleanup_configuration:
             raise HTTPException(status_code=404, detail="cleanup_configuration not found")
-
+        cleanup_configuration.start_date = cleanup_configuration.start_date
     return cleanup_configuration
 
 #insert the cleanup configuration for a rootfolder and update the rootfolder to point to the cleanup configuration
 def insert_or_update_cleanup_configuration(rootfolder_id:int, cleanup_config: dtos.CleanupConfigurationDTO):
     if (rootfolder_id is None) or (rootfolder_id == 0):
         raise HTTPException(status_code=404, detail="You must provide a valid rootfolder_id to create a cleanup configuration")
-    existing_cleanup_cfg:dtos.CleanupConfigurationDTO = None
     with Session(Database.get_engine()) as session:
         #verify if the rootfolder already exists
         rootfolder:dtos.RootFolderDTO = session.exec(select(dtos.RootFolderDTO).where((dtos.RootFolderDTO.id == rootfolder_id))).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail=f"Failed to find rootfolder with id {rootfolder_id} to create a cleanup configuration")
 
-        existing_cleanup_cfg = rootfolder.get_cleanup_configuration(session)
-        #verify if a cleanup configuration already exists for this rootfolder
-        # existing_cleanup_config:dtos.CleanupConfigurationDTO = session.exec(select(dtos.CleanupConfigurationDTO).where((dtos.CleanupConfigurationDTO.rootfolder_id == rootfolder_id))).first()
-        # if existing_cleanup_config and (cleanup_config.id != existing_cleanup_config.id or cleanup_config.rootfolder_id != existing_cleanup_config.rootfolder_id) :
-        #     raise HTTPException(status_code=404, detail=f"There can only be one cleanupconfiguration for the rootfolder. Its id and rootfolder_id must match. existing cleanup id {rootfolder_id} new id {cleanup_config.id}")
+        existing_cleanup_cfg:dtos.CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
+        if existing_cleanup_cfg is None:
+            raise HTTPException(status_code=404, detail=f"Failed to find existing cleanup configuration for rootfolder with id {rootfolder_id} to update")
+        
         existing_cleanup_cfg.lead_time  = cleanup_config.lead_time
         existing_cleanup_cfg.frequency  = cleanup_config.frequency
-        existing_cleanup_cfg.start_date = datetime.fromisoformat(cleanup_config.start_date)
+        existing_cleanup_cfg.start_date = None if cleanup_config.start_date is None else datetime.fromisoformat(cleanup_config.start_date.replace("Z", "+00:00")) #datetime.fromisoformat(ts.replace("Z", "+00:00")) #cleanup_config.start_date #fastapi/pydantics handles the conversion 
         existing_cleanup_cfg.progress   = dtos.CleanupProgress.Progress.INACTIVE # any change to the cleanupå config resets progress to INACTIVE
-        
+
+
         # Import at runtime to avoid circular dependency
         from cleanup.scheduler import CleanupScheduler
-        CleanupScheduler.deactivate_calendar(existing_cleanup_cfg.rootfolder_id)
+        CleanupScheduler.deactivate_calendar(cleanup_config.rootfolder_id)
         
         session.add(existing_cleanup_cfg)
         session.commit()
-        #session.refresh(existing_cleanup_cfg)
-        #existing_rootfolder.cleanup_config_id = existing_cleanup_config.id
-        #session.add(existing_rootfolder)
-        #session.commit()
+        session.refresh(existing_cleanup_cfg)
 
-        #if (cleanup_config.id is None) or (cleanup_config.id == 0):
-        #    raise HTTPException(status_code=404, detail=f"Failed to provide cleanup configuration for rootfolder_id {rootfolder_id} with an id")
-        return existing_cleanup_cfg
+        cleanup_config.id       = existing_cleanup_cfg.id if existing_cleanup_cfg else None
+        cleanup_config.progress = existing_cleanup_cfg.progress        
+        return cleanup_config
     
 # def update_cleanup_configuration_by_rootfolder_id(rootfolder_id: int, cleanup_configuration: dtos.CleanupConfigurationDTO):
 #     #is_valid = cleanup_configuration.is_valid()
@@ -374,8 +383,11 @@ def add_pathprotection(rootfolder_id:int, path_protection:dtos.PathProtectionDTO
         
         session.add(new_protection)
         session.commit()
-        return {"id": new_protection.id,
-            "message": f"Path protection added id '{new_protection.id}' for path '{new_protection.path}'"}
+        session.refresh(new_protection)
+        path_protection.id = new_protection.id
+        path_protection.rootfolder_id = rootfolder_id
+
+        return path_protection
 
 def add_pathprotection_by_paths(rootfolder_id:int, paths:list[str]):
     # step 1: find the folder nodes by path
@@ -506,7 +518,7 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
             # Apply protection to matching folders
             for folder in matching_folders:
                 folder.retention_id = path_retention_id
-                folder.pathprotection_id = protection.id
+                folder.path_protection_id = protection.id
                 session.add(folder)
                 folders_modified += 1
         
@@ -526,14 +538,14 @@ def apply_pathprotections(rootfolder_id:int)-> dict[str, int]:
             select(dtos.FolderNodeDTO).where(
                 (dtos.FolderNodeDTO.rootfolder_id == rootfolder_id) &
                 (dtos.FolderNodeDTO.retention_id == path_retention_id) &
-                (dtos.FolderNodeDTO.pathprotection_id.notin_(valid_protection_ids))
+                (dtos.FolderNodeDTO.path_protection_id.notin_(valid_protection_ids))
             )
         ).all()
         
         # Reset these folders to undefined retention
         for folder in folders_to_reset:
             folder.retention_id = undefined_retention_id
-            folder.pathprotection_id = None
+            folder.path_protection_id = None
             session.add(folder)
             folders_reset += 1
         
@@ -598,23 +610,17 @@ def read_simulations_by_retention_type(rootfolder_id: int, retention_type: dtos.
         )
         
         if require_pathprotection:
-            query = query.where(dtos.FolderNodeDTO.pathprotection_id.isnot(None))
+            query = query.where(dtos.FolderNodeDTO.path_protection_id.isnot(None))
         
         folders = session.exec(query).all()
         return folders
 
-def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]):
+def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]) -> list[dtos.FolderRetention]:
     from datamodel.retentions import RetentionCalculator    
     with Session(Database.get_engine()) as session:
         rootfolder = session.exec(select(dtos.RootFolderDTO).where(dtos.RootFolderDTO.id == rootfolder_id)).first()
         if not rootfolder:
             raise HTTPException(status_code=404, detail="RootFolder not found")
-
-        #cleanup_config: CleanupConfigurationDTO = rootfolder.get_cleanup_configuration(session)
-        # the cleanup_round_start_date must be set for calculation of retention.expiration_date. It could make sens to set path retentions before the first cleanup round. 
-        # However, when a cleanup round is started they have time at "rootfolder.lead_time" to adjust retention
-        #if not cleanup_config.is_valid():
-        #    raise HTTPException(status_code=400, detail="The rootFolder's CleanupConfiguration is is missing frequency, cleanup_round_start_date or lead_time ")
 
         # Get retention types for calculations
         #retention_calculator: RetentionCalculator = RetentionCalculator(read_rootfolder_retentiontypes_dict(rootfolder_id), cleanup_config) 
@@ -624,7 +630,7 @@ def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]
         # Since RetentionUpdateDTO IS-A Retention, we can pass it directly to the calculator
         for retention in retentions:
             retention.update_retention_fields(
-                retention_calculator.adjust_expiration_date_from_cleanup_configuration_and_retentiontype(retention)
+                retention_calculator.adjust_expiration_date_from_cleanup_configuration_and_retentiontype(retention.getRetention())
             )
            
         # Prepare bulk update data - much more efficient than Python loops
@@ -633,16 +639,22 @@ def change_retentions(rootfolder_id: int, retentions: list[dtos.FolderRetention]
             {
                 "id": retention.folder_id,
                 "retention_id": retention.retention_id,
-                "pathprotection_id": retention.pathprotection_id,
+                "pathprotection_id": retention.path_protection_id,
                 "expiration_date": retention.expiration_date
             }
             for retention in retentions
         ]
         session.bulk_update_mappings(dtos.FolderNodeDTO, bulk_updates)
         session.commit()
+
+        #get all FolderNodeDTO that were updated
+        #updated_folders:list[dtos.FolderNodeDTO] = session.exec(
+        #    select(dtos.FolderNodeDTO).where(dtos.FolderNodeDTO.id.in_([retention.folder_id for retention in retentions]))
+        #).all()
+
+        #retentions: list[dtos.FolderRetention] = [dtos.FolderRetention.from_folder_node_dto(folder) for folder in updated_folders]    
         
-        #print(f"end changeretentions rootfolder_id{rootfolder_id} changing number of retention {len(retentions)}")
-        return {"message": f"Updated rootfolder {rootfolder_id} with {len(retentions)} retentions"}
+        return retentions
 
 # -------------------------- db operation related to cleanup_cycle action ---------
 def read_folders_marked_for_cleanup(rootfolder_id: int) -> list[dtos.FolderNodeDTO]:
@@ -784,7 +796,7 @@ def update_simulation_attributes_in_db_internal(session: Session, rootfolder: dt
             "modified_date": new_modified_date,
             "expiration_date": new_retention.expiration_date,
             "retention_id": new_retention.retention_id,
-            "pathprotection_id": new_retention.pathprotection_id
+            "pathprotection_id": new_retention.path_protection_id
         })
     
     # Execute bulk update

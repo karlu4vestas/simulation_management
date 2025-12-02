@@ -319,11 +319,11 @@ class TestCleanupWorkflows:
             
             # extract the number of protected folders from the database
             # select all folders under data_set.output.rootfolder with a pathprotection_id
-            folders_with_path_protection:list[FolderNodeDTO] = [ folder for folder in data_set.output.folders if folder.pathprotection_id is not None ]
+            folders_with_path_protection:list[FolderNodeDTO] = [ folder for folder in data_set.output.folders if folder.path_protection_id is not None ]
             #verify that they are all leafs
             assert all( folder.nodetype_id == data_set.nodetype_leaf for folder in folders_with_path_protection ), f"data_set.key={data_set.key}: Not all folders with pathprotection_id are leafs"
             # assert that the pathprotection_id is assigned for alle the folders
-            assert all( (folder.pathprotection_id is not None and folder.pathprotection_id !=0)  for folder in folders_with_path_protection ), f"data_set.key={data_set.key}: All folders with pathprotection_id must have it assigned"
+            assert all( (folder.path_protection_id is not None and folder.path_protection_id !=0)  for folder in folders_with_path_protection ), f"data_set.key={data_set.key}: All folders with pathprotection_id must have it assigned"
 
             #assert that the number of protected leafs is as expected
             assert len(folders_with_path_protection) == data_set.expected_protected_leaf_count, \
@@ -351,10 +351,10 @@ class TestCleanupWorkflows:
                 #   - unless the db folder is under a path retention
                 #   - unless the user have previously define a retention. This is not the case now because we just imported the simulations
                 if folder.retention_id == data_set.path_retention.id: #path protections take precedence
-                    assert folder.pathprotection_id is not None
+                    assert folder.path_protection_id is not None
                 else:
                     #so the retention must be numeric, clean, Issue or missing. verify that the pathprotection_id is None
-                    assert folder.pathprotection_id is None
+                    assert folder.path_protection_id is None
 
 
                     sim_retention_type_id: int | None = data_set.retention_calculator.to_internal_type_id(sim_folder.retention)
@@ -738,7 +738,7 @@ class TestCleanupWorkflows:
         assert sim_changed_by_import_ui.id not in [folder.id for folder in reduced_marked_folders], f"sim_changed_by_import_ui (id={sim_changed_by_import_ui.id}, {sim_changed_by_import_ui.path}) should not be in the reduced marked folders"
 
         pathprotected_folder_after_insert: FolderNodeDTO = db_api.read_folder(pathprotected_folder.id)
-        assert pathprotected_folder_after_insert.pathprotection_id is not None, \
+        assert pathprotected_folder_after_insert.path_protection_id is not None, \
             f"pathprotected_folder_after_insert (id={pathprotected_folder.id}, {pathprotected_folder.path}) should still be path protected but pathprotection_id is None"
         assert pathprotected_folder.retention_id == pathprotected_folder_after_insert.retention_id, \
             f"pathprotected_folder_after_insert (id={pathprotected_folder.id}, {pathprotected_folder.path}) retention_id should be unchanged but was {pathprotected_folder_after_insert.retention_id}"

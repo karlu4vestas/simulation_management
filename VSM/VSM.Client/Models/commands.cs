@@ -7,23 +7,7 @@ using VSM.Client.SharedAPI;
 /// to a server and have the server broadcast the changes to all clients - in this way we avoid sending the state changes of the folder
 /// Has to be validated that this will converge to the same state on all clients.
 /// </summary>
-public class CommandManager
-{
-    private static readonly Lazy<CommandManager> _instance = new Lazy<CommandManager>(() => new CommandManager());
-    // Prevent instantiation from outside
-    private CommandManager() { }
-    // Public static property to access the instance
-    public static CommandManager Instance => _instance.Value;
 
-    public void Add(Command command)
-    {
-        // Implementation for adding a command
-    }
-    public void Remove(Command command)
-    {
-        // Implementation for removing a command
-    }
-}
 //@todo we need for all commands to have a rollback option. That is we must implement as rollback function for all commands in order to reload data from server 
 public abstract class Command
 {
@@ -47,7 +31,7 @@ public abstract class Command
             bool result = await Apply();
             _wasSuccessful = result;
             wasSuccessful = result;
-            Log("Apply", wasSuccessful);
+            //Log("Apply", wasSuccessful);
             return result;
         }
         catch (Exception applyException)
@@ -77,8 +61,6 @@ public abstract class Command
             _isExecuting = false;
             // Call the abstract finally method with success status
             await OnFinally(wasSuccessful);
-            // Always ensure command is removed from manager after execution attempt
-            CommandManager.Instance.Remove(this);
         }
     }
 
@@ -111,18 +93,19 @@ public class UpdateCleanupConfigurationCmd : Command
     CleanupConfigurationDTO cleanup_configuration;
     RootFolder rootFolder;
     CleanupConfigurationDTO? original_cleanup_configuration;
-    public UpdateCleanupConfigurationCmd(RootFolder rootFolder, CleanupConfigurationDTO newCleanupConfiguration)
+    protected API Api { get; }
+    public UpdateCleanupConfigurationCmd(API api, RootFolder rootFolder, CleanupConfigurationDTO newCleanupConfiguration)
     {
+        Api = api;
         this.cleanup_configuration = newCleanupConfiguration;
         this.rootFolder = rootFolder;
-        CommandManager.Instance.Add(this);
     }
     public override async Task<bool> Apply()
     {
         // Store original state for rollback
         original_cleanup_configuration = rootFolder.CleanupConfiguration;
 
-        var updatedConfig = await API.Instance.UpdateCleanupConfigurationForRootFolder(this.rootFolder.Id, this.cleanup_configuration);
+        var updatedConfig = await Api.UpdateCleanupConfigurationForRootFolderAsync(this.rootFolder.Id, this.cleanup_configuration);
         if (updatedConfig != null)
         {
             rootFolder.CleanupConfiguration = updatedConfig;
@@ -139,7 +122,7 @@ public class UpdateCleanupConfigurationCmd : Command
         {
             rootFolder.CleanupConfiguration = original_cleanup_configuration;
             // Optionally restore on server too
-            // await API.Instance.UpdateCleanupConfigurationForRootFolder(rootFolder.Id, original_cleanup_configuration);
+            // await Api..UpdateCleanupConfigurationForRootFolder(rootFolder.Id, original_cleanup_configuration);
         }
         await Task.Delay(0);
         return true;
@@ -157,60 +140,63 @@ public class AddPathProtectionCmd : Command
 {
     public PathProtectionDTO? pathProtection = null;
     RootFolder rootFolder;
-    FolderNode folderNode;
-    public AddPathProtectionCmd(RootFolder rootFolder, FolderNode node)
+    FolderNode pathprotectionNode;
+    protected API Api { get; }
+    public AddPathProtectionCmd(API api, RootFolder rootFolder, FolderNode pathprotectionNode)
     {
-        this.folderNode = node;
+        Api = api;
+        this.pathprotectionNode = pathprotectionNode;
         this.rootFolder = rootFolder;
-        CommandManager.Instance.Add(this);
     }
     public override async Task<bool> Apply()
     {
-        int path_retentiontype_id = rootFolder.RetentionConfiguration.Path_retentiontype.Id;
-
-        PathProtectionDTO? parent_protection = rootFolder.FindClosestPathProtectedParent(folderNode);
+        int path_retentiontype_id = rootFolder.RetentionTypes.PathRetentionType.Id;
+        PathProtectionDTO? existing_pathprotection = rootFolder.FindPathProtection(pathprotectionNode);
+        if (existing_pathprotection != null){
+            // it already exists so nothing to add
+            return true; // already exists
+        }
+        PathProtectionDTO? parent_protection = rootFolder.FindClosestPathProtectedParent(pathprotectionNode);
         Retention? parent_path_retention = parent_protection == null ? null : new Retention(path_retentiontype_id, parent_protection.Id);
 
         PathProtectionDTO new_path_protection = new PathProtectionDTO
         {
-            Rootfolder_Id = folderNode.Rootfolder_Id,
-            Folder_Id = folderNode.Id,
-            Path = folderNode.FullPath
+            RootfolderId = pathprotectionNode.RootfolderId,
+            FolderId = pathprotectionNode.Id,
+            Path = pathprotectionNode.FullPath
         };
+        pathProtection = new_path_protection;
 
-        int? pathprotection_id = await API.Instance.AddPathProtectionByRootFolder(new_path_protection);
-        new_path_protection.Id = pathprotection_id == null ? 0 : pathprotection_id.Value;
-        if (pathprotection_id == null)
-        {
+        PathProtectionDTO pathprotection = await Api.AddPathProtectionByRootFolderAsync(new_path_protection);
+        if (pathprotection == null || pathprotection.Id == 0)
             throw new Exception("Failed to add path protection via API.");
+        else {
+            new_path_protection.Id = pathprotection.Id;            
+            rootFolder.PathProtections.Add(new_path_protection);
+
+            Retention new_path_retention = new Retention(path_retentiontype_id,  new_path_protection.Id);
+            List<FolderRetention> retentionUpdates;
+            if (parent_path_retention != null)
+                retentionUpdates = await pathprotectionNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
+            else
+                retentionUpdates = await pathprotectionNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
+
+            List<FolderRetention> result = await Api.UpdateRootFolderRetentionsAsync(rootFolder.Id, retentionUpdates);
+            if (result==null)
+                throw new Exception("AddPathProtectionCmd:Failed to update retentions via API.");
+
+            return true ;
         }
-        this.pathProtection = new_path_protection;
-        rootFolder.Path_protections.Add(this.pathProtection);
-
-        Retention new_path_retention = new Retention(path_retentiontype_id, this.pathProtection.Id);
-        List<RetentionUpdateDTO> retentionUpdates = new List<RetentionUpdateDTO>();
-        if (parent_path_retention != null)
-            retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionToParentPathProtectionDelegate(parent_path_retention, new_path_retention));
-        else
-            retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new AddPathProtectionOnMixedSubtreesDelegate(new_path_retention));
-
-        bool result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
-        if (!result)
-        {
-            throw new Exception("AddPathProtectionCmd:Failed to update retentions via API.");
-        }
-
-        return result;
     }
     public override async Task<bool> Rollback()
     {
         if (pathProtection != null)
         {
             // Remove from client state
-            rootFolder.Path_protections.RemoveAll(p => p.Id == pathProtection.Id);
+            rootFolder.PathProtections.RemoveAll(p => p.Id == pathProtection.Id);
 
             // Remove from server
-            await API.Instance.DeletePathProtectionByRootFolderAndPathProtection(rootFolder.Id, pathProtection.Id);
+            await Api.DeletePathProtectionByRootFolderAndPathProtectionAsync(rootFolder.Id, pathProtection.Id);
 
             // Update aggregation
             await rootFolder.UpdateAggregation();
@@ -219,8 +205,10 @@ public class AddPathProtectionCmd : Command
     }
     protected override async Task OnFinally(bool wasSuccessful)
     {
+        //Console.WriteLine($"AddPathProtectionCmd OnFinally entry . Success: {wasSuccessful}");
         // Always update aggregation regardless of success/failure
         await rootFolder.UpdateAggregation();
+        //Console.WriteLine($"AddPathProtectionCmd OnFinally exit . Success: {wasSuccessful}");
     }
     protected override void Log(string action, bool wasSuccessful)
     {
@@ -228,11 +216,11 @@ public class AddPathProtectionCmd : Command
 
         if (action == "Apply" && wasSuccessful && pathProtection != null)
         {
-            Console.WriteLine($"Added PathProtection ID: {pathProtection.Id} for Folder ID: {pathProtection.Folder_Id}");
+            //Console.WriteLine($"Added PathProtection ID: {pathProtection.Id} for Folder ID: {pathProtection.FolderId}");
         }
         else if (action == "Apply" && !wasSuccessful)
         {
-            Console.WriteLine($"Error: Failed to create path protection for folder {folderNode.Name} ({folderNode.FullPath})");
+            Console.WriteLine($"Error: Failed to create path protection for folder {pathprotectionNode.Name} ({pathprotectionNode.FullPath})");
         }
     }
 }
@@ -243,14 +231,15 @@ public class RemovePathProtectionCmd : Command
 {
     public int remove_count = 0;
     RootFolder rootFolder;
-    FolderNode folderNode;
+    FolderNode pathprotectionNode;
     int to_retention_Id;
-    public RemovePathProtectionCmd(RootFolder rootFolder, FolderNode folderNode, int to_retention_Id)
+    protected API Api { get; }
+    public RemovePathProtectionCmd(API api, RootFolder rootFolder, FolderNode pathprotectionNode, int to_retention_Id)
     {
-        this.folderNode = folderNode;
+        Api = api;
+        this.pathprotectionNode = pathprotectionNode;
         this.rootFolder = rootFolder;
         this.to_retention_Id = to_retention_Id;
-        CommandManager.Instance.Add(this);
     }
     public override async Task<bool> Apply()
     {
@@ -262,47 +251,45 @@ public class RemovePathProtectionCmd : Command
         //         else  
         //            -then set the retention of leaves under this node to (path protection type,  from_path_protectection.Id).
         //         In this way we do not touch path protection of other children.
-        int path_retentiontype_id = rootFolder.RetentionConfiguration.Path_retentiontype.Id;
+        int path_retentiontype_id = rootFolder.RetentionTypes.PathRetentionType.Id;
 
-        PathProtectionDTO? from_path_protection = rootFolder.Path_protections.FirstOrDefault(p => p.Folder_Id == folderNode.Id);
+        PathProtectionDTO? from_path_protection = rootFolder.PathProtections.FirstOrDefault(p => p.FolderId == pathprotectionNode.Id);
         if (from_path_protection == null)
             throw new ArgumentException("Invalid new path protection folder specified.");
+        else{
+            Retention from_path_retention = new Retention(path_retentiontype_id, from_path_protection.Id);
 
-        PathProtectionDTO valid_from_path_protection = from_path_protection; //get rid of these null warnings
+            // check for the presence of a parent of path_protection_folder before choosing the to_retention
+            PathProtectionDTO? parent_path_protection = rootFolder.FindClosestPathProtectedParent(pathprotectionNode);
+            Retention to_retention = parent_path_protection == null ? new Retention(to_retention_Id) : new Retention(path_retentiontype_id, parent_path_protection.Id);
 
-        // check for the presence of a parent of path_protection_folder
-        PathProtectionDTO? parent_path_protection = rootFolder.FindClosestPathProtectedParent(folderNode);
-        Retention to_retention = parent_path_protection == null ? new Retention(to_retention_Id) : new Retention(path_retentiontype_id, parent_path_protection.Id);
+            //change retention of client. Maybe we shoudl do this after server update instead?
+            remove_count = rootFolder.PathProtections.RemoveAll(p => p.FolderId == pathprotectionNode.Id);
+            List<FolderRetention> retentionUpdates = await pathprotectionNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_retention));
 
-        Retention from_path_retention = new Retention(path_retentiontype_id, valid_from_path_protection.Id);
+            //change retention on server. by removing the path protection first and then updating the retentions
+            bool result = await Api.DeletePathProtectionByRootFolderAndPathProtectionAsync(rootFolder.Id, from_path_protection.Id);
+            if (!result)
+                throw new Exception("Failed to delete path protection via API.");
+            
+            List<FolderRetention> retention_results = await Api.UpdateRootFolderRetentionsAsync(rootFolder.Id, retentionUpdates);
+            if (retention_results==null)
+                throw new Exception("RemovePathProtectionCmd: Failed to update retentions via API.");
 
-        //change of client
-        remove_count = rootFolder.Path_protections.RemoveAll(p => p.Folder_Id == folderNode.Id);
-        List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(from_path_retention, to_retention));
-
-        //change on server
-        bool result = await API.Instance.DeletePathProtectionByRootFolderAndPathProtection(rootFolder.Id, valid_from_path_protection.Id);
-        if (!result)
-        {
-            throw new Exception("Failed to delete path protection via API.");
+            return true;
         }
-        result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
-        if (!result)
-        {
-            throw new Exception("RemovePathProtectionCmd: Failed to update retentions via API.");
-        }
-
-        return remove_count != 0;
     }
 
     protected override async Task OnFinally(bool wasSuccessful)
     {
-        // Move the existing finally logic here
+        //Console.WriteLine($"RemovePathProtectionCmd OnFinally entry . Success: {wasSuccessful}");
+        // Always update aggregation regardless of success/failure
         await rootFolder.UpdateAggregation();
+        //Console.WriteLine($"RemovePathProtectionCmd OnFinally exit . Success: {wasSuccessful}");
     }
     public override async Task<bool> Rollback()
     {
-        Console.WriteLine("Rollback of RemovePathProtectionCmd not implemented");
+        //Console.WriteLine("Rollback of RemovePathProtectionCmd not implemented");
         await Task.Delay(0);
         return true;
     }
@@ -312,11 +299,11 @@ public class RemovePathProtectionCmd : Command
 
         if (action == "Apply" && wasSuccessful)
         {
-            Console.WriteLine($"Removed PathProtection for Folder: {folderNode.FullPath}");
+            //Console.WriteLine($"Removed PathProtection for Folder: {pathprotectionNode.FullPath}");
         }
         else if (action == "Apply" && !wasSuccessful)
         {
-            Console.WriteLine($"Error: Failed to remove path protection for folder {folderNode.FullPath}");
+            Console.WriteLine($"Error: Failed to remove path protection for folder {pathprotectionNode.FullPath}");
         }
     }
 }
@@ -330,36 +317,37 @@ public class ChangeRetentionsCmd : Command
     FolderNode folderNode;
     int from_retention_Id;
     int to_retention_Id;
-    public ChangeRetentionsCmd(RootFolder rootFolder, FolderNode folderNode, int from_retention_Id, int to_retention_Id)
+    protected API Api { get; }
+    public ChangeRetentionsCmd(API api, RootFolder rootFolder, FolderNode folderNode, int from_retention_Id, int to_retention_Id)
     {
+        Api = api;
         this.rootFolder = rootFolder;
         this.folderNode = folderNode;
         this.from_retention_Id = from_retention_Id;
         this.to_retention_Id = to_retention_Id;
-        CommandManager.Instance.Add(this);
     }
 
     public override async Task<bool> Apply()
     {
-        List<RetentionUpdateDTO> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(new Retention(from_retention_Id), new Retention(to_retention_Id)));
+        List<FolderRetention> retentionUpdates = await folderNode.ChangeRetentionsOfSubtree(new ChangeOnFullmatchDelegate(new Retention(from_retention_Id), new Retention(to_retention_Id)));
 
-        bool result = await API.Instance.UpdateRootFolderRetentions(rootFolder.Id, retentionUpdates);
-        if (!result)
-        {
+        List<FolderRetention> results = await Api.UpdateRootFolderRetentionsAsync(rootFolder.Id, retentionUpdates);
+        if (results==null)
             throw new Exception("ChangeRetentionId2IdCmd: Failed to update retentions via API.");
-        }
 
-        return result;
+        return results!=null;
     }
 
     protected override async Task OnFinally(bool wasSuccessful)
     {
+        //Console.WriteLine($"ChangeRetentionsCmd OnFinally entry . Success: {wasSuccessful}");
         // Move the existing finally logic here
         await rootFolder.UpdateAggregation();
+        //Console.WriteLine($"ChangeRetentionsCmd OnFinally exit . Success: {wasSuccessful}");
     }
     public override async Task<bool> Rollback()
     {
-        Console.WriteLine("Rollback of ChangeRetentionsCmd not implemented");
+        //Console.WriteLine("Rollback of ChangeRetentionsCmd not implemented");
         await Task.Delay(0);
         return true;
     }
@@ -369,7 +357,7 @@ public class ChangeRetentionsCmd : Command
 
         if (action == "Apply" && wasSuccessful)
         {
-            Console.WriteLine($"ChangeRetentionsCmd: {from_retention_Id} to {to_retention_Id}");
+            //Console.WriteLine($"ChangeRetentionsCmd: {from_retention_Id} to {to_retention_Id}");
         }
         else if (action == "Apply" && !wasSuccessful)
         {

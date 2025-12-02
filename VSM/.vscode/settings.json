@@ -1,27 +1,4 @@
 {
-    // Port forwarding configuration for VSM frontend
-    "remote.portsAttributes": {
-        "5000": {
-            "label": "VSM Development Server",
-            "onAutoForward": "notify",
-            "protocol": "http"
-        },
-        "5001": {
-            "label": "VSM HTTPS Server",
-            "onAutoForward": "notify",
-            "protocol": "https"
-        },
-    },
-    "remote.autoForwardPorts": true,
-    "remote.autoForwardPortsSource": "hybrid",
-    "dotnet.defaultSolution": "VSM.slnx",
-    "omnisharp.enableRoslynAnalyzers": true,
-    "omnisharp.enableEditorConfigSupport": true,
-    "csharp.format.enable": true,
-    "editor.formatOnSave": true,
-    "[csharp]": {
-        "editor.defaultFormatter": "ms-dotnettools.csharp"
-    },
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
     "python.analysis.extraPaths": [
         "${workspaceFolder}/.venv/lib/python3.11/site-packages"

@@ -231,7 +231,7 @@ class RetentionCalculator:
         # Initialize with existing values
         new_retention = Retention(
             retention_id=db_retention.retention_id,
-            pathprotection_id=db_retention.pathprotection_id,
+            path_protection_id=db_retention.path_protection_id,
             expiration_date=db_retention.expiration_date
         )
         new_modified_date = db_modified_date

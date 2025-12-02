@@ -1,12 +1,67 @@
 using System;
+using System.Text.Json.Serialization;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace VSM.Client.Datamodel
 {
+    public class SimulationDomainDTO
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+    public class CleanupFrequencyDTO
+    {
+        public int Id { get; set; }
+        public int SimulationdomainId { get; set; }
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+    public class LeadTimeDTO
+    {
+        public int Id { get; set; }
+        public int SimulationdomainId { get; set; }
+        public string Name { get; set; } = "";
+        public int Days { get; set; }
+    }
+    public class CleanupConfigurationDTO
+    {
+        public int Id { get; set; } = 0;
+        public int RootfolderId { get; set; } = 0;
+        public int LeadTime { get; set; } = 0;
+        public int Frequency { get; set; } = 0;
+        public DateTime? StartDate { get; set; } = new DateTime(); // nullable DateTime to match server nullable datetime
+        public string Progress { get; set; } = "";
+        /// Return true if cleanup can be started with this configuration
+        public bool IsValid() { return Frequency > 0 && LeadTime > 0;}// && StartDate != null; }
+    }
 
+    public class FolderNodeDTO
+    {
+        public int Id { get; set; }
+        public int RootfolderId { get; set; }
+        public int ParentId { get; set; } = 0; // Default to 0, indicating no parent
+        public string Name { get; set; } = "";
+        //public int NodeTypeId { get; set; } = 0;           //could be byte
+        public int RetentionId { get; set; } = 0;          //could be byte
+        public int PathProtectionId { get; set; } = 0;     //could be byte
+    }
 
-    /// <summary>
+    // NodeAttributesDTO is only used for nodes with metadata. Most nodes is just an organization of subfolders and will not contain other metadata
+    public class RootFolderDTO
+    {
+        public int Id { get; set; } = 0; //ID of this DTO
+        public int SimulationdomainId { get; set; } = 0; //Id of the simulation domain this rootfolder belongs to
+        public int FolderId { get; set; } = 0; //Id to folder' FolderNodeDTO. unit24 would be sufficient
+        public string StorageId { get; set; } = "local"; // storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system.
+        public string Owner { get; set; } = ""; // the initials of the owner
+        public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
+        public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
+        public int? CleanupConfigId { get; set; } = null; // foreign key to CleanupConfigurationDTO
+    }
+
+    /*/// <summary>
     /// Enumeration of legal folder type names for simulation domains.
     /// 'innernode' must exist for all domains and will be applied to all folders that are not simulations.
     /// </summary>
@@ -17,148 +72,91 @@ namespace VSM.Client.Datamodel
             INNERNODE,
             VTS_SIMULATION
         }
-
         public static readonly Dictionary<Types, string> StringValues = new()
         {
             { Types.INNERNODE, "innernode" },
             { Types.VTS_SIMULATION, "vts_simulation" }
         };
-
         // Direct access properties
         public static string INNERNODE => StringValues[Types.INNERNODE];
         public static string VTS_SIMULATION => StringValues[Types.VTS_SIMULATION];
-
         public static string GetStringValue(Types folderType)
         {
             return StringValues.TryGetValue(folderType, out var value) ? value : folderType.ToString().ToLower();
         }
     }
 
-    public class SimulationDomainDTO
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-    }
-    public class CleanupFrequencyDTO
-    {
-        public int Id { get; set; }
-        public int simulationdomain_id { get; set; }
-        public string Name { get; set; } = "";
-        public int Days { get; set; }
-    }
-    public class LeadTimeDTO
-    {
-        public int Id { get; set; }
-        public int simulationdomain_id { get; set; }
-        public string Name { get; set; } = "";
-        public int Days { get; set; }
-    }
-    public class CleanupConfigurationDTO
-    {
-        public int Id { get; set; } = 0;
-        public int Rootfolder_id { get; set; } = 0;
-        public int Lead_time { get; set; } = 0;
-        public int Frequency { get; set; } = 0;
-        public DateTime? Start_date { get; set; } = null;
-        public string Progress { get; set; } = "";
-        /// Return true if cleanup can be started with this configuration
-        public bool IsValid { get { return Frequency > 0 && Lead_time > 0 && Start_date != null; } }
-    }
-
-    public class FolderNodeDTO
-    {
-        public int Id { get; set; }
-        public int Rootfolder_Id { get; set; }
-        public int Parent_Id { get; set; } = 0; // Default to 0, indicating no parent
-        public string Name { get; set; } = "";
-        public int Type_Id { get; set; } = 0;               //should be byte
-        public int Retention_Id { get; set; } = 0;          //should be byte
-        public int Path_Protection_Id { get; set; } = 0;    //should be byte
-        public string? Retention_Date { get; set; } = null;
-        public string? Modified { get; set; } = null;
-    }
-
-    // NodeAttributesDTO is only used for nodes with metadata. Most nodes is just an organization of subfolders and will not contain other metadata
-    public class RootFolderDTO
-    {
-        public int Id { get; set; } = 0; //ID of this DTO
-        public int Simulationdomain_Id { get; set; } = 0; //Id of the simulation domain this rootfolder belongs to
-        public int Folder_Id { get; set; } = 0; //Id to folder' FolderNodeDTO. unit24 would be sufficient
-        public string Storage_Id { get; set; } = "local"; // storage identifier that will be used by the scan and cleanup agents to pick tasks for their local system.
-        public string Owner { get; set; } = ""; // the initials of the owner
-        public string Approvers { get; set; } = ""; // the initials of the approvers (co-owners)
-        public string Path { get; set; } = ""; // like /parent/folder. parent would most often be a domain url
-        public int? Cleanup_Config_Id { get; set; } = null; // foreign key to CleanupConfigurationDTO
-    }
-
-    // so far we know: 
-    // InnerNode, 
-    // VTSSimulation, which is currently a LeafNode but that might change
     public class FolderTypeDTO
     {
         public byte Id { get; set; }
         public string Name { get; set; } = "";
-    }
+    }*/
     public class RetentionTypeDTO
     {
-        public byte Id { get; set; }
+        public int Id { get; set; }
         public string Name { get; set; } = "";
         public bool IsEndStage { get; set; } = false;
-        public byte DisplayRank { get; set; } = 0;
+        public int DisplayRank { get; set; } = 0;
     }
 
     public class PathProtectionDTO
     {
         public int Id { get; set; }
-        public int Rootfolder_Id { get; set; }
-        public int Folder_Id { get; set; }
+        public int RootfolderId { get; set; }
+        public int FolderId { get; set; }
         public string Path { get; set; } = "";
     }
-    public class RetentionTypesDTO
-    {
-        public RetentionTypesDTO(List<RetentionTypeDTO>? all_retentions = null)
-        {
-            if (all_retentions != null)
-                this.All_retentions = all_retentions;
-            this.Path_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("path", StringComparison.OrdinalIgnoreCase)) ?? this.Path_retention;
-            this.Cleaned_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("cleaned", StringComparison.OrdinalIgnoreCase)) ?? this.Cleaned_retention;
-            this.Issue_retention = this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)) ?? this.Issue_retention;
-        }
-        public List<RetentionTypeDTO> All_retentions = new();
-        public RetentionTypeDTO Path_retention = new();
-        public RetentionTypeDTO Cleaned_retention = new();
-        public RetentionTypeDTO Issue_retention = new();
-    }
 
-    //@todo: convert from the DTOs
     public class RetentionTypes
     {
-        RetentionTypesDTO dto;
-        public RetentionTypes(RetentionTypesDTO dto)
+        public RetentionTypes(List<RetentionTypeDTO>? all_retentions)
         {
-            this.dto = dto;
-            //the list of dropdown retentions is equal to retentionOptions except for the issue and cleaned retention value
-            this.Target_retentions = this.All_retentions.Where(r => !r.Name.Contains("clean", StringComparison.OrdinalIgnoreCase) &&
-                                                                    !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase)).ToList() ?? this.Target_retentions;
+            this.AllRetentions = all_retentions ?? new List<RetentionTypeDTO>();
+
+            this.PathRetentionType = this.AllRetentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("path", StringComparison.OrdinalIgnoreCase)) ?? new RetentionTypeDTO();
+            this.CleanedRetentionType = this.AllRetentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("clean", StringComparison.OrdinalIgnoreCase)) ?? new RetentionTypeDTO();
+            this.IssueRetentionType = this.AllRetentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase))?? new RetentionTypeDTO();
+
+            // the list of dropdown retentions is equal to retentionOptions except for the following retention values
+            this.TargetRetentions = this.AllRetentions.Where(r => !string.IsNullOrEmpty(r.Name) &&
+                                                                  !r.Name.Contains("clean", StringComparison.OrdinalIgnoreCase) &&
+                                                                  !r.Name.Contains("issue", StringComparison.OrdinalIgnoreCase) &&
+                                                                  !r.Name.Contains("missing", StringComparison.OrdinalIgnoreCase) ).ToList();
         }
-        public List<RetentionTypeDTO> All_retentions => dto.All_retentions;
-        public List<RetentionTypeDTO> Target_retentions = new();
-        public RetentionTypeDTO Path_retentiontype => dto.Path_retention;
-        public RetentionTypeDTO Cleaned_retentiontype => dto.Cleaned_retention;
-        public RetentionTypeDTO Issue_retentiontype => dto.Issue_retention;
-        public RetentionTypeDTO? Find_by_Name(string name)
+
+        public List<RetentionTypeDTO> AllRetentions { get; protected set; }
+        public List<RetentionTypeDTO> TargetRetentions { get; protected set; }
+        public RetentionTypeDTO PathRetentionType { get; protected set; }
+        public RetentionTypeDTO CleanedRetentionType { get; protected set; }
+        public RetentionTypeDTO IssueRetentionType { get; protected set; }
+        public RetentionTypeDTO? FindByName(string name)
         {
-            return this.All_retentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(name))
+            {
+                Console.WriteLine("FindByName called with null or empty name");
+                return null;
+            }
+            return this.AllRetentions.FirstOrDefault(r => !string.IsNullOrEmpty(r.Name) && r.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
         }
-        public RetentionTypeDTO? Find_by_Id(int id)
+        public RetentionTypeDTO? FindById(int id)
         {
-            return this.All_retentions.FirstOrDefault(r => r.Id == id);
+            RetentionTypeDTO? ret = this.AllRetentions.FirstOrDefault(r => r.Id == id);
+            if (ret == null)
+            {
+                Console.WriteLine($"FindById did not find retention with id: {id}");
+            }
+            else
+            {
+                //Console.WriteLine($"FindById found retention with id: {id}, name: {ret.Name}");
+            }
+            return ret;
         }
     }
-    public class RetentionUpdateDTO
+    public class FolderRetention
     {
-        public required int Folder_id { get; set; }
-        public required int Retention_id { get; set; }
-        public required int Pathprotection_id { get; set; }
+        public required int FolderId { get; set; }
+        public required int RetentionId { get; set; }
+        public required int PathProtectionId { get; set; }
+        //public DateTime? ExpirationDate{ get; set; }= null;
     }
 }
